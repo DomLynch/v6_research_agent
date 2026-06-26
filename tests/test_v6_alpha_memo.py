@@ -577,6 +577,31 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage(coverage
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
 
 
+def test_fullraw_client_preserves_coverage_trace_when_sweep_wait_expires() -> None:
+    payloads: list[dict[str, object]] = []
+    body = {
+        "error": "coverage_too_narrow",
+        "shard_receipt": {"shards_searched": 0, "shards_total": 1525},
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        payloads.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        raise HTTPError(request.full_url, 422, "Unprocessable Entity", Message(), BytesIO(json.dumps(body).encode()))
+
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=opener,
+        sweep_wait_seconds=0.02,
+        sweep_poll_seconds=0.01,
+    )
+    result = client.search("abc", limit=1)
+
+    assert payloads[1].get("cache_only") is True
+    assert result.receipt.error == "coverage_too_narrow"
+    assert result.receipt.shards_total == 1525
+
+
 def test_writer_stays_receipt_owned() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
     memo = render_memo(run.top_pairs[0])

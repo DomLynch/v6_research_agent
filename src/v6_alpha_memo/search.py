@@ -156,7 +156,7 @@ class FullrawSearchClient:
                 raise
             cached = self._wait_for_sweep_hit(search_url, payload, headers)
             if cached is None:
-                raise
+                return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0))
             data = cached
         parsed: list[Paper] = []
         for item in _items(data):
@@ -370,7 +370,7 @@ def _receipt(data: object, *, hits: int) -> CoverageReceipt:
         return CoverageReceipt(hits=hits)
     meta = data.get("meta")
     meta = meta if isinstance(meta, dict) else {}
-    shard = meta.get("shard_receipt")
+    shard = meta.get("shard_receipt") or data.get("shard_receipt")
     shard = shard if isinstance(shard, dict) else {}
     return CoverageReceipt(
         hits=hits,
@@ -380,6 +380,7 @@ def _receipt(data: object, *, hits: int) -> CoverageReceipt:
         papers_total=_int(shard.get("papers_total")) or 0,
         sources_searched=_sources(shard.get("sources_searched")),
         partial=bool(shard.get("partial_shard_search") or meta.get("partial")),
+        error=_clean(data.get("error"), limit=200),
     )
 
 
