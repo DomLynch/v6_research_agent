@@ -48,7 +48,7 @@ class NoMemoError(RuntimeError):
 
 
 class SearchClient(Protocol):
-    def search(self, query: str, *, limit: int = 25) -> SearchResult:
+    def search(self, query: str, *, limit: int = 5) -> SearchResult:
         ...
 
 
@@ -57,7 +57,7 @@ def build_memo(
     *,
     client: SearchClient,
     query_limit: int = 8,
-    per_query_limit: int = 20,
+    per_query_limit: int = 5,
     writer: str = "template",
 ) -> V6Run:
     results = tuple(
@@ -96,7 +96,7 @@ def main() -> None:
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--writer", choices=["template", "minimax"], default="template")
     parser.add_argument("--queries", type=int, default=8)
-    parser.add_argument("--limit", type=int, default=20)
+    parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--trace", action="store_true")
     args = parser.parse_args()
 
@@ -134,10 +134,12 @@ def _trace(
         "coverage": [
             {
                 "hits": result.receipt.hits,
+                "async_status": result.receipt.async_status,
                 "shards_searched": result.receipt.shards_searched,
                 "shards_total": result.receipt.shards_total,
                 "sweep_failed_shards": result.receipt.sweep_failed_shards,
                 "sources_searched": result.receipt.sources_searched,
+                "source_count_searched": result.receipt.source_count_searched,
                 "papers_searched": result.receipt.papers_searched,
                 "partial": result.receipt.partial,
                 "error": result.receipt.error,
@@ -159,7 +161,7 @@ def _trace(
 
 
 class DemoClient(SearchClient):
-    def search(self, query: str, *, limit: int = 25) -> SearchResult:
+    def search(self, query: str, *, limit: int = 5) -> SearchResult:
         del limit
         papers = _demo_papers(query)
         receipt = CoverageReceipt(

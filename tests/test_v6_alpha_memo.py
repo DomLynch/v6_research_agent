@@ -104,6 +104,9 @@ def test_demo_run_outputs_required_memo_and_trace() -> None:
     assert "**Receipt 1:**" in run.memo
     assert run.top_pairs[0].score >= 85
     assert run.trace["top_pairs"]
+    coverage = cast(list[dict[str, object]], run.trace["coverage"])
+    assert "async_status" in coverage[0]
+    assert "source_count_searched" in coverage[0]
 
 
 def test_scores_translation_boundary_without_reversal() -> None:
@@ -317,6 +320,7 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
 
     assert result.receipt.hits == 1
     assert result.receipt.shards_searched == 965
+    assert result.receipt.source_count_searched == 2
     assert "openalex" in result.receipt.sources_searched
     assert result.papers[0].doi == "10.test/metformin"
 
@@ -325,10 +329,12 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
     calls: list[tuple[str, dict[str, object], dict[str, str]]] = []
     payload: dict[str, object] = {
         "meta": {
+            "async_sweep": {"status": "hit"},
             "shard_receipt": {
                 "shards_searched": 1525,
                 "shards_total": 1525,
                 "sweep_failed_shards": 0,
+                "source_count_searched": 5,
                 "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "biorxiv": 1, "semantic_scholar_abstracts": 1},
                 "partial_shard_search": False,
             }
@@ -365,7 +371,7 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
         "_post",
         fake_post,
     )
-    result = FullrawSearchClient.from_env().search("glynac", limit=1)
+    result = FullrawSearchClient.from_env().search("glynac")
     papers = (
         Paper(
             "positive",
@@ -383,7 +389,10 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
     assert calls[0][1]["cache_only"] is True
     assert calls[0][1]["queue_if_missing"] is True
     assert calls[0][1]["rank_mode"] == "relevance"
+    assert calls[0][1]["limit"] == 5
     assert calls[0][2]["Authorization"] == "Bearer index-token"
+    assert result.receipt.async_status == "hit"
+    assert result.receipt.source_count_searched == 5
     assert scored and scored[0].shape == "subgroup_endpoint_split"
 
 
@@ -649,7 +658,37 @@ def test_fullraw_client_reports_async_running_state() -> None:
     result = client.search("abc", limit=1)
 
     assert result.receipt.shards_total == 1525
+    assert result.receipt.async_status == "running"
     assert result.receipt.partial is True
+    assert result.receipt.error == "async_sweep_running"
+
+
+def test_fullraw_client_requires_async_hit_for_complete_coverage() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "running"},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "biorxiv": 1, "semantic_scholar_abstracts": 1},
+                "partial_shard_search": False,
+            },
+        },
+        "results": [{"title": "Complete-looking but still running", "abstract": "Do not trust yet.", "source": "openalex"}],
+    }
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        token="token",
+        opener=_fake_opener(payload),
+        require_complete=True,
+    )
+
+    result = client.search("resveratrol", limit=5)
+
+    assert result.papers == ()
+    assert result.receipt.async_status == "running"
     assert result.receipt.error == "async_sweep_running"
 
 

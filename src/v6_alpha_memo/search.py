@@ -51,12 +51,14 @@ class Paper:
 @dataclass(frozen=True, slots=True)
 class CoverageReceipt:
     hits: int = 0
+    async_status: str = ""
     shards_searched: int = 0
     shards_total: int = 0
     sweep_failed_shards: int = 0
     papers_searched: int = 0
     papers_total: int = 0
     sources_searched: tuple[str, ...] = ()
+    source_count_searched: int = 0
     partial: bool = False
     error: str = ""
 
@@ -126,7 +128,7 @@ class FullrawSearchClient:
             require_complete=os.environ.get("V6_FULLRAW_REQUIRE_COMPLETE", "1") != "0",
         )
 
-    def search(self, query: str, *, limit: int = 25) -> SearchResult:
+    def search(self, query: str, *, limit: int = 5) -> SearchResult:
         if not self.search_urls:
             raise RuntimeError("V6_FULLRAW_SEARCH_URL is required")
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
@@ -259,12 +261,13 @@ def _is_transient_connection_error(exc: BaseException) -> bool:
 
 
 def _coverage_complete(receipt: CoverageReceipt) -> bool:
-    required_shards = max(_FULLRAW_REQUIRED_SHARDS, receipt.shards_total)
     return (
-        receipt.shards_searched >= required_shards
+        receipt.async_status == "hit"
+        and receipt.shards_searched == _FULLRAW_REQUIRED_SHARDS
+        and receipt.shards_total == _FULLRAW_REQUIRED_SHARDS
         and not receipt.partial
         and receipt.sweep_failed_shards == 0
-        and len(receipt.sources_searched) >= _FULLRAW_REQUIRED_SOURCES
+        and receipt.source_count_searched >= _FULLRAW_REQUIRED_SOURCES
     )
 
 
@@ -383,16 +386,20 @@ def _receipt(data: object, *, hits: int) -> CoverageReceipt:
     shard = meta.get("shard_receipt") or data.get("shard_receipt")
     shard = shard if isinstance(shard, dict) else {}
     async_status = _clean(sweep.get("status"), limit=80)
+    sources = _sources(shard.get("sources_searched"))
+    source_count = _int(shard.get("source_count_searched")) or len(sources)
     return CoverageReceipt(
         hits=hits,
+        async_status=async_status,
         shards_searched=_int(shard.get("shards_searched")) or 0,
         shards_total=_int(shard.get("shards_total") or sweep.get("shard_limit")) or 0,
         sweep_failed_shards=_int(shard.get("sweep_failed_shards") or shard.get("failed_shards")) or 0,
         papers_searched=_int(shard.get("papers_searched")) or 0,
         papers_total=_int(shard.get("papers_total")) or 0,
-        sources_searched=_sources(shard.get("sources_searched")),
+        sources_searched=sources,
+        source_count_searched=source_count,
         partial=bool(shard.get("partial_shard_search") or meta.get("partial") or async_status in {"queued", "running", "busy"}),
-        error=_clean(data.get("error"), limit=200) or (f"async_sweep_{async_status}" if async_status else ""),
+        error=_clean(data.get("error"), limit=200) or (f"async_sweep_{async_status}" if async_status and async_status != "hit" else ""),
     )
 
 
