@@ -498,7 +498,8 @@ def test_fullraw_client_falls_back_to_second_endpoint() -> None:
     assert result.papers[0].title == "Metformin blunted exercise adaptation"
 
 
-def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> None:
+@pytest.mark.parametrize("coverage_error", ["shard coverage incomplete", "coverage_too_narrow"])
+def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage(coverage_error: str) -> None:
     payloads: list[dict[str, object]] = []
     hit_payload: dict[str, object] = {
         "meta": {
@@ -521,7 +522,7 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> Non
         payload = json.loads(raw.decode())
         payloads.append(payload)
         if len(payloads) == 1:
-            body = json.dumps({"error": "shard coverage incomplete"}).encode()
+            body = json.dumps({"error": coverage_error}).encode()
             raise HTTPError(request.full_url, 422, "Unprocessable Entity", Message(), BytesIO(body))
         if len(payloads) == 2:
             return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})

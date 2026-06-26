@@ -212,7 +212,7 @@ def _http_error_json(exc: HTTPError) -> object:
 
 
 def _is_incomplete_coverage(data: object) -> bool:
-    return isinstance(data, dict) and data.get("error") == "shard coverage incomplete"
+    return isinstance(data, dict) and data.get("error") in {"shard coverage incomplete", "coverage_too_narrow"}
 
 
 def _async_status(data: object) -> str:
