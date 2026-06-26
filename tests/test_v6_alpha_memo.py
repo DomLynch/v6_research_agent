@@ -559,7 +559,8 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage(coverage
             body = json.dumps({"error": coverage_error}).encode()
             raise HTTPError(request.full_url, 422, "Unprocessable Entity", Message(), BytesIO(body))
         if len(payloads) == 2:
-            return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
+            body = json.dumps({"error": "coverage_too_narrow"}).encode()
+            raise HTTPError(request.full_url, 422, "Unprocessable Entity", Message(), BytesIO(body))
         return _Response(hit_payload)
 
     client = FullrawSearchClient(

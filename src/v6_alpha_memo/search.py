@@ -78,7 +78,7 @@ class FullrawSearchClient:
         *,
         search_url: str,
         token: str = "",
-        timeout: float = 180.0,
+        timeout: float = 30.0,
         sweep_wait_seconds: float = 0.0,
         sweep_poll_seconds: float = 10.0,
         retry_attempts: int = 0,
@@ -100,7 +100,7 @@ class FullrawSearchClient:
         return cls(
             search_url=os.environ.get("V6_FULLRAW_SEARCH_URL", ""),
             token=os.environ.get("V6_FULLRAW_TOKEN", ""),
-            timeout=float(os.environ.get("V6_FULLRAW_TIMEOUT", "180")),
+            timeout=float(os.environ.get("V6_FULLRAW_TIMEOUT", "30")),
             sweep_wait_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_WAIT_SECONDS", "0")),
             sweep_poll_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_POLL_SECONDS", "10")),
             retry_attempts=int(os.environ.get("V6_FULLRAW_RETRY_ATTEMPTS", "2")),
@@ -185,7 +185,12 @@ class FullrawSearchClient:
         deadline = time.monotonic() + self.sweep_wait_seconds
         cache_payload = {**payload, "cache_only": True, "queue_if_missing": True}
         while time.monotonic() < deadline:
-            data = self._post(search_url, cache_payload, headers)
+            try:
+                data = self._post(search_url, cache_payload, headers)
+            except HTTPError as exc:
+                data = _http_error_json(exc)
+                if not _is_incomplete_coverage(data):
+                    return None
             status = _async_status(data)
             if status == "hit":
                 return data
