@@ -18,7 +18,7 @@ from v6_alpha_memo import (
     score_pairs,
 )
 from v6_alpha_memo import write as v6_write
-from v6_alpha_memo.run import DemoClient, build_memo
+from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
 from v6_alpha_memo.write import judge_with_minimax
 
@@ -186,8 +186,10 @@ def test_positive_only_human_overlap_does_not_publish_as_alpha() -> None:
             )
             return SearchResult("glynac", papers, CoverageReceipt(hits=2))
 
-    with pytest.raises(RuntimeError, match="no elite receipt-geometry pair"):
+    with pytest.raises(NoMemoError, match="no elite receipt-geometry pair") as exc:
         build_memo("glynac aging glutathione", client=PositiveOnlyClient())
+    assert exc.value.trace["paper_count"] == 2
+    assert exc.value.trace["scored_count"] == 0
 
 
 def test_generic_older_adult_primary_care_overlap_does_not_publish() -> None:
