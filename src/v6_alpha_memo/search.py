@@ -53,6 +53,7 @@ class CoverageReceipt:
     hits: int = 0
     shards_searched: int = 0
     shards_total: int = 0
+    sweep_failed_shards: int = 0
     papers_searched: int = 0
     papers_total: int = 0
     sources_searched: tuple[str, ...] = ()
@@ -68,6 +69,8 @@ class SearchResult:
 
 
 _GERO_HINTS = frozenset({"aging", "glutathione", "mitochondrial", "oxidative", "redox"})
+_FULLRAW_REQUIRED_SHARDS = 1525
+_FULLRAW_REQUIRED_SOURCES = 5
 
 
 class FullrawSearchClient:
@@ -83,6 +86,7 @@ class FullrawSearchClient:
         sweep_poll_seconds: float = 10.0,
         retry_attempts: int = 0,
         retry_sleep_seconds: float = 5.0,
+        require_complete: bool = False,
         opener: RequestOpener | None = None,
     ) -> None:
         self.search_url = search_url.strip()
@@ -93,18 +97,33 @@ class FullrawSearchClient:
         self.sweep_poll_seconds = sweep_poll_seconds
         self.retry_attempts = max(0, retry_attempts)
         self.retry_sleep_seconds = max(0.0, retry_sleep_seconds)
+        self.require_complete = require_complete
         self._opener = opener or cast(RequestOpener, urlopen)
 
     @classmethod
     def from_env(cls) -> FullrawSearchClient:
+        search_url = os.environ.get("V6_FULLRAW_SEARCH_URL") or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_SEARCH_URL")
+        token = (
+            os.environ.get("V6_FULLRAW_TOKEN")
+            or os.environ.get("V5_MEMO_FULL_RAW_INDEX_TOKEN")
+            or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_TOKEN")
+            or ""
+        )
+        sweep_wait = (
+            os.environ.get("V6_FULLRAW_SWEEP_WAIT_SECONDS")
+            or os.environ.get("V5_MEMO_FULL_RAW_FOREGROUND_SWEEP_WAIT_SECONDS")
+            or os.environ.get("V5_MEMO_FULL_RAW_SWEEP_WAIT_SECONDS")
+            or "900"
+        )
         return cls(
-            search_url=os.environ.get("V6_FULLRAW_SEARCH_URL", ""),
-            token=os.environ.get("V6_FULLRAW_TOKEN", ""),
+            search_url=search_url or "http://127.0.0.1:9903/search",
+            token=token,
             timeout=float(os.environ.get("V6_FULLRAW_TIMEOUT", "30")),
-            sweep_wait_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_WAIT_SECONDS", "0")),
+            sweep_wait_seconds=float(sweep_wait),
             sweep_poll_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_POLL_SECONDS", "10")),
             retry_attempts=int(os.environ.get("V6_FULLRAW_RETRY_ATTEMPTS", "2")),
             retry_sleep_seconds=float(os.environ.get("V6_FULLRAW_RETRY_SLEEP_SECONDS", "5")),
+            require_complete=os.environ.get("V6_FULLRAW_REQUIRE_COMPLETE", "1") != "0",
         )
 
     def search(self, query: str, *, limit: int = 25) -> SearchResult:
@@ -140,24 +159,16 @@ class FullrawSearchClient:
         payload = {
             "query": query[:1024],
             "limit": max(1, min(limit, 200)),
-            "top_k": max(1, min(limit, 200)),
+            "rank_mode": "relevance",
+            "cache_only": True,
             "queue_if_missing": True,
-            "corpus": "full_raw_5tb",
-            "timeout_seconds": self.timeout,
         }
         headers = {"Content-Type": "application/json", "User-Agent": "v6-alpha-memo/0.1"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
-        try:
-            data = self._post(search_url, payload, headers)
-        except HTTPError as exc:
-            data = _http_error_json(exc)
-            if not _is_incomplete_coverage(data) or not self.sweep_wait_seconds:
-                raise
-            cached = self._wait_for_sweep_hit(search_url, payload, headers)
-            if cached is None:
-                return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0))
-            data = cached
+        data = self._poll_fullraw(search_url, payload, headers)
+        if self.require_complete and not _coverage_complete(_receipt(data, hits=0)):
+            return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0))
         parsed: list[Paper] = []
         for item in _items(data):
             paper = _parse_paper(item)
@@ -176,28 +187,27 @@ class FullrawSearchClient:
         with self._opener(request, timeout=self.timeout + 5) as response:
             return json.loads(response.read().decode())
 
-    def _wait_for_sweep_hit(
+    def _poll_fullraw(
         self,
         search_url: str,
         payload: dict[str, object],
         headers: dict[str, str],
-    ) -> object | None:
+    ) -> object:
         deadline = time.monotonic() + self.sweep_wait_seconds
-        cache_payload = {**payload, "cache_only": True, "queue_if_missing": True}
-        while time.monotonic() < deadline:
+        last: object = {}
+        while True:
             try:
-                data = self._post(search_url, cache_payload, headers)
+                data = self._post(search_url, payload, headers)
             except HTTPError as exc:
                 data = _http_error_json(exc)
                 if not _is_incomplete_coverage(data):
-                    return None
-            status = _async_status(data)
-            if status == "hit":
+                    raise
+            last = data
+            if not self.require_complete or _coverage_complete(_receipt(data, hits=len(_items(data)))):
                 return data
-            if status in {"disabled", "error", "failed"}:
-                return None
+            if time.monotonic() >= deadline:
+                return last
             time.sleep(min(max(self.sweep_poll_seconds, 0.1), max(deadline - time.monotonic(), 0.1)))
-        return None
 
 
 def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
@@ -248,16 +258,14 @@ def _is_transient_connection_error(exc: BaseException) -> bool:
     return isinstance(exc, OSError)
 
 
-def _async_status(data: object) -> str:
-    if not isinstance(data, dict):
-        return ""
-    meta = data.get("meta")
-    if not isinstance(meta, dict):
-        return ""
-    sweep = meta.get("async_sweep")
-    if not isinstance(sweep, dict):
-        return ""
-    return str(sweep.get("status") or "")
+def _coverage_complete(receipt: CoverageReceipt) -> bool:
+    required_shards = max(_FULLRAW_REQUIRED_SHARDS, receipt.shards_total)
+    return (
+        receipt.shards_searched >= required_shards
+        and not receipt.partial
+        and receipt.sweep_failed_shards == 0
+        and len(receipt.sources_searched) >= _FULLRAW_REQUIRED_SOURCES
+    )
 
 
 def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
@@ -376,6 +384,7 @@ def _receipt(data: object, *, hits: int) -> CoverageReceipt:
         hits=hits,
         shards_searched=_int(shard.get("shards_searched")) or 0,
         shards_total=_int(shard.get("shards_total")) or 0,
+        sweep_failed_shards=_int(shard.get("sweep_failed_shards") or shard.get("failed_shards")) or 0,
         papers_searched=_int(shard.get("papers_searched")) or 0,
         papers_total=_int(shard.get("papers_total")) or 0,
         sources_searched=_sources(shard.get("sources_searched")),

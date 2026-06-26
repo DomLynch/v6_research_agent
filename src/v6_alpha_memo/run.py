@@ -135,6 +135,8 @@ def _trace(
             {
                 "hits": result.receipt.hits,
                 "shards_searched": result.receipt.shards_searched,
+                "shards_total": result.receipt.shards_total,
+                "sweep_failed_shards": result.receipt.sweep_failed_shards,
                 "sources_searched": result.receipt.sources_searched,
                 "papers_searched": result.receipt.papers_searched,
                 "partial": result.receipt.partial,

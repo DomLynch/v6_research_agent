@@ -322,7 +322,17 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
 
 
 def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
+    calls: list[tuple[str, dict[str, object], dict[str, str]]] = []
+    payload: dict[str, object] = {
+        "meta": {
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "biorxiv": 1, "semantic_scholar_abstracts": 1},
+                "partial_shard_search": False,
+            }
+        },
         "results": [
             {
                 "id": "S2",
@@ -340,13 +350,20 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
                 "doi": "10.3389/fragi.2022.852569",
             }
         ],
-        "receipt": {"sources_searched": {"semantic_scholar": 1}},
     }
     monkeypatch.setenv("V6_FULLRAW_SEARCH_URL", "http://fullraw/search")
+    monkeypatch.delenv("V6_FULLRAW_TOKEN", raising=False)
+    monkeypatch.setenv("V5_MEMO_FULL_RAW_INDEX_TOKEN", "index-token")
+
+    def fake_post(self: FullrawSearchClient, url: str, post_payload: dict[str, object], headers: dict[str, str]) -> dict[str, object]:
+        del self
+        calls.append((url, post_payload, headers))
+        return payload
+
     monkeypatch.setattr(
         FullrawSearchClient,
         "_post",
-        lambda _self, _url, _payload, _headers: payload,
+        fake_post,
     )
     result = FullrawSearchClient.from_env().search("glynac", limit=1)
     papers = (
@@ -362,6 +379,11 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
     scored = score_pairs(mine_pairs(papers), topic_terms={"glynac", "glycine", "acetylcysteine", "glutathione"})
 
     assert "did not increase" in result.papers[0].abstract
+    assert calls[0][0] == "http://fullraw/search"
+    assert calls[0][1]["cache_only"] is True
+    assert calls[0][1]["queue_if_missing"] is True
+    assert calls[0][1]["rank_mode"] == "relevance"
+    assert calls[0][2]["Authorization"] == "Bearer index-token"
     assert scored and scored[0].shape == "subgroup_endpoint_split"
 
 
@@ -538,7 +560,13 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage(coverage
     hit_payload: dict[str, object] = {
         "meta": {
             "async_sweep": {"status": "hit"},
-            "shard_receipt": {"shards_searched": 1514, "shards_total": 1514},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "biorxiv": 1, "semantic_scholar_abstracts": 1},
+                "partial_shard_search": False,
+            },
         },
         "results": [
             {
@@ -568,12 +596,13 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage(coverage
         opener=opener,
         sweep_wait_seconds=1,
         sweep_poll_seconds=0.01,
+        require_complete=True,
     )
     result = client.search("calcium alpha ketoglutarate aging", limit=3)
 
-    assert payloads[0].get("cache_only") is None
+    assert payloads[0].get("cache_only") is True
     assert payloads[1].get("cache_only") is True
-    assert result.receipt.shards_searched == 1514
+    assert result.receipt.shards_searched == 1525
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
 
 
@@ -594,6 +623,7 @@ def test_fullraw_client_preserves_coverage_trace_when_sweep_wait_expires() -> No
         opener=opener,
         sweep_wait_seconds=0.02,
         sweep_poll_seconds=0.01,
+        require_complete=True,
     )
     result = client.search("abc", limit=1)
 
