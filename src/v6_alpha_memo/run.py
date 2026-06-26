@@ -26,34 +26,25 @@ class V6Run:
     memo: str
     top_pairs: tuple[ScoredPair, ...]
     results: tuple[SearchResult, ...]
+    paper_count: int = 0
+    pair_count: int = 0
+    scored_count: int = 0
 
     @property
     def trace(self) -> dict[str, object]:
-        return {
-            "queries": [result.query for result in self.results],
-            "coverage": [
-                {
-                    "hits": result.receipt.hits,
-                    "shards_searched": result.receipt.shards_searched,
-                    "sources_searched": result.receipt.sources_searched,
-                    "papers_searched": result.receipt.papers_searched,
-                    "partial": result.receipt.partial,
-                    "error": result.receipt.error,
-                }
-                for result in self.results
-            ],
-            "top_pairs": [
-                {
-                    "score": pair.score,
-                    "shape": pair.shape,
-                    "anchors": pair.pair.anchors,
-                    "receipt_1": pair.pair.a.title,
-                    "receipt_2": pair.pair.b.title,
-                    "reasons": pair.reasons,
-                }
-                for pair in self.top_pairs[:5]
-            ],
-        }
+        return _trace(
+            self.results,
+            self.top_pairs,
+            paper_count=self.paper_count,
+            pair_count=self.pair_count,
+            scored_count=self.scored_count,
+        )
+
+
+class NoMemoError(RuntimeError):
+    def __init__(self, trace: dict[str, object]) -> None:
+        super().__init__("no elite receipt-geometry pair found; inspect search/mine/score trace")
+        self.trace = trace
 
 
 class SearchClient(Protocol):
@@ -78,10 +69,25 @@ def build_memo(
     topic_terms = _topic_terms(topic)
     scored = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
     if not scored:
-        raise RuntimeError("no elite receipt-geometry pair found; inspect search/mine/score trace")
+        raise NoMemoError(
+            _trace(
+                results,
+                (),
+                paper_count=len(papers),
+                pair_count=len(pairs),
+                scored_count=0,
+            )
+        )
     receipt = _best_receipt(results)
     memo = render_with_minimax(scored, receipt=receipt) if writer == "minimax" else render_memo(scored[0], receipt=receipt)
-    return V6Run(memo=memo, top_pairs=scored, results=results)
+    return V6Run(
+        memo=memo,
+        top_pairs=scored,
+        results=results,
+        paper_count=len(papers),
+        pair_count=len(pairs),
+        scored_count=len(scored),
+    )
 
 
 def main() -> None:
@@ -95,16 +101,59 @@ def main() -> None:
     args = parser.parse_args()
 
     client: SearchClient = DemoClient() if args.demo else FullrawSearchClient.from_env()
-    run = build_memo(
-        args.topic,
-        client=client,
-        query_limit=args.queries,
-        per_query_limit=args.limit,
-        writer=args.writer,
-    )
+    try:
+        run = build_memo(
+            args.topic,
+            client=client,
+            query_limit=args.queries,
+            per_query_limit=args.limit,
+            writer=args.writer,
+        )
+    except NoMemoError as exc:
+        if args.trace:
+            print(json.dumps(exc.trace, indent=2))
+        raise SystemExit(str(exc)) from exc
     print(run.memo)
     if args.trace:
         print(json.dumps(run.trace, indent=2))
+
+
+def _trace(
+    results: tuple[SearchResult, ...],
+    top_pairs: tuple[ScoredPair, ...],
+    *,
+    paper_count: int,
+    pair_count: int,
+    scored_count: int,
+) -> dict[str, object]:
+    return {
+        "queries": [result.query for result in results],
+        "paper_count": paper_count,
+        "pair_count": pair_count,
+        "scored_count": scored_count,
+        "coverage": [
+            {
+                "hits": result.receipt.hits,
+                "shards_searched": result.receipt.shards_searched,
+                "sources_searched": result.receipt.sources_searched,
+                "papers_searched": result.receipt.papers_searched,
+                "partial": result.receipt.partial,
+                "error": result.receipt.error,
+            }
+            for result in results
+        ],
+        "top_pairs": [
+            {
+                "score": pair.score,
+                "shape": pair.shape,
+                "anchors": pair.pair.anchors,
+                "receipt_1": pair.pair.a.title,
+                "receipt_2": pair.pair.b.title,
+                "reasons": pair.reasons,
+            }
+            for pair in top_pairs[:5]
+        ],
+    }
 
 
 class DemoClient(SearchClient):
