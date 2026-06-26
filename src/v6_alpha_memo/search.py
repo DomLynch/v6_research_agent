@@ -81,6 +81,8 @@ class FullrawSearchClient:
         timeout: float = 180.0,
         sweep_wait_seconds: float = 0.0,
         sweep_poll_seconds: float = 10.0,
+        retry_attempts: int = 0,
+        retry_sleep_seconds: float = 5.0,
         opener: RequestOpener | None = None,
     ) -> None:
         self.search_url = search_url.strip()
@@ -89,6 +91,8 @@ class FullrawSearchClient:
         self.timeout = timeout
         self.sweep_wait_seconds = sweep_wait_seconds
         self.sweep_poll_seconds = sweep_poll_seconds
+        self.retry_attempts = max(0, retry_attempts)
+        self.retry_sleep_seconds = max(0.0, retry_sleep_seconds)
         self._opener = opener or cast(RequestOpener, urlopen)
 
     @classmethod
@@ -99,6 +103,8 @@ class FullrawSearchClient:
             timeout=float(os.environ.get("V6_FULLRAW_TIMEOUT", "180")),
             sweep_wait_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_WAIT_SECONDS", "0")),
             sweep_poll_seconds=float(os.environ.get("V6_FULLRAW_SWEEP_POLL_SECONDS", "10")),
+            retry_attempts=int(os.environ.get("V6_FULLRAW_RETRY_ATTEMPTS", "2")),
+            retry_sleep_seconds=float(os.environ.get("V6_FULLRAW_RETRY_SLEEP_SECONDS", "5")),
         )
 
     def search(self, query: str, *, limit: int = 25) -> SearchResult:
@@ -107,19 +113,28 @@ class FullrawSearchClient:
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
         for variant in _query_variants(query):
             for search_url in self.search_urls:
-                try:
-                    result = self._search_once(variant, limit=limit, search_url=search_url)
-                except (OSError, RemoteDisconnected, TimeoutError, URLError) as exc:
-                    last = SearchResult(
-                        query=variant,
-                        papers=(),
-                        receipt=CoverageReceipt(error=f"{type(exc).__name__}: {exc}"),
-                    )
+                result = self._search_with_retries(variant, limit=limit, search_url=search_url)
+                if result is None:
                     continue
                 last = result
                 if result.papers and _result_matches_query(result, variant):
                     return result
         return last
+
+    def _search_with_retries(self, query: str, *, limit: int, search_url: str) -> SearchResult | None:
+        for attempt in range(self.retry_attempts + 1):
+            try:
+                return self._search_once(query, limit=limit, search_url=search_url)
+            except (OSError, RemoteDisconnected, TimeoutError, URLError) as exc:
+                last = SearchResult(
+                    query=query,
+                    papers=(),
+                    receipt=CoverageReceipt(error=f"{type(exc).__name__}: {exc}"),
+                )
+                if attempt >= self.retry_attempts or not _is_transient_connection_error(exc):
+                    return last
+                time.sleep(self.retry_sleep_seconds)
+        return None
 
     def _search_once(self, query: str, *, limit: int, search_url: str) -> SearchResult:
         payload = {
@@ -213,6 +228,19 @@ def _http_error_json(exc: HTTPError) -> object:
 
 def _is_incomplete_coverage(data: object) -> bool:
     return isinstance(data, dict) and data.get("error") in {"shard coverage incomplete", "coverage_too_narrow"}
+
+
+def _is_transient_connection_error(exc: BaseException) -> bool:
+    if isinstance(exc, HTTPError):
+        return False
+    if isinstance(exc, TimeoutError):
+        return False
+    if isinstance(exc, (RemoteDisconnected, ConnectionError)):
+        return True
+    if isinstance(exc, URLError):
+        reason = str(getattr(exc, "reason", exc)).casefold()
+        return any(marker in reason for marker in ("connection refused", "connection reset", "timed out"))
+    return isinstance(exc, OSError)
 
 
 def _async_status(data: object) -> str:

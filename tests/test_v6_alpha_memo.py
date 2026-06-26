@@ -467,6 +467,40 @@ def test_fullraw_client_skips_timeout_and_uses_next_variant() -> None:
     assert result.papers[0].title == "Metformin blunted exercise adaptation"
 
 
+def test_fullraw_client_retries_transient_connection_errors() -> None:
+    calls: list[str] = []
+    hit_payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "results": [
+            {
+                "id": "W1",
+                "title": "Metformin blunted exercise adaptation",
+                "abstract": "Metformin reduced exercise adaptation in humans.",
+                "source": "openalex",
+            }
+        ],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        query = json.loads(cast(bytes, request.data or b"{}").decode())["query"]
+        calls.append(query)
+        if len(calls) == 1:
+            raise ConnectionRefusedError("backend restart")
+        return _Response(hit_payload)
+
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=opener,
+        retry_attempts=1,
+        retry_sleep_seconds=0,
+    )
+    result = client.search("metformin exercise adaptation")
+
+    assert calls[:2] == ["metformin exercise adaptation", "metformin exercise adaptation"]
+    assert result.papers[0].title == "Metformin blunted exercise adaptation"
+
+
 def test_fullraw_client_falls_back_to_second_endpoint() -> None:
     urls: list[str] = []
     hit_payload: dict[str, object] = {
