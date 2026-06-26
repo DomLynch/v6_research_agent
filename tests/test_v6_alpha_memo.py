@@ -632,6 +632,27 @@ def test_fullraw_client_preserves_coverage_trace_when_sweep_wait_expires() -> No
     assert result.receipt.shards_total == 1525
 
 
+def test_fullraw_client_reports_async_running_state() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "shard_receipt": {"auth_required": True, "authenticated": True},
+            "async_sweep": {"status": "running", "shard_limit": 1525},
+        },
+        "results": [],
+    }
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        token="token",
+        opener=_fake_opener(payload),
+        require_complete=True,
+    )
+    result = client.search("abc", limit=1)
+
+    assert result.receipt.shards_total == 1525
+    assert result.receipt.partial is True
+    assert result.receipt.error == "async_sweep_running"
+
+
 def test_writer_stays_receipt_owned() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
     memo = render_memo(run.top_pairs[0])

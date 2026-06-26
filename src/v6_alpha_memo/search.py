@@ -378,18 +378,21 @@ def _receipt(data: object, *, hits: int) -> CoverageReceipt:
         return CoverageReceipt(hits=hits)
     meta = data.get("meta")
     meta = meta if isinstance(meta, dict) else {}
+    sweep = meta.get("async_sweep")
+    sweep = sweep if isinstance(sweep, dict) else {}
     shard = meta.get("shard_receipt") or data.get("shard_receipt")
     shard = shard if isinstance(shard, dict) else {}
+    async_status = _clean(sweep.get("status"), limit=80)
     return CoverageReceipt(
         hits=hits,
         shards_searched=_int(shard.get("shards_searched")) or 0,
-        shards_total=_int(shard.get("shards_total")) or 0,
+        shards_total=_int(shard.get("shards_total") or sweep.get("shard_limit")) or 0,
         sweep_failed_shards=_int(shard.get("sweep_failed_shards") or shard.get("failed_shards")) or 0,
         papers_searched=_int(shard.get("papers_searched")) or 0,
         papers_total=_int(shard.get("papers_total")) or 0,
         sources_searched=_sources(shard.get("sources_searched")),
-        partial=bool(shard.get("partial_shard_search") or meta.get("partial")),
-        error=_clean(data.get("error"), limit=200),
+        partial=bool(shard.get("partial_shard_search") or meta.get("partial") or async_status in {"queued", "running", "busy"}),
+        error=_clean(data.get("error"), limit=200) or (f"async_sweep_{async_status}" if async_status else ""),
     )
 
 
