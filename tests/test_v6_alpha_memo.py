@@ -109,6 +109,56 @@ def test_demo_run_outputs_required_memo_and_trace() -> None:
     assert "source_count_searched" in coverage[0]
 
 
+def test_build_memo_uses_strict_verification_receipt_before_writing() -> None:
+    calls: list[str] = []
+
+    class VerifyClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            calls.append(query)
+            return SearchResult(
+                query,
+                (),
+                CoverageReceipt(
+                    async_status="hit",
+                    shards_searched=1525,
+                    shards_total=1525,
+                    sweep_failed_shards=0,
+                    source_count_searched=5,
+                ),
+            )
+
+    run = build_memo(
+        "longevity exercise adaptation",
+        client=DemoClient(),
+        verify_client=VerifyClient(),
+    )
+
+    assert len(calls) == 1
+    assert "resveratrol" in calls[0]
+    assert run.results[-1].receipt.async_status == "hit"
+    coverage = cast(list[dict[str, object]], run.trace["coverage"])
+    assert coverage[-1]["shards_searched"] == 1525
+
+
+def test_build_memo_waits_when_strict_verification_is_still_queued() -> None:
+    class QueuedVerifyClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            del limit
+            return SearchResult(query, (), CoverageReceipt(async_status="queued", shards_total=1525, partial=True))
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo(
+            "longevity exercise adaptation",
+            client=DemoClient(),
+            verify_client=QueuedVerifyClient(),
+        )
+
+    assert exc.value.trace["blocked_stage"] == "verification_cache_waiting"
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert coverage[-1]["async_status"] == "queued"
+    assert exc.value.trace["top_pairs"]
+
+
 def test_scores_translation_boundary_without_reversal() -> None:
     papers = (
         Paper(
@@ -394,6 +444,31 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
     assert result.receipt.async_status == "hit"
     assert result.receipt.source_count_searched == 5
     assert scored and scored[0].shape == "subgroup_endpoint_split"
+
+
+def test_fullraw_from_env_can_disable_cache_only_for_fast_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+    payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 64, "sources_searched": {"openalex": 1}}},
+        "results": [{"title": "Resveratrol exercise adaptation", "abstract": "A candidate receipt.", "source": "openalex"}],
+    }
+    monkeypatch.setenv("V6_FULLRAW_SEARCH_URL", "http://fullraw/search")
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
+    monkeypatch.setenv("V6_FULLRAW_CACHE_ONLY", "0")
+    monkeypatch.setenv("V6_FULLRAW_QUEUE_IF_MISSING", "0")
+
+    def fake_post(self: FullrawSearchClient, url: str, post_payload: dict[str, object], headers: dict[str, str]) -> dict[str, object]:
+        del self, url, headers
+        calls.append(post_payload)
+        return payload
+
+    monkeypatch.setattr(FullrawSearchClient, "_post", fake_post)
+
+    result = FullrawSearchClient.from_env().search("resveratrol exercise adaptation")
+
+    assert calls[0]["cache_only"] is False
+    assert calls[0]["queue_if_missing"] is False
+    assert result.papers
 
 
 def test_fullraw_client_skips_noisy_results_for_rare_query_variant() -> None:

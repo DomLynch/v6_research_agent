@@ -56,8 +56,10 @@ def build_memo(
     topic: str,
     *,
     client: SearchClient,
+    verify_client: SearchClient | None = None,
     query_limit: int = 8,
     per_query_limit: int = 5,
+    verify_limit: int = 50,
     writer: str = "template",
 ) -> V6Run:
     results = tuple(
@@ -79,6 +81,20 @@ def build_memo(
             )
         )
     receipt = _best_receipt(results)
+    if verify_client is not None:
+        verify_result = verify_client.search(_verify_query(scored[0]), limit=verify_limit)
+        results = (*results, verify_result)
+        receipt = verify_result.receipt
+        if not _receipt_complete(receipt):
+            trace = _trace(
+                results,
+                scored,
+                paper_count=len(papers),
+                pair_count=len(pairs),
+                scored_count=len(scored),
+            )
+            trace["blocked_stage"] = "verification_cache_waiting"
+            raise NoMemoError(trace)
     memo = render_with_minimax(scored, receipt=receipt) if writer == "minimax" else render_memo(scored[0], receipt=receipt)
     return V6Run(
         memo=memo,
@@ -180,6 +196,27 @@ def _best_receipt(results: tuple[SearchResult, ...]) -> CoverageReceipt:
     if not results:
         return CoverageReceipt()
     return max(results, key=lambda result: result.receipt.papers_searched).receipt
+
+
+def _receipt_complete(receipt: CoverageReceipt) -> bool:
+    return (
+        receipt.async_status == "hit"
+        and receipt.shards_searched == 1525
+        and receipt.shards_total == 1525
+        and receipt.sweep_failed_shards == 0
+        and receipt.source_count_searched >= 5
+        and not receipt.partial
+    )
+
+
+def _verify_query(pair: ScoredPair) -> str:
+    if pair.pair.anchors:
+        return " ".join(pair.pair.anchors[:4])
+    return " ".join((*_title_terms(pair.pair.a.title)[:3], *_title_terms(pair.pair.b.title)[:3]))
+
+
+def _title_terms(title: str) -> tuple[str, ...]:
+    return tuple(word for word in re.findall(r"[a-z][a-z0-9]{2,}", title.casefold()) if word not in _GENERIC_TOPIC_TERMS)[:6]
 
 
 def _topic_terms(topic: str) -> set[str]:

@@ -89,6 +89,8 @@ class FullrawSearchClient:
         retry_attempts: int = 0,
         retry_sleep_seconds: float = 5.0,
         require_complete: bool = False,
+        cache_only: bool = True,
+        queue_if_missing: bool = True,
         opener: RequestOpener | None = None,
     ) -> None:
         self.search_url = search_url.strip()
@@ -100,6 +102,8 @@ class FullrawSearchClient:
         self.retry_attempts = max(0, retry_attempts)
         self.retry_sleep_seconds = max(0.0, retry_sleep_seconds)
         self.require_complete = require_complete
+        self.cache_only = cache_only
+        self.queue_if_missing = queue_if_missing
         self._opener = opener or cast(RequestOpener, urlopen)
 
     @classmethod
@@ -126,6 +130,8 @@ class FullrawSearchClient:
             retry_attempts=int(os.environ.get("V6_FULLRAW_RETRY_ATTEMPTS", "2")),
             retry_sleep_seconds=float(os.environ.get("V6_FULLRAW_RETRY_SLEEP_SECONDS", "5")),
             require_complete=os.environ.get("V6_FULLRAW_REQUIRE_COMPLETE", "1") != "0",
+            cache_only=_env_bool("V6_FULLRAW_CACHE_ONLY", True),
+            queue_if_missing=_env_bool("V6_FULLRAW_QUEUE_IF_MISSING", True),
         )
 
     def search(self, query: str, *, limit: int = 5) -> SearchResult:
@@ -164,8 +170,8 @@ class FullrawSearchClient:
             "query": query[:1024],
             "limit": max(1, min(limit, 200)),
             "rank_mode": "relevance",
-            "cache_only": True,
-            "queue_if_missing": True,
+            "cache_only": self.cache_only,
+            "queue_if_missing": self.queue_if_missing,
         }
         headers = {"Content-Type": "application/json", "User-Agent": "v6-alpha-memo/0.1"}
         if self.token:
@@ -325,6 +331,13 @@ def _query_variants(query: str) -> tuple[str, ...]:
 
 def _search_urls(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(url.strip() for url in value.split(",") if url.strip()))
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().casefold() in {"1", "true", "yes", "on"}
 
 
 _QUERY_DROP = frozenset({
