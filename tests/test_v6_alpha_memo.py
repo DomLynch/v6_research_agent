@@ -592,6 +592,7 @@ def test_fullraw_from_env_can_disable_cache_only_for_fast_discovery(monkeypatch:
 
 
 def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    urls: list[str] = []
     calls: list[dict[str, object]] = []
     payload: dict[str, object] = {
         "meta": {
@@ -609,6 +610,7 @@ def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch
 
     def opener(request: Request, timeout: float) -> _Response:
         del timeout
+        urls.append(request.full_url)
         calls.append(json.loads(cast(bytes, request.data or b"{}").decode()))
         return _Response(payload)
 
@@ -620,6 +622,7 @@ def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch
         queue_if_missing=True,
     )
     monkeypatch.setattr(FullrawSearchClient, "from_env", staticmethod(lambda: strict))
+    monkeypatch.setenv("V6_DISCOVERY_FULLRAW_SEARCH_URL", "http://discovery/search")
 
     discovery, verify = v6_run._clients(demo=False)
 
@@ -630,6 +633,7 @@ def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch
     assert calls[0]["queue_if_missing"] is False
     assert calls[1]["cache_only"] is True
     assert calls[1]["queue_if_missing"] is True
+    assert urls == ["http://discovery/search", "http://fullraw/search"]
 
 
 def test_fullraw_client_skips_noisy_results_for_rare_query_variant() -> None:

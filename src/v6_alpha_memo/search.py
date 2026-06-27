@@ -108,9 +108,9 @@ class FullrawSearchClient:
         self._cache: dict[tuple[str, int], SearchResult] = {}
         self._cache_lock = Lock()
 
-    def discovery_client(self) -> FullrawSearchClient:
+    def discovery_client(self, *, search_url: str | None = None) -> FullrawSearchClient:
         return FullrawSearchClient(
-            search_url=self.search_url,
+            search_url=search_url or self.search_url,
             token=self.token,
             timeout=self.timeout,
             sweep_wait_seconds=0.0,

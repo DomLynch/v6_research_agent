@@ -213,7 +213,7 @@ def _clients(*, demo: bool) -> tuple[SearchClient, SearchClient | None]:
         fullraw.require_complete = True
         fullraw.cache_only = True
         fullraw.queue_if_missing = True
-        return fullraw.discovery_client(), fullraw
+        return fullraw.discovery_client(search_url=os.environ.get("V6_DISCOVERY_FULLRAW_SEARCH_URL")), fullraw
     return fullraw, None
 
 
