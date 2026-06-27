@@ -71,7 +71,6 @@ class SearchResult:
     receipt: CoverageReceipt
 
 
-_GERO_HINTS = frozenset({"aging", "glutathione", "mitochondrial", "oxidative", "redox"})
 _FULLRAW_REQUIRED_SHARDS = 1525
 _FULLRAW_REQUIRED_SOURCES = 5
 
@@ -109,6 +108,21 @@ class FullrawSearchClient:
         self._cache: dict[tuple[str, int], SearchResult] = {}
         self._cache_lock = Lock()
 
+    def discovery_client(self) -> FullrawSearchClient:
+        return FullrawSearchClient(
+            search_url=self.search_url,
+            token=self.token,
+            timeout=self.timeout,
+            sweep_wait_seconds=0.0,
+            sweep_poll_seconds=self.sweep_poll_seconds,
+            retry_attempts=self.retry_attempts,
+            retry_sleep_seconds=self.retry_sleep_seconds,
+            require_complete=False,
+            cache_only=False,
+            queue_if_missing=False,
+            opener=self._opener,
+        )
+
     @classmethod
     def from_env(cls) -> FullrawSearchClient:
         search_url = os.environ.get("V6_FULLRAW_SEARCH_URL") or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_SEARCH_URL")
@@ -140,7 +154,7 @@ class FullrawSearchClient:
     def search(self, query: str, *, limit: int = 5) -> SearchResult:
         if not self.search_urls:
             raise RuntimeError("V6_FULLRAW_SEARCH_URL is required")
-        cache_key = (query, limit)
+        cache_key = (_query_key(query), limit)
         with self._cache_lock:
             cached = self._cache.get(cache_key)
         if cached is not None:
@@ -244,24 +258,23 @@ class FullrawSearchClient:
 def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     """Turn a domain/topic seed into targeted novelty-search shapes."""
     seed = " ".join(seed.split())
-    words = seed.split()
-    lead = words[:3]
-    gero = bool(_GERO_HINTS & {word.casefold() for word in words})
-    animal_query = " ".join((*lead, "supplementation", "mice", "length", "of", "life", "glutathione", "deficiency", "oxidative", "stress")) if lead else seed
-    rct_query = " ".join(("randomized", "controlled", "clinical", "trial", "healthy", "older", "adults", "determine", "efficacy", *lead, "supplementation", "glutathione", "redox", "status", "oxidative", "damage")) if lead else seed
-    healthy_query = " ".join(("healthy", "older", "adults", *words[1:3], words[-3], "redox")) if gero and len(words) > 5 else seed
-    templates = (
-        "{seed} randomized placebo no effect primary endpoint",
-        "{seed} baseline subgroup high low response",
-        "{seed} mechanism model human failed translation",
-        "{seed} endpoint split randomized trial placebo",
-        "{seed} intervention opposite endpoint boundary condition",
-        "{seed} field experiment intervention null effect",
-        "{seed} benchmark improvement replication failure",
-        "{seed} same intervention different modality adaptation",
+    if not seed:
+        return ()
+    terms = _content_terms(seed)
+    anchor = seed if len(seed.split()) <= 5 else " ".join(terms)
+    anchor = anchor or seed
+    modifiers = (
+        "",
+        "human trial",
+        "null primary endpoint",
+        "failed replication",
+        "blunted",
+        "subgroup baseline",
+        "mechanism human",
+        "endpoint split",
+        "modality boundary",
     )
-    base = (animal_query, rct_query, " ".join(words[:4]), healthy_query) if gero else (" ".join(words[:4]), seed)
-    queries = [*base, *(template.format(seed=seed) for template in templates if seed)]
+    queries = (f"{anchor} {modifier}".strip() for modifier in modifiers)
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 
 
@@ -369,7 +382,45 @@ _QUERY_DROP = frozenset({
     "subgroup", "translation", "trial",
 })
 _QUERY_CONTEXT_KEEP = frozenset({"adult", "adults", "healthy", "human", "humans", "older", "participants", "patient", "patients", "workers"})
+_ALPHA_QUERY_KEEP = frozenset({
+    "baseline",
+    "blunted",
+    "boundary",
+    "endpoint",
+    "failed",
+    "human",
+    "mechanism",
+    "modality",
+    "null",
+    "primary",
+    "replication",
+    "split",
+    "subgroup",
+    "trial",
+})
 _PUBMED_BACKFILL_LIMIT = 4
+
+
+def _query_key(query: str) -> str:
+    return " ".join(_shape_terms(query)) or " ".join(query.casefold().split())
+
+
+def _shape_terms(query: str) -> tuple[str, ...]:
+    terms = (
+        word
+        for word in re.findall(r"[a-z][a-z0-9]{2,}", query.casefold().replace("-", " "))
+        if word in _ALPHA_QUERY_KEEP or word not in _QUERY_DROP
+    )
+    return tuple(dict.fromkeys(terms))[:8]
+
+
+def _content_terms(query: str) -> tuple[str, ...]:
+    terms = (
+        word
+        for word in re.findall(r"[a-z][a-z0-9]{2,}", query.casefold().replace("-", " "))
+        if word not in _QUERY_DROP and word not in _ALPHA_QUERY_KEEP
+    )
+    return tuple(dict.fromkeys(terms))[:5]
 
 
 def _result_matches_query(result: SearchResult, query: str) -> bool:

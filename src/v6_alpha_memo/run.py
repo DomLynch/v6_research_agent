@@ -126,11 +126,12 @@ def main() -> None:
     parser.add_argument("--trace", action="store_true")
     args = parser.parse_args()
 
-    client: SearchClient = DemoClient() if args.demo else FullrawSearchClient.from_env()
+    client, verify_client = _clients(demo=args.demo)
     try:
         run = build_memo(
             args.topic,
             client=client,
+            verify_client=verify_client,
             query_limit=args.queries,
             per_query_limit=args.limit,
             discovery_workers=args.discovery_workers,
@@ -202,6 +203,18 @@ def _search_queries(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         return tuple(pool.map(run, queries))
+
+
+def _clients(*, demo: bool) -> tuple[SearchClient, SearchClient | None]:
+    if demo:
+        return DemoClient(), None
+    fullraw = FullrawSearchClient.from_env()
+    if os.environ.get("V6_TWO_TIER_SEARCH", "1").strip().casefold() not in {"0", "false", "no", "off"}:
+        fullraw.require_complete = True
+        fullraw.cache_only = True
+        fullraw.queue_if_missing = True
+        return fullraw.discovery_client(), fullraw
+    return fullraw, None
 
 
 def _discovery_workers(value: int | None, query_count: int) -> int:

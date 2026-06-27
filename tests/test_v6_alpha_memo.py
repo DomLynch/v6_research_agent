@@ -19,6 +19,7 @@ from v6_alpha_memo import (
     render_memo,
     score_pairs,
 )
+from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
@@ -32,16 +33,14 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
     assert len(queries) >= 6
     assert queries[0] == "marketing attribution incrementality"
     assert all("marketing attribution incrementality" in query for query in queries)
-    assert "glynac glycine n-acetylcysteine supplementation mice length of life glutathione deficiency oxidative stress" in gero_queries
-    assert "randomized controlled clinical trial healthy older adults determine efficacy glynac glycine n-acetylcysteine supplementation glutathione redox status oxidative damage" in gero_queries
-    assert gero_queries[:2] == (
-        "glynac glycine n-acetylcysteine supplementation mice length of life glutathione deficiency oxidative stress",
-        "randomized controlled clinical trial healthy older adults determine efficacy glynac glycine n-acetylcysteine supplementation glutathione redox status oxidative damage",
-    )
-    assert any("randomized placebo no effect primary endpoint" in query for query in queries)
-    assert any("baseline subgroup high low response" in query for query in queries)
-    assert any("mechanism model human failed translation" in query for query in queries)
-    assert any("replication failure" in query for query in queries)
+    assert gero_queries[0] == "glynac glycine acetylcysteine glutathione"
+    assert all(len(query.split()) <= 7 for query in gero_queries)
+    assert all("randomized controlled clinical trial" not in query for query in gero_queries)
+    assert any("null primary endpoint" in query for query in queries)
+    assert any("subgroup baseline" in query for query in queries)
+    assert any("mechanism human" in query for query in queries)
+    assert any("failed replication" in query for query in queries)
+    assert any("endpoint split" in query for query in queries)
 
 
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
@@ -436,6 +435,27 @@ def test_fullraw_client_reuses_cached_discovery_results() -> None:
     assert second is first
 
 
+def test_fullraw_client_reuses_near_duplicate_query_cache() -> None:
+    calls: list[str] = []
+    payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "results": [{"title": "Urolithin mitochondrial aging", "abstract": "Candidate receipt.", "source": "openalex"}],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
+        return _Response(payload)
+
+    client = FullrawSearchClient(search_url="http://fullraw/search", opener=opener)
+
+    first = client.search("urolithin A mitochondrial aging", limit=3)
+    second = client.search("urolithin mitochondrial aging", limit=3)
+
+    assert calls == ["urolithin A mitochondrial aging"]
+    assert second is first
+
+
 def test_fullraw_client_does_not_cache_strict_running_receipt() -> None:
     calls = 0
     running_payload: dict[str, object] = {
@@ -569,6 +589,47 @@ def test_fullraw_from_env_can_disable_cache_only_for_fast_discovery(monkeypatch:
     assert calls[0]["cache_only"] is False
     assert calls[0]["queue_if_missing"] is False
     assert result.papers
+
+
+def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, object]] = []
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "hit"},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+                "partial_shard_search": False,
+            },
+        },
+        "results": [{"title": "Resveratrol exercise adaptation", "abstract": "A candidate receipt.", "source": "openalex"}],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        return _Response(payload)
+
+    strict = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=opener,
+        require_complete=True,
+        cache_only=True,
+        queue_if_missing=True,
+    )
+    monkeypatch.setattr(FullrawSearchClient, "from_env", staticmethod(lambda: strict))
+
+    discovery, verify = v6_run._clients(demo=False)
+
+    assert verify is not None
+    discovery.search("resveratrol exercise adaptation")
+    verify.search("resveratrol exercise adaptation")
+    assert calls[0]["cache_only"] is False
+    assert calls[0]["queue_if_missing"] is False
+    assert calls[1]["cache_only"] is True
+    assert calls[1]["queue_if_missing"] is True
 
 
 def test_fullraw_client_skips_noisy_results_for_rare_query_variant() -> None:
