@@ -9,6 +9,7 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from http.client import RemoteDisconnected
+from threading import Lock
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -105,6 +106,8 @@ class FullrawSearchClient:
         self.cache_only = cache_only
         self.queue_if_missing = queue_if_missing
         self._opener = opener or cast(RequestOpener, urlopen)
+        self._cache: dict[tuple[str, int], SearchResult] = {}
+        self._cache_lock = Lock()
 
     @classmethod
     def from_env(cls) -> FullrawSearchClient:
@@ -137,6 +140,11 @@ class FullrawSearchClient:
     def search(self, query: str, *, limit: int = 5) -> SearchResult:
         if not self.search_urls:
             raise RuntimeError("V6_FULLRAW_SEARCH_URL is required")
+        cache_key = (query, limit)
+        with self._cache_lock:
+            cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
         for variant in _query_variants(query):
             for search_url in self.search_urls:
@@ -147,8 +155,17 @@ class FullrawSearchClient:
                 if self.require_complete and result.receipt.async_status in {"queued", "running", "busy"}:
                     return result
                 if result.papers and _result_matches_query(result, variant):
-                    return result
-        return last
+                    return self._cache_result(cache_key, result)
+        return self._cache_result(cache_key, last)
+
+    def _cache_result(self, key: tuple[str, int], result: SearchResult) -> SearchResult:
+        if result.receipt.error and not result.papers:
+            return result
+        if self.require_complete and not _coverage_complete(result.receipt):
+            return result
+        with self._cache_lock:
+            self._cache[key] = result
+        return result
 
     def _search_with_retries(self, query: str, *, limit: int, search_url: str) -> SearchResult | None:
         for attempt in range(self.retry_attempts + 1):

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -59,12 +61,16 @@ def build_memo(
     verify_client: SearchClient | None = None,
     query_limit: int = 8,
     per_query_limit: int = 5,
+    discovery_workers: int | None = None,
     verify_limit: int = 50,
     writer: str = "template",
 ) -> V6Run:
-    results = tuple(
-        client.search(query, limit=per_query_limit)
-        for query in query_shapes(topic, limit=query_limit)
+    queries = query_shapes(topic, limit=query_limit)
+    results = _search_queries(
+        client,
+        queries,
+        limit=per_query_limit,
+        workers=_discovery_workers(discovery_workers, len(queries)),
     )
     papers = merge_results(results)
     pairs = mine_pairs(papers)
@@ -113,6 +119,7 @@ def main() -> None:
     parser.add_argument("--writer", choices=["template", "minimax"], default="template")
     parser.add_argument("--queries", type=int, default=8)
     parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--discovery-workers", type=int)
     parser.add_argument("--trace", action="store_true")
     args = parser.parse_args()
 
@@ -123,6 +130,7 @@ def main() -> None:
             client=client,
             query_limit=args.queries,
             per_query_limit=args.limit,
+            discovery_workers=args.discovery_workers,
             writer=args.writer,
         )
     except NoMemoError as exc:
@@ -174,6 +182,32 @@ def _trace(
             for pair in top_pairs[:5]
         ],
     }
+
+
+def _search_queries(
+    client: SearchClient,
+    queries: tuple[str, ...],
+    *,
+    limit: int,
+    workers: int,
+) -> tuple[SearchResult, ...]:
+    if workers <= 1 or len(queries) <= 1:
+        return tuple(client.search(query, limit=limit) for query in queries)
+
+    def run(query: str) -> SearchResult:
+        return client.search(query, limit=limit)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        return tuple(pool.map(run, queries))
+
+
+def _discovery_workers(value: int | None, query_count: int) -> int:
+    raw = value if value is not None else os.environ.get("V6_DISCOVERY_WORKERS", "3")
+    try:
+        workers = int(raw)
+    except (TypeError, ValueError):
+        workers = 1
+    return max(1, min(workers, max(query_count, 1), 3))
 
 
 class DemoClient(SearchClient):

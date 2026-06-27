@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import time
 from email.message import Message
 from io import BytesIO
+from threading import Lock
 from typing import cast
 from urllib.error import HTTPError
 from urllib.request import Request
@@ -138,6 +140,29 @@ def test_build_memo_uses_strict_verification_receipt_before_writing() -> None:
     assert run.results[-1].receipt.async_status == "hit"
     coverage = cast(list[dict[str, object]], run.trace["coverage"])
     assert coverage[-1]["shards_searched"] == 1525
+
+
+def test_build_memo_searches_discovery_queries_in_parallel() -> None:
+    active = 0
+    peak = 0
+    lock = Lock()
+
+    class SlowDemo(DemoClient):
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            try:
+                time.sleep(0.02)
+                return super().search(query, limit=limit)
+            finally:
+                with lock:
+                    active -= 1
+
+    build_memo("longevity exercise adaptation", client=SlowDemo(), query_limit=3, discovery_workers=3)
+
+    assert peak >= 2
 
 
 def test_build_memo_waits_when_strict_verification_is_still_queued() -> None:
@@ -373,6 +398,66 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.receipt.source_count_searched == 2
     assert "openalex" in result.receipt.sources_searched
     assert result.papers[0].doi == "10.test/metformin"
+
+
+def test_fullraw_client_reuses_cached_discovery_results() -> None:
+    calls: list[str] = []
+    payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "results": [{"title": "Metformin blunted exercise adaptation", "abstract": "Metformin reduced exercise adaptation.", "source": "openalex"}],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
+        return _Response(payload)
+
+    client = FullrawSearchClient(search_url="http://fullraw/search", opener=opener)
+
+    first = client.search("metformin exercise adaptation", limit=3)
+    second = client.search("metformin exercise adaptation", limit=3)
+
+    assert len(calls) == 1
+    assert second is first
+
+
+def test_fullraw_client_does_not_cache_strict_running_receipt() -> None:
+    calls = 0
+    running_payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "running"},
+            "shard_receipt": {"shards_total": 1525, "partial_shard_search": True},
+        },
+        "results": [],
+    }
+    hit_payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "hit"},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+                "partial_shard_search": False,
+            },
+        },
+        "results": [{"title": "Metformin blunted exercise adaptation", "abstract": "Metformin reduced exercise adaptation.", "source": "openalex"}],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        return _Response(hit_payload if calls == 2 else running_payload)
+
+    client = FullrawSearchClient(search_url="http://fullraw/search", opener=opener, require_complete=True)
+
+    first = client.search("metformin exercise adaptation", limit=3)
+    second = client.search("metformin exercise adaptation", limit=3)
+
+    assert first.receipt.async_status == "running"
+    assert second.receipt.async_status == "hit"
+    assert calls == 2
 
 
 def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch) -> None:
