@@ -663,6 +663,35 @@ def test_fullraw_client_reports_async_running_state() -> None:
     assert result.receipt.error == "async_sweep_running"
 
 
+def test_fullraw_client_does_not_fan_out_when_exact_query_is_queued() -> None:
+    payloads: list[dict[str, object]] = []
+    payload: dict[str, object] = {
+        "meta": {
+            "shard_receipt": {"auth_required": True, "authenticated": True},
+            "async_sweep": {"status": "queued", "shard_limit": 1525},
+        },
+        "results": [],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        assert timeout > 0
+        payloads.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        return _Response(payload)
+
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        token="token",
+        opener=opener,
+        require_complete=True,
+    )
+
+    result = client.search("urolithin A mitochondrial aging", limit=5)
+
+    assert len(payloads) == 1
+    assert payloads[0]["query"] == "urolithin A mitochondrial aging"
+    assert result.receipt.async_status == "queued"
+
+
 def test_fullraw_client_requires_async_hit_for_complete_coverage() -> None:
     payload: dict[str, object] = {
         "meta": {

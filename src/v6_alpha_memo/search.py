@@ -138,6 +138,8 @@ class FullrawSearchClient:
                 if result is None:
                     continue
                 last = result
+                if self.require_complete and result.receipt.async_status in {"queued", "running", "busy"}:
+                    return result
                 if result.papers and _result_matches_query(result, variant):
                     return result
         return last
