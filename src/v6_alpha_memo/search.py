@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from http.client import RemoteDisconnected
+from pathlib import Path
 from threading import Lock
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
@@ -91,6 +93,8 @@ class FullrawSearchClient:
         require_complete: bool = False,
         cache_only: bool = True,
         queue_if_missing: bool = True,
+        cache_dir: str | None = None,
+        early_stop_shards: int = 0,
         opener: RequestOpener | None = None,
     ) -> None:
         self.search_url = search_url.strip()
@@ -104,6 +108,8 @@ class FullrawSearchClient:
         self.require_complete = require_complete
         self.cache_only = cache_only
         self.queue_if_missing = queue_if_missing
+        self.cache_dir = Path(cache_dir).expanduser() if cache_dir else None
+        self.early_stop_shards = max(0, early_stop_shards)
         self._opener = opener or cast(RequestOpener, urlopen)
         self._cache: dict[tuple[str, int], SearchResult] = {}
         self._cache_lock = Lock()
@@ -120,6 +126,8 @@ class FullrawSearchClient:
             require_complete=False,
             cache_only=False,
             queue_if_missing=False,
+            cache_dir=str(self.cache_dir) if self.cache_dir else None,
+            early_stop_shards=self.early_stop_shards,
             opener=self._opener,
         )
 
@@ -149,6 +157,8 @@ class FullrawSearchClient:
             require_complete=os.environ.get("V6_FULLRAW_REQUIRE_COMPLETE", "1") != "0",
             cache_only=_env_bool("V6_FULLRAW_CACHE_ONLY", True),
             queue_if_missing=_env_bool("V6_FULLRAW_QUEUE_IF_MISSING", True),
+            cache_dir=os.environ.get("V6_FULLRAW_RESULT_CACHE_DIR"),
+            early_stop_shards=int(os.environ.get("V6_FULLRAW_EARLY_STOP_SHARDS", "0")),
         )
 
     def search(self, query: str, *, limit: int = 5) -> SearchResult:
@@ -159,6 +169,9 @@ class FullrawSearchClient:
             cached = self._cache.get(cache_key)
         if cached is not None:
             return cached
+        cached = self._load_disk_result(cache_key)
+        if cached is not None:
+            return self._cache_result(cache_key, cached)
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
         variants = (query,) if self._fast_discovery_only() else _query_variants(query)
         for variant in variants:
@@ -168,6 +181,8 @@ class FullrawSearchClient:
                     continue
                 last = result
                 if self.require_complete and result.receipt.async_status in {"queued", "running", "busy"}:
+                    return result
+                if result.receipt.error == "early_stop_no_hits":
                     return result
                 if result.papers and _result_matches_query(result, variant):
                     return self._cache_result(cache_key, result)
@@ -180,7 +195,39 @@ class FullrawSearchClient:
             return result
         with self._cache_lock:
             self._cache[key] = result
+        if _coverage_complete(result.receipt):
+            self._store_disk_result(key, result)
         return result
+
+    def _load_disk_result(self, key: tuple[str, int]) -> SearchResult | None:
+        path = self._cache_path(key)
+        if path is None or not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text())
+            receipt = CoverageReceipt(**{**data["receipt"], "sources_searched": tuple(data["receipt"].get("sources_searched", ()))})
+            if not _coverage_complete(receipt):
+                return None
+            papers = tuple(Paper(**paper) for paper in data.get("papers", ()))
+            return SearchResult(query=str(data.get("query") or key[0]), papers=papers, receipt=receipt)
+        except (OSError, TypeError, KeyError, json.JSONDecodeError):
+            return None
+
+    def _store_disk_result(self, key: tuple[str, int], result: SearchResult) -> None:
+        path = self._cache_path(key)
+        if path is None:
+            return
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"query": result.query, "papers": [asdict(paper) for paper in result.papers], "receipt": asdict(result.receipt)}))
+        except OSError:
+            return
+
+    def _cache_path(self, key: tuple[str, int]) -> Path | None:
+        if self.cache_dir is None:
+            return None
+        digest = hashlib.sha256(f"{key[0]}\n{key[1]}".encode()).hexdigest()[:24]
+        return self.cache_dir / f"{digest}.json"
 
     def _fast_discovery_only(self) -> bool:
         return not self.require_complete and not self.cache_only and not self.queue_if_missing
@@ -212,15 +259,19 @@ class FullrawSearchClient:
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         data = self._poll_fullraw(search_url, payload, headers)
-        if self.require_complete and not _coverage_complete(_receipt(data, hits=0)):
-            return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0))
+        receipt = _receipt(data, hits=0)
+        if self.require_complete and not _coverage_complete(receipt):
+            return SearchResult(query=query, papers=(), receipt=receipt)
         parsed: list[Paper] = []
         for item in _items(data):
             paper = _parse_paper(item)
             if paper is not None:
                 parsed.append(paper)
         papers = tuple(parsed)
-        return SearchResult(query=query, papers=papers, receipt=_receipt(data, hits=len(papers)))
+        receipt = _receipt(data, hits=len(papers))
+        if not papers and _early_stop(receipt, self.early_stop_shards):
+            receipt = replace(receipt, error=receipt.error or "early_stop_no_hits")
+        return SearchResult(query=query, papers=papers, receipt=receipt)
 
     def _post(self, search_url: str, payload: dict[str, object], headers: dict[str, str]) -> object:
         request = Request(
@@ -311,6 +362,10 @@ def _coverage_complete(receipt: CoverageReceipt) -> bool:
         and receipt.sweep_failed_shards == 0
         and receipt.source_count_searched >= _FULLRAW_REQUIRED_SOURCES
     )
+
+
+def _early_stop(receipt: CoverageReceipt, threshold: int) -> bool:
+    return threshold > 0 and receipt.partial and receipt.shards_searched >= threshold
 
 
 def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:

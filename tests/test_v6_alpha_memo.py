@@ -4,6 +4,7 @@ import json
 import time
 from email.message import Message
 from io import BytesIO
+from pathlib import Path
 from threading import Lock
 from typing import cast
 from urllib.error import HTTPError
@@ -454,6 +455,68 @@ def test_fullraw_client_reuses_near_duplicate_query_cache() -> None:
 
     assert calls == ["urolithin A mitochondrial aging"]
     assert second is first
+
+
+def test_fullraw_client_persists_completed_sweep_cache(tmp_path: Path) -> None:
+    calls: list[str] = []
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "hit"},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+                "partial_shard_search": False,
+            },
+        },
+        "results": [{"title": "Metformin blunted exercise adaptation", "abstract": "Metformin reduced exercise adaptation.", "source": "openalex"}],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
+        return _Response(payload)
+
+    first_client = FullrawSearchClient(search_url="http://fullraw/search", opener=opener, require_complete=True, cache_dir=str(tmp_path))
+    first = first_client.search("metformin exercise adaptation", limit=3)
+    def fail_opener(request: Request, timeout: float) -> _Response:
+        del request, timeout
+        raise AssertionError("network should not be called")
+
+    second_client = FullrawSearchClient(search_url="http://fullraw/search", opener=fail_opener, require_complete=True, cache_dir=str(tmp_path))
+    second = second_client.search("metformin exercise", limit=3)
+
+    assert calls == ["metformin exercise adaptation"]
+    assert first.receipt.shards_searched == 1525
+    assert second.receipt.shards_searched == 1525
+    assert second.papers[0].title == "Metformin blunted exercise adaptation"
+
+
+def test_fullraw_client_early_stops_empty_partial_discovery() -> None:
+    calls: list[str] = []
+    payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 128, "shards_total": 1525, "partial_shard_search": True, "sources_searched": {"openalex": 1}}},
+        "results": [],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
+        return _Response(payload)
+
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=opener,
+        require_complete=False,
+        cache_only=True,
+        queue_if_missing=False,
+        early_stop_shards=100,
+    )
+    result = client.search("metformin exercise adaptation expected improved null outcome randomized trial", limit=3)
+
+    assert calls == ["metformin exercise adaptation expected improved null outcome randomized trial"]
+    assert result.receipt.error == "early_stop_no_hits"
 
 
 def test_fullraw_client_does_not_cache_strict_running_receipt() -> None:
