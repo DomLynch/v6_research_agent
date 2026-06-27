@@ -146,7 +146,8 @@ class FullrawSearchClient:
         if cached is not None:
             return cached
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
-        for variant in _query_variants(query):
+        variants = (query,) if self._fast_discovery_only() else _query_variants(query)
+        for variant in variants:
             for search_url in self.search_urls:
                 result = self._search_with_retries(variant, limit=limit, search_url=search_url)
                 if result is None:
@@ -166,6 +167,9 @@ class FullrawSearchClient:
         with self._cache_lock:
             self._cache[key] = result
         return result
+
+    def _fast_discovery_only(self) -> bool:
+        return not self.require_complete and not self.cache_only and not self.queue_if_missing
 
     def _search_with_retries(self, query: str, *, limit: int, search_url: str) -> SearchResult | None:
         for attempt in range(self.retry_attempts + 1):

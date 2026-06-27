@@ -625,6 +625,32 @@ def test_fullraw_client_compacts_zero_hit_queries() -> None:
     assert result.papers[0].title == "Metformin blunted exercise adaptation"
 
 
+def test_fast_discovery_uses_exact_batched_query_without_variant_fanout() -> None:
+    calls: list[str] = []
+    payload: dict[str, object] = {
+        "meta": {"shard_receipt": {"shards_searched": 16, "sources_searched": {"openalex": 1}}},
+        "results": [],
+    }
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        body = json.loads(cast(bytes, request.data or b"{}").decode())
+        calls.append(body["query"])
+        return _Response(payload)
+
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=opener,
+        require_complete=False,
+        cache_only=False,
+        queue_if_missing=False,
+    )
+
+    client.search("metformin exercise adaptation expected improved null outcome randomized trial")
+
+    assert calls == ["metformin exercise adaptation expected improved null outcome randomized trial"]
+
+
 def test_fullraw_client_skips_timeout_and_uses_next_variant() -> None:
     calls: list[str] = []
     hit_payload: dict[str, object] = {
