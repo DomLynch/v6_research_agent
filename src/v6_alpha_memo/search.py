@@ -133,15 +133,22 @@ class FullrawSearchClient:
 
     @classmethod
     def from_env(cls) -> FullrawSearchClient:
-        search_url = os.environ.get("V6_FULLRAW_SEARCH_URL") or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_SEARCH_URL")
+        search_url = (
+            os.environ.get("V6_FULLRAW_SEARCH_URL")
+            or os.environ.get("RESEARKA_FULLRAW_SEARCH_URL")
+            or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_SEARCH_URL")
+        )
         token = (
             os.environ.get("V6_FULLRAW_TOKEN")
+            or os.environ.get("RESEARKA_FULLRAW_INDEX_TOKEN")
             or os.environ.get("V5_MEMO_FULL_RAW_INDEX_TOKEN")
             or os.environ.get("V5_MEMO_FULL_RAW_CORPUS_TOKEN")
             or ""
         )
         sweep_wait = (
             os.environ.get("V6_FULLRAW_SWEEP_WAIT_SECONDS")
+            or os.environ.get("RESEARKA_FULLRAW_FOREGROUND_SWEEP_WAIT_SECONDS")
+            or os.environ.get("RESEARKA_FULLRAW_SWEEP_WAIT_SECONDS")
             or os.environ.get("V5_MEMO_FULL_RAW_FOREGROUND_SWEEP_WAIT_SECONDS")
             or os.environ.get("V5_MEMO_FULL_RAW_SWEEP_WAIT_SECONDS")
             or "900"

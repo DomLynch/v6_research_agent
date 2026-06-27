@@ -590,9 +590,11 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
             }
         ],
     }
-    monkeypatch.setenv("V6_FULLRAW_SEARCH_URL", "http://fullraw/search")
+    monkeypatch.delenv("V6_FULLRAW_SEARCH_URL", raising=False)
+    monkeypatch.setenv("RESEARKA_FULLRAW_SEARCH_URL", "http://fullraw/search")
     monkeypatch.delenv("V6_FULLRAW_TOKEN", raising=False)
-    monkeypatch.setenv("V5_MEMO_FULL_RAW_INDEX_TOKEN", "index-token")
+    monkeypatch.setenv("RESEARKA_FULLRAW_INDEX_TOKEN", "index-token")
+    monkeypatch.setenv("V5_MEMO_FULL_RAW_INDEX_TOKEN", "legacy-token")
 
     def fake_post(self: FullrawSearchClient, url: str, post_payload: dict[str, object], headers: dict[str, str]) -> dict[str, object]:
         del self
