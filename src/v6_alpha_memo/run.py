@@ -77,14 +77,17 @@ def build_memo(
     topic_terms = _topic_terms(topic)
     scored = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
     if not scored:
+        trace = _trace(
+            results,
+            (),
+            paper_count=len(papers),
+            pair_count=len(pairs),
+            scored_count=0,
+        )
+        if _search_waiting(results):
+            trace["blocked_stage"] = "search_cache_waiting"
         raise NoMemoError(
-            _trace(
-                results,
-                (),
-                paper_count=len(papers),
-                pair_count=len(pairs),
-                scored_count=0,
-            )
+            trace
         )
     receipt = _best_receipt(results)
     if verify_client is not None:
@@ -240,6 +243,14 @@ def _receipt_complete(receipt: CoverageReceipt) -> bool:
         and receipt.sweep_failed_shards == 0
         and receipt.source_count_searched >= 5
         and not receipt.partial
+    )
+
+
+def _search_waiting(results: tuple[SearchResult, ...]) -> bool:
+    return any(
+        result.receipt.async_status in {"queued", "running", "busy"}
+        or (result.receipt.shards_total == 1525 and result.receipt.shards_searched < 1525)
+        for result in results
     )
 
 

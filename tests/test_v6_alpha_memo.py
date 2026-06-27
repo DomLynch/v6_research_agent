@@ -184,6 +184,21 @@ def test_build_memo_waits_when_strict_verification_is_still_queued() -> None:
     assert exc.value.trace["top_pairs"]
 
 
+def test_build_memo_marks_queued_search_as_cache_waiting() -> None:
+    class QueuedSearchClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            del limit
+            return SearchResult(query, (), CoverageReceipt(async_status="queued", shards_total=1525, partial=True))
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("urolithin A mitochondrial aging", client=QueuedSearchClient(), query_limit=3, discovery_workers=3)
+
+    assert exc.value.trace["blocked_stage"] == "search_cache_waiting"
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert len(coverage) == 3
+    assert {row["async_status"] for row in coverage} == {"queued"}
+
+
 def test_scores_translation_boundary_without_reversal() -> None:
     papers = (
         Paper(
