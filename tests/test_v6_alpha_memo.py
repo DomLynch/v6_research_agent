@@ -491,6 +491,7 @@ def test_fullraw_client_backfills_empty_doi_abstract(monkeypatch: pytest.MonkeyP
     def fake_backfill(request: Request, timeout: float) -> _Response:
         assert timeout > 0
         assert "api.semanticscholar.org" in request.full_url
+        assert "DOI:10.1123/ijspp.2019-0965" in request.full_url
         return _Response({"abstract": "Backfilled abstract with strength adaptation outcomes.", "venue": "IJSPP"})
 
     monkeypatch.setattr(v6_search, "urlopen", fake_backfill)

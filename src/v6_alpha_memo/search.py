@@ -425,7 +425,7 @@ def _backfill_missing_abstracts(papers: tuple[Paper, ...]) -> tuple[Paper, ...]:
 def _semantic_scholar_backfill(paper: Paper) -> Paper:
     url = (
         "https://api.semanticscholar.org/graph/v1/paper/"
-        f"DOI:{quote(paper.doi, safe='')}?fields=title,abstract,year,venue,url"
+        f"DOI:{quote(paper.doi, safe='/')}?fields=title,abstract,year,venue,url"
     )
     try:
         with urlopen(Request(url, headers={"User-Agent": "v6-alpha-memo/0.1"}), timeout=10) as response:
