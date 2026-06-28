@@ -353,7 +353,8 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
 
 
 def _claim_contract_flags(topic: str, memo: str, scored: ScoredPair) -> tuple[str, ...]:
-    claim = f"{topic} {_memo_claim_surface(memo)}"
+    topic_claim_terms = " ".join(term for term in _topic_terms(topic) if term in _MODALITY_TERMS or term in _OUTCOME_TERMS)
+    claim = f"{topic_claim_terms} {_memo_claim_surface(memo)}"
     receipt_text = f"{scored.pair.a.text} {scored.pair.b.text}".casefold()
     receipt_title_tokens = (_tokens(scored.pair.a.title), _tokens(scored.pair.b.title))
     receipt_tokens = _tokens(receipt_text)
@@ -424,14 +425,14 @@ _SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | frozenset({
     "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
 })
 _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
-    "adaptation", "adaptations", "after", "alpha", "anchor", "antidiabetes", "benefit", "beneficial", "blunted", "blocks",
+    "adaptation", "adaptations", "after", "alpha", "anchor", "antidiabetes", "attenuate", "attenuated", "attenuates", "benefit", "beneficial", "blunted", "blunting", "blocks",
     "and", "compound", "compounds",
     "across", "bounded", "boundary", "but", "can", "carry", "claim", "cleanly", "comparison", "context", "deficit", "dependent", "different", "direction", "effect", "endpoint", "expect",
-    "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "intervention", "may", "mechanism",
+    "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "impair", "impaired", "impairment", "impairs", "intervention", "may", "mechanism",
     "gains", "harm", "improve", "improved", "improves", "longevity", "memo", "modality", "negative", "null", "one", "outcome",
     "limited", "limit", "limits", "looks", "positive", "preserved", "promise", "protect", "protected", "protection", "protective",
     "automatically", "does", "not", "rather", "receipt", "receipts", "reduced", "reversal", "reverse", "signal", "setting", "settings", "species",
-    "recovery", "same", "sentence", "split", "splits", "stable", "supported", "than", "that", "the", "tool", "training", "travel", "trial", "two",
+    "recovery", "same", "sentence", "split", "splits", "stable", "supported", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
     "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "would",
 })
 _CROSS_COMPARISON_MARKERS = (

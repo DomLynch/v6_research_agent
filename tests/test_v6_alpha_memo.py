@@ -494,6 +494,33 @@ def test_claim_contract_allows_explicit_cross_compound_title() -> None:
     assert "weak_direct_anchor:metformin" not in v6_run._claim_contract_flags("metformin exercise adaptation", memo, scored[0])
 
 
+def test_claim_contract_allows_polarity_cues_in_topic() -> None:
+    memo = "# Alpha memo: resveratrol exercise signal\n**One-sentence alpha:** Resveratrol in exercise-trained rats does not transfer cleanly to aged men.\n"
+    papers = (
+        Paper(
+            "a",
+            "Improvements in skeletal muscle strength and cardiac function induced by resveratrol during exercise training contribute to enhanced exercise performance in rats",
+            "Resveratrol during exercise training improved skeletal muscle strength and exercise performance in rats.",
+            "openalex",
+            2013,
+            "10.test/rat",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle of aged men",
+            "Exercise training but not resveratrol improved metabolic status in skeletal muscle of aged men.",
+            "pubmed",
+            2014,
+            "10.test/human",
+        ),
+    )
+    pair = CandidatePair(papers[0], papers[1], ("skeletal", "muscle", "resveratrol", "exercise"))
+    scored = ScoredPair(pair, 100, "mechanism_to_human_failure", "update", ("shared_anchor:resveratrol",))
+
+    assert not v6_run._claim_contract_flags("resveratrol human exercise training blunting", memo, scored)
+    assert not v6_run._claim_contract_flags("resveratrol human exercise training blunting", v6_run._contract_surface(scored), scored)
+
+
 def test_build_memo_searches_discovery_queries_in_parallel() -> None:
     active = 0
     peak = 0
