@@ -23,7 +23,9 @@ from v6_alpha_memo import (
 from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import search as v6_search
 from v6_alpha_memo import write as v6_write
+from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
+from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
 from v6_alpha_memo.write import judge_with_minimax
 
@@ -86,6 +88,94 @@ def test_rejects_background_efficacy_as_promise_receipt() -> None:
     )
 
     scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "exercise", "adaptation"})
+
+    assert scored == ()
+
+
+def test_rejects_same_drug_unrelated_protocol_bridge() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Metformin and Hyperemesis Gravidarum: Reframing a Metabolic Disorder Through the Lens of Placental Adaptation",
+            "Metformin is discussed in a placental metabolic disorder context with pregnancy outcomes.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Metformin Protects Rat Skeletal Muscle from Physical Exercise-Induced Injury",
+            "Metformin protected rat skeletal muscle damage markers after physical exercise.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "exercise", "training", "adaptation"})
+
+    assert scored == ()
+
+
+def test_rejects_topic_entity_missing_from_receipt_titles() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Influence of Sodium Glucose Cotransporter 2 Inhibition on Physiological Adaptation to Endurance Exercise Training",
+            "The introduction mentions metformin as background.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Adaptation of endogenous insulin secretion by an individual sport therapeutic intervention",
+            "The pilot study mentions metformin in background.",
+            "pubmed",
+        ),
+    )
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "exercise", "training", "adaptation"})
+
+    assert scored == ()
+
+    pair = CandidatePair(papers[0], papers[1], ("adaptation", "training", "metformin"))
+    weak = ScoredPair(pair, 85, "subgroup_endpoint_split", "weak", ("shared_anchor:metformin",))
+    flags = v6_run._claim_contract_flags("metformin exercise training adaptation", "# Alpha memo: adaptation / training bounded update", weak)
+    assert "weak_direct_anchor:metformin" in flags
+
+
+def test_heart_failure_is_not_a_negative_result_signal() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Urolithin A induces cardioprotection and enhanced mitochondrial quality during natural aging and heart failure",
+            "Urolithin A improved mitochondrial quality.",
+            "biorxiv",
+        ),
+        Paper(
+            "b",
+            "Methylated urolithin A mitigates cognitive impairment and mitochondrial dysfunction in aging mice",
+            "Methylated urolithin A improved learning and memory in aging mice.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"urolithin", "mitochondrial", "aging"})
+
+    assert scored == ()
+
+
+def test_rejects_subgroup_split_without_shared_endpoint_family() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Cold-water immersion after training sessions: effects on fiber type-specific adaptations in muscle K+ transport proteins to sprint-interval training in men",
+            "Training changed muscle K+ transport proteins after sprint interval training.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "The Effects of Daily Cold-Water Recovery and Postexercise Hot-Water Immersion on Training-Load Tolerance During 5 Days of Heat-Based Training",
+            "Cold-water immersion changed session RPE training-load tolerance during heat training.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "immersion", "training"})
 
     assert scored == ()
 
@@ -292,11 +382,11 @@ def test_claim_contract_rejects_single_drug_title_on_cross_drug_pair(
             )
             return SearchResult(query, papers, CoverageReceipt(hits=2))
 
-    def fake_render(pairs: tuple[object, ...], **kwargs: object) -> str:
-        del pairs, kwargs
+    def fake_render(pair: object, **kwargs: object) -> str:
+        del pair, kwargs
         return "**Memo: Metformin + Exercise -- Protection Signal vs Adaptation Deficit**\n\n**Alpha:** Metformin splits protection and adaptation under exercise.\n"
 
-    monkeypatch.setattr(v6_run, "render_with_minimax", fake_render)
+    monkeypatch.setattr(v6_run, "render_memo", fake_render)
     monkeypatch.setattr(v6_run, "judge_with_minimax", lambda pairs: pairs[:1])
 
     with pytest.raises(NoMemoError) as exc:
@@ -1357,18 +1447,41 @@ def test_build_memo_keeps_minimax_selected_pair(monkeypatch: pytest.MonkeyPatch)
         selected["pair"] = (pairs[1],)
         return selected["pair"]
 
-    def fake_render(pairs: tuple[object, ...], **kwargs: object) -> str:
-        assert pairs == selected["pair"]
-        assert kwargs["judge"] is False
+    def fake_render(pair: object, **kwargs: object) -> str:
+        assert pair == selected["pair"][0]
+        assert "receipt" in kwargs
         return "memo\n"
 
     monkeypatch.setattr(v6_run, "judge_with_minimax", fake_judge)
-    monkeypatch.setattr(v6_run, "render_with_minimax", fake_render)
+    monkeypatch.setattr(v6_run, "render_memo", fake_render)
 
     run = build_memo("tool", client=TwoPairClient(), writer="minimax")
 
     assert run.memo == "memo\n"
     assert run.top_pairs == selected["pair"]
+
+
+def test_build_memo_keeps_deterministic_elite_when_minimax_vetoes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(v6_run, "judge_with_minimax", lambda pairs: ())
+
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient(), writer="minimax")
+
+    assert run.top_pairs[0].score >= 85
+    assert run.memo.startswith("# Alpha memo:")
+
+
+def test_build_memo_rejects_weak_pair_when_minimax_vetoes(monkeypatch: pytest.MonkeyPatch) -> None:
+    pair = mine_pairs((
+        Paper("a", "Tool X improves accuracy", "Tool X improved accuracy.", "openalex"),
+        Paper("b", "Tool X produces mixed accuracy results", "Tool X had mixed results.", "pubmed"),
+    ))[0]
+    weak = ScoredPair(pair, 70, "shared_anchor", "weak update", ("shared_anchor:tool",))
+
+    monkeypatch.setattr(v6_run, "score_pairs", lambda pairs, **kwargs: (weak,))
+    monkeypatch.setattr(v6_run, "judge_with_minimax", lambda pairs: ())
+
+    with pytest.raises(RuntimeError, match="MiniMax rejected all receipt pairs"):
+        build_memo("tool accuracy", client=DemoClient(), writer="minimax")
 
 
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:

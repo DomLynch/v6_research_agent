@@ -17,7 +17,7 @@ _PROMISE = frozenset({
 })
 _FAILURE = frozenset({
     "attenuate", "attenuated", "attenuates", "blunt", "blunted", "decrease",
-    "decreased", "failed", "failure", "impair", "impaired", "limited",
+    "decreased", "failed", "impair", "impaired", "limited",
     "lowered", "null", "reduce", "reduced", "unchanged", "worse", "worsened",
 })
 _MECHANISM = frozenset({
@@ -42,6 +42,11 @@ _ADAPTATION = frozenset({"adaptation", "adaptations", "adaptive"})
 _MODALITY = frozenset({
     "endurance", "interval", "load", "modality", "resistance", "sprint",
     "strength", "training-load",
+})
+_ENDPOINT = _ADAPTATION | frozenset({
+    "accuracy", "biomarker", "biomarkers", "damage", "forecast", "function",
+    "glutathione", "hypertrophy", "insulin", "mitochondrial", "performance",
+    "productivity", "sensitivity", "strength", "tolerance",
 })
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
@@ -164,6 +169,12 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if a.doi and b.doi and a.doi != b.doi:
         score += 5
         reasons.append("doi_distinct")
+    if shape == "subgroup_endpoint_split" and not _shared_endpoint(a, b):
+        score = 0
+        reasons.append("reject:endpoint_mismatch")
+    if shape == "protocol_result_mismatch" and _shared_title_anchor_count(a, b, anchors) < 2:
+        score = 0
+        reasons.append("reject:weak_directness")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
@@ -230,6 +241,16 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
         return "reject:name_or_context_only_anchor"
     return ""
+
+
+def _shared_title_anchor_count(a: Paper, b: Paper, anchors: tuple[str, ...]) -> int:
+    title_a = set(_WORD_RE.findall(a.title.casefold()))
+    title_b = set(_WORD_RE.findall(b.title.casefold()))
+    return sum(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors)
+
+
+def _shared_endpoint(a: Paper, b: Paper) -> bool:
+    return bool((_tokens(a) & _tokens(b)) & _ENDPOINT)
 
 
 def _nonprimary(paper: Paper) -> bool:

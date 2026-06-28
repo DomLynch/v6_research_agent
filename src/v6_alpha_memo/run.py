@@ -20,7 +20,7 @@ from v6_alpha_memo.search import (
     merge_results,
     query_shapes,
 )
-from v6_alpha_memo.write import judge_with_minimax, render_memo, render_with_minimax
+from v6_alpha_memo.write import judge_with_minimax, render_memo
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,10 +89,25 @@ def build_memo(
         raise NoMemoError(
             trace
         )
+    safe_scored = _claim_safe_pairs(topic, scored)
+    if not safe_scored:
+        trace = _trace(
+            results,
+            scored,
+            paper_count=len(papers),
+            pair_count=len(pairs),
+            scored_count=len(scored),
+        )
+        trace["blocked_stage"] = "claim_contract_failed"
+        trace["claim_contract_flags"] = _claim_contract_flags(topic, _contract_surface(scored[0]), scored[0])
+        raise NoMemoError(trace)
+    scored = safe_scored
     receipt = _best_receipt(results)
     if writer == "minimax":
-        scored = judge_with_minimax(scored)
-        if not scored:
+        judged = judge_with_minimax(scored)
+        if judged:
+            scored = judged
+        elif scored[0].score < 85:
             raise RuntimeError("MiniMax rejected all receipt pairs")
     if verify_client is not None:
         covered = _complete_receipt_covering_pair(results, scored[0])
@@ -112,10 +127,7 @@ def build_memo(
             )
             trace["blocked_stage"] = "verification_cache_waiting"
             raise NoMemoError(trace)
-    if writer == "minimax":
-        memo = render_with_minimax(scored, receipt=receipt, judge=False)
-    else:
-        memo = render_memo(scored[0], receipt=receipt)
+    memo = render_memo(scored[0], receipt=receipt)
     flags = _claim_contract_flags(topic, memo, scored[0])
     if flags:
         trace = _trace(
@@ -342,9 +354,18 @@ def _claim_contract_flags(topic: str, memo: str, scored: ScoredPair) -> tuple[st
             if term in _SOFT_ANCHOR_TERMS:
                 continue
             title_hits = sum(term in tokens for tokens in receipt_title_tokens)
-            if title_hits == 1:
+            if title_hits != 2:
                 flags.append(f"weak_direct_anchor:{term}")
     return tuple(dict.fromkeys(flags))
+
+
+def _claim_safe_pairs(topic: str, scored: tuple[ScoredPair, ...]) -> tuple[ScoredPair, ...]:
+    return tuple(pair for pair in scored if not _claim_contract_flags(topic, _contract_surface(pair), pair))
+
+
+def _contract_surface(scored: ScoredPair) -> str:
+    anchors = " ".join(scored.pair.anchors)
+    return f"# Alpha memo: {anchors} bounded update\n**One-sentence alpha:** {anchors} translation boundary\n"
 
 
 def _memo_claim_surface(memo: str) -> str:
@@ -391,14 +412,15 @@ _SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | frozenset({
     "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
 })
 _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
-    "adaptation", "adaptations", "alpha", "anchor", "antidiabetes", "benefit", "beneficial", "blunted", "blocks",
+    "adaptation", "adaptations", "after", "alpha", "anchor", "antidiabetes", "benefit", "beneficial", "blunted", "blocks",
     "and", "compound", "compounds",
-    "bounded", "boundary", "can", "claim", "cleanly", "context", "deficit", "different", "effect", "endpoint", "expect",
+    "across", "bounded", "boundary", "but", "can", "carry", "claim", "cleanly", "comparison", "context", "deficit", "dependent", "different", "direction", "effect", "endpoint", "expect",
     "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "intervention", "may", "mechanism",
-    "gains", "improve", "improved", "improves", "longevity", "memo", "modality", "negative", "null", "one", "outcome",
-    "positive", "preserved", "promise", "protect", "protected", "protection", "protective", "reduced", "reversal", "reverse", "signal",
-    "recovery", "same", "sentence", "split", "splits", "that", "the", "tool", "training", "travel", "trial",
-    "under", "uniformly", "update", "versus", "would",
+    "gains", "harm", "improve", "improved", "improves", "longevity", "memo", "modality", "negative", "null", "one", "outcome",
+    "limited", "limit", "limits", "looks", "positive", "preserved", "promise", "protect", "protected", "protection", "protective",
+    "automatically", "does", "not", "rather", "receipt", "receipts", "reduced", "reversal", "reverse", "signal", "setting", "settings", "species",
+    "recovery", "same", "sentence", "split", "splits", "stable", "supported", "than", "that", "the", "tool", "training", "travel", "trial", "two",
+    "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "would",
 })
 _CROSS_COMPARISON_MARKERS = (
     " compared ", " comparison ", "split by compound",

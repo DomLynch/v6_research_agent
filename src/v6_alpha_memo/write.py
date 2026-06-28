@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -14,33 +15,40 @@ _MINIMAX_BASE_URL = "https://api.minimax.io/anthropic"
 
 
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
+    del receipt
     pair = scored.pair
     title = _title(scored)
+    anchor = _display_anchor(scored, limit=3)
     lines = [
         f"# {title}",
         "",
-        f"**One-sentence alpha:** {scored.expectation_update}",
+        "**Research question:** How far does the Receipt 1 signal transfer across the setting tested by Receipt 2?",
+        "",
+        f"**One-sentence alpha:** {_alpha_sentence(scored)}",
         "",
         f"**Receipt 1:** {_receipt_line(pair.a)}",
         "",
         f"**Receipt 2:** {_receipt_line(pair.b)}",
         "",
-        f"**Why this is surprising:** The pair has `{scored.shape}` geometry over "
-        f"`{', '.join(pair.anchors[:3])}` rather than a broad literature-summary bridge.",
+        "**Synthesis:** "
+        f"Receipt 1 reports {_brief_finding(pair.a)} in {_setting(pair.a)}. Receipt 2 reports "
+        f"{_brief_finding(pair.b)} in {_setting(pair.b)}. The comparison is bounded to {anchor}, "
+        "and should not be read as advice, settled science, or a broad class claim.",
+        f"**Bounded contrast:** Receipt 1 axes: {_evidence_axes(pair.a)}. Receipt 2 axes: {_evidence_axes(pair.b)}.",
+        "**Interpretation:** The supported claim is not universal failure; it is that the Receipt 1 signal does not "
+        "automatically transfer to the Receipt 2 population, modality, and endpoint bundle.",
         "",
-        "**Caveats/falsifiers:**",
-        "- Reject if the shared anchor is not the same construct/intervention in the full text.",
-        "- Reject if later receipts show the apparent reversal is only population, dose, or measurement noise.",
-        "- Reject if either receipt is a review, case-only report, or keyword-only match.",
+        "**Why this is surprising:** The same named anchor is not enough. The useful signal is the boundary between "
+        f"the two receipt settings and endpoints, not a literature-average claim about {anchor}.",
+        "",
+        "**Limitations:** This pair does not isolate whether species, population, dose, duration, modality, or endpoint class explains the split.",
+        "",
+        "**Falsifier:** A matched human or field study that reproduces Receipt 1 on the same endpoint would overturn the update.",
+        "",
+        "**Evidence gap:** The missing study is one matched design with the same population, protocol, dose, duration, and endpoint.",
+        "",
+        f"**Next test:** Run the same {anchor} comparison in one matched design before treating the signal as general.",
     ]
-    if receipt is not None:
-        lines.extend([
-            "",
-            "**Search receipt:** "
-            f"hits={receipt.hits}; shards={receipt.shards_searched}/{receipt.shards_total}; "
-            f"sources={','.join(receipt.sources_searched) or 'unknown'}; "
-            f"papers_searched={receipt.papers_searched}; partial={receipt.partial}.",
-        ])
     return "\n".join(lines).strip() + "\n"
 
 
@@ -122,8 +130,63 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = " / ".join(scored.pair.anchors[:2]) or "receipt pair"
-    return f"Alpha memo: {anchor} {scored.shape.replace('_', ' ')}"
+    anchor = _display_anchor(scored, limit=2)
+    return f"Alpha memo: {anchor} bounded update"
+
+
+def _alpha_sentence(scored: ScoredPair) -> str:
+    anchor = _display_anchor(scored, limit=2)
+    return (
+        f"{anchor} does not carry one stable direction across the two receipts; the supported alpha is "
+        "an endpoint- and setting-bounded comparison rather than a universal benefit or harm claim."
+    )
+
+
+def _display_anchor(scored: ScoredPair, *, limit: int) -> str:
+    anchors = [anchor for anchor in scored.pair.anchors if anchor not in _TITLE_ANCHOR_DROP]
+    anchors = anchors or list(scored.pair.anchors)
+    phrase = _contiguous_phrase(anchors, f"{scored.pair.a.title} {scored.pair.b.title}")
+    if phrase:
+        return phrase
+    return " / ".join(anchors[:limit]) or "the shared receipt anchor"
+
+
+def _brief_finding(paper: Paper) -> str:
+    title = paper.title.rstrip(".")
+    excerpt = _first_sentence(paper.abstract)
+    return f"{title}; excerpt: {excerpt}" if excerpt else title
+
+
+def _first_sentence(text: str) -> str:
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip()) if text.strip() else []
+    sentence = next((item for item in sentences if _RESULT_MARKERS.search(item)), sentences[0] if sentences else "")
+    return sentence[:240].rstrip()
+
+
+def _evidence_axes(paper: Paper) -> str:
+    terms = set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
+    axes = [term for term in _AXIS_TERMS if term in terms]
+    return ", ".join(axes[:8]) if axes else "endpoint not explicit in title"
+
+
+def _contiguous_phrase(anchors: list[str], text: str) -> str:
+    normalized = f" {text.casefold().replace('-', ' ')} "
+    for size in range(min(4, len(anchors)), 1, -1):
+        phrase = " ".join(anchors[:size])
+        if f" {phrase} " in normalized:
+            return phrase
+    return ""
+
+
+def _setting(paper: Paper) -> str:
+    terms = set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
+    if terms & {"rat", "rats", "mouse", "mice"}:
+        return "an animal model"
+    if terms & {"adult", "adults", "aged", "human", "men", "participants", "trial", "women"}:
+        return "a human study"
+    if terms & {"field", "firm", "firms", "manager", "management", "worker", "workers"}:
+        return "a field setting"
+    return "a different study setting"
 
 
 def _receipt_line(paper: Paper) -> str:
@@ -212,3 +275,12 @@ def _content_text(data: object) -> str:
     if isinstance(content, list):
         return "\n".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
     return str(data.get("text", ""))
+
+
+_TITLE_ANCHOR_DROP = frozenset({"cell", "cells", "muscle", "skeletal", "study", "trial"})
+_RESULT_MARKERS = re.compile(r"\b(but not|did not|failed|improved|reduced|blunted|increased|decreased|null|result)", re.I)
+_AXIS_TERMS = (
+    "rats", "mice", "mouse", "men", "women", "adults", "aged", "human", "sprint", "cycling", "strength",
+    "resistance", "endurance", "exercise", "training", "cardiac", "metabolic", "inflammatory", "performance",
+    "adaptation", "adaptations", "function", "tolerance",
+)
