@@ -35,6 +35,7 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         f"{_brief_finding(pair.b)} in {_setting(pair.b)}. The comparison is bounded to {anchor}, "
         "and should not be read as advice, settled science, or a broad class claim.",
         f"**Bounded contrast:** Receipt 1 axes: {_evidence_axes(pair.a)}. Receipt 2 axes: {_evidence_axes(pair.b)}.",
+        f"**Receipt-role check:** {_receipt_role_check(scored)}",
         f"**Interpretation:** {_logical_move(scored)}",
         "",
         f"**Why this is surprising:** {_why_surprising(scored)}",
@@ -181,7 +182,7 @@ def _boundary_label(a: Paper, b: Paper) -> str:
     a_kind, b_kind = _setting_label(a), _setting_label(b)
     a_endpoint, b_endpoint = _axis_label(a), _axis_label(b)
     if a_endpoint != b_endpoint:
-        return f"{a_kind} {a_endpoint}-to-{b_kind} {b_endpoint} boundary"
+        return f"{a_kind}-to-{b_kind} endpoint boundary"
     if _has_disease_axis(a) != _has_disease_axis(b):
         if _has_disease_axis(a):
             return f"disease-model-to-{b_kind} boundary"
@@ -289,6 +290,12 @@ def _logical_move(scored: ScoredPair) -> str:
         f"Receipt 2 establishes {_axis_label(pair.b)} in {_setting_label(pair.b)}; "
         "the update is the boundary between those receipt-owned axes, not a universal benefit or failure claim."
     )
+
+
+def _receipt_role_check(scored: ScoredPair) -> str:
+    if _combined_protocol(scored.pair.a):
+        return "Receipt 1 is treated as the full combined protocol named in its title, not isolated single-component causality."
+    return "Each receipt is interpreted only within its named intervention, comparator, population, and endpoint setting."
 
 
 def _falsifier(scored: ScoredPair) -> str:
