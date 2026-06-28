@@ -35,7 +35,8 @@ def mine_pairs(papers: tuple[Paper, ...], *, limit: int = 80) -> tuple[Candidate
         reject = _pair_rejects(a, b)
         if reject:
             continue
-        anchors = tuple(sorted((_terms(a) & _terms(b)) - _BAD_SHARED))
+        shared = (_terms(a) & _terms(b)) - _BAD_SHARED
+        anchors = tuple(word for word in _ordered_terms(a) if word in shared)
         if not anchors:
             continue
         pairs.append(CandidatePair(a=a, b=b, anchors=anchors[:6]))
@@ -56,6 +57,11 @@ def _pair_rejects(a: Paper, b: Paper) -> tuple[str, ...]:
 
 def _terms(paper: Paper) -> set[str]:
     return {word for word in _WORD_RE.findall(paper.text.casefold()) if word not in _STOP}
+
+
+def _ordered_terms(paper: Paper) -> tuple[str, ...]:
+    terms = (word for word in _WORD_RE.findall(paper.text.casefold()) if word not in _STOP)
+    return tuple(dict.fromkeys(terms))
 
 
 def _source_diverse(pair: CandidatePair) -> int:
