@@ -323,16 +323,7 @@ def test_merge_results_prefers_published_duplicate_over_preprint() -> None:
 
 def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     payload: dict[str, object] = {
-        "meta": {
-            "shard_receipt": {
-                "shards_searched": 965,
-                "shards_total": 1397,
-                "papers_searched": 648767345,
-                "papers_total": 1379119449,
-                "sources_searched": {"openalex": 100, "pubmed": 10},
-                "partial_shard_search": True,
-            }
-        },
+        "meta": _strict_meta({"openalex": 100, "pubmed": 10}),
         "results": [
             {
                 "id": "W1",
@@ -353,13 +344,16 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     result = client.search("metformin oxidative stress", limit=3)
 
     assert result.receipt.hits == 1
-    assert result.receipt.shards_searched == 965
+    assert result.receipt.async_status == "hit"
+    assert result.receipt.shards_searched == 1525
+    assert result.receipt.source_count_searched == 5
     assert "openalex" in result.receipt.sources_searched
     assert result.papers[0].doi == "10.test/metformin"
 
 
 def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {
+        "meta": _strict_meta({"semantic_scholar": 1}),
         "results": [
             {
                 "id": "S2",
@@ -377,7 +371,6 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
                 "doi": "10.3389/fragi.2022.852569",
             }
         ],
-        "receipt": {"sources_searched": {"semantic_scholar": 1}},
     }
     monkeypatch.setenv("V6_FULLRAW_SEARCH_URL", "http://fullraw/search")
     monkeypatch.setattr(
@@ -405,11 +398,11 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
 def test_fullraw_client_skips_noisy_results_for_rare_query_variant() -> None:
     calls: list[str] = []
     noise_payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 8, "sources_searched": {"openalex": 1}}},
+        "meta": _strict_meta({"openalex": 1}),
         "results": [{"title": "Clinical outcomes in older adults", "abstract": "Older adults had clinical outcomes.", "source": "openalex"}],
     }
     hit_payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 8, "sources_searched": {"semantic_scholar": 1}}},
+        "meta": _strict_meta({"semantic_scholar": 1}),
         "results": [{
             "title": "Glycine and N-Acetylcysteine Supplementation on Glutathione Redox Status",
             "abstract": "GlyNAC did not increase total glutathione in healthy older adults.",
@@ -439,11 +432,11 @@ def test_fullraw_client_skips_noisy_results_for_rare_query_variant() -> None:
 def test_fullraw_client_compacts_zero_hit_queries() -> None:
     calls: list[str] = []
     payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "meta": _strict_meta({"openalex": 1}),
         "results": [],
     }
     hit_payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "meta": _strict_meta({"openalex": 1}),
         "results": [
             {
                 "id": "W1",
@@ -474,7 +467,7 @@ def test_fullraw_client_compacts_zero_hit_queries() -> None:
 def test_fullraw_client_skips_timeout_and_uses_next_variant() -> None:
     calls: list[str] = []
     hit_payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "meta": _strict_meta({"openalex": 1}),
         "results": [
             {
                 "id": "W1",
@@ -507,7 +500,7 @@ def test_fullraw_client_skips_timeout_and_uses_next_variant() -> None:
 def test_fullraw_client_falls_back_to_second_endpoint() -> None:
     urls: list[str] = []
     hit_payload: dict[str, object] = {
-        "meta": {"shard_receipt": {"shards_searched": 50, "sources_searched": {"openalex": 1}}},
+        "meta": _strict_meta({"openalex": 1}),
         "results": [
             {
                 "id": "W1",
@@ -538,10 +531,7 @@ def test_fullraw_client_falls_back_to_second_endpoint() -> None:
 def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> None:
     payloads: list[dict[str, object]] = []
     hit_payload: dict[str, object] = {
-        "meta": {
-            "async_sweep": {"status": "hit"},
-            "shard_receipt": {"shards_searched": 1514, "shards_total": 1514},
-        },
+        "meta": _strict_meta({"openalex": 1}),
         "results": [
             {
                 "id": "W1",
@@ -572,10 +562,59 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> Non
     )
     result = client.search("calcium alpha ketoglutarate aging", limit=3)
 
-    assert payloads[0].get("cache_only") is None
+    assert payloads[0].get("cache_only") is True
+    assert payloads[0].get("rank_mode") == "relevance"
     assert payloads[1].get("cache_only") is True
-    assert result.receipt.shards_searched == 1514
+    assert result.receipt.shards_searched == 1525
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
+
+
+def test_fullraw_client_does_not_fan_out_when_sweep_is_busy() -> None:
+    calls: list[str] = []
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
+        return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search(
+        "metformin exercise adaptation expected improved null outcome randomized trial"
+    )
+
+    assert calls == ["metformin exercise adaptation expected improved null outcome randomized trial"]
+    assert result.papers == ()
+    assert result.receipt.error == "async_sweep_busy"
+
+
+def test_build_memo_stops_query_fanout_when_fullraw_is_waiting() -> None:
+    class WaitingClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
+
+    client = WaitingClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("resveratrol exercise adaptation", client=client)
+
+    assert client.queries == ["resveratrol exercise adaptation"]
+    assert exc.value.trace["coverage"] == [
+        {
+            "hits": 0,
+            "async_status": "",
+            "shards_searched": 0,
+            "shards_total": 0,
+            "source_count_searched": 0,
+            "sources_searched": (),
+            "papers_searched": 0,
+            "partial": False,
+            "sweep_failed_shards": 0,
+            "error": "async_sweep_queued",
+        }
+    ]
 
 
 def test_writer_stays_receipt_owned() -> None:
@@ -716,3 +755,19 @@ def _fake_opener(payload: dict[str, object]) -> RequestOpener:
         return _Response(payload)
 
     return opener
+
+
+def _strict_meta(sources: dict[str, int]) -> dict[str, object]:
+    return {
+        "async_sweep": {"status": "hit"},
+        "shard_receipt": {
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "papers_searched": 1456919317,
+            "papers_total": 1456919317,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+            "sources_searched": sources,
+            "partial_shard_search": False,
+        },
+    }
