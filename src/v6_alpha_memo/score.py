@@ -12,12 +12,13 @@ _WORD_RE = re.compile(r"[a-z][a-z0-9-]{2,}")
 _PROMISE = frozenset({
     "activate", "activated", "benefit", "enhance", "enhanced", "improve",
     "improved", "increase", "increased", "mimetic", "mimic", "promote",
-    "protect", "protected", "raise", "raised", "superior",
+    "protect", "protected", "raise", "raised", "recovery", "regeneration",
+    "superior", "tolerance",
 })
 _FAILURE = frozenset({
-    "attenuate", "attenuated", "blunt", "blunted", "decrease", "decreased",
-    "failed", "failure", "impair", "impaired", "limited", "lower", "lowered",
-    "null", "reduce", "reduced", "unchanged", "worse", "worsened",
+    "attenuate", "attenuated", "attenuates", "blunt", "blunted", "decrease",
+    "decreased", "failed", "failure", "impair", "impaired", "limited", "lower",
+    "lowered", "null", "reduce", "reduced", "unchanged", "worse", "worsened",
 })
 _MECHANISM = frozenset({
     "animal", "cell", "cells", "in-vitro", "mechanism", "mechanistic", "mice",
@@ -37,6 +38,11 @@ _BOUNDARY = frozenset({
 _LIMITED_HUMAN = frozenset({"association", "biomarker", "disease", "open-label", "observational", "patient",
                             "patients", "pilot", "placebo", "preliminary", "primary", "subgroup", "surrogate"})
 _GATED = frozenset({"baseline", "deficiency", "deficient", "healthy", "high", "low", "post-hoc", "posthoc"})
+_ADAPTATION = frozenset({"adaptation", "adaptations", "adaptive"})
+_MODALITY = frozenset({
+    "endurance", "interval", "load", "modality", "resistance", "sprint",
+    "strength", "training-load",
+})
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
     "conclusion", "control", "divided", "elisa", "older", "primary", "retrospective",
@@ -50,7 +56,8 @@ _CONTEXT_ANCHOR = frozenset({
 })
 _NONPRIMARY_PHRASES = (
     "case report", "commentary", "dispatch", "editorial", "in brief", "meta-analysis",
-    "news and views", "news & views", "perspective", "research highlight", "systematic review",
+    "news and views", "news & views", "perspective", "potential of applying",
+    "research highlight", "systematic review",
 )
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
@@ -104,6 +111,16 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         score += 40
         shape = "subgroup_endpoint_split"
         reasons.append("primary_endpoint_or_subgroup_split")
+        first, second = b, a
+
+    if shape == "shared_anchor" and _roles_fit("modality_boundary", a, b, topic_terms):
+        score += 40
+        shape = "modality_boundary"
+        reasons.append("same_intervention_modality_boundary")
+    elif shape == "shared_anchor" and _roles_fit("modality_boundary", b, a, topic_terms):
+        score += 40
+        shape = "modality_boundary"
+        reasons.append("same_intervention_modality_boundary")
         first, second = b, a
 
     if shape == "shared_anchor" and _has(at, _PROMISE) and _has(bt, _FAILURE) and _roles_fit("promise_reversal", a, b, topic_terms):
@@ -171,6 +188,11 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
             f"{a.title} made us expect {anchor} would generalize across the target population; "
             f"{b.title} forces the update that the response may be baseline-, subgroup-, or endpoint-gated."
         )
+    if shape == "modality_boundary":
+        return (
+            f"{a.title} made us expect {anchor} would help recovery or performance; "
+            f"{b.title} forces the update that the same intervention may be bounded by training modality or adaptation endpoint."
+        )
     return (
         f"{a.title} made us expect {anchor} would travel cleanly as a positive signal; "
         f"{b.title} forces the update that the same anchor can fail, reverse, or split by context."
@@ -233,6 +255,8 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
         )
     if shape == "subgroup_endpoint_split":
         return _is_human(first) and _is_human(second) and _has(ft, _PROMISE) and _negative(st) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+    if shape == "modality_boundary":
+        return _has(ft, _PROMISE) and _has(st, _FAILURE) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
         return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE)
     if shape == "promise_reversal":
