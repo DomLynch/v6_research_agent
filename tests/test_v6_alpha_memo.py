@@ -362,10 +362,10 @@ def test_build_memo_skips_redundant_verify_when_discovery_is_complete() -> None:
         def search(self, query: str, *, limit: int = 5) -> SearchResult:
             del query, limit
             return SearchResult(
-                "tool accuracy",
+                "tool benchmark accuracy",
                 (
                     Paper("a", "Tool X improved benchmark accuracy", "Tool X improved accuracy.", "openalex", doi="10.test/a"),
-                    Paper("b", "Tool X failed to improve human accuracy", "Tool X failed in a human trial.", "pubmed", doi="10.test/b"),
+                    Paper("b", "Tool X failed to improve human benchmark accuracy", "Tool X failed in a human trial.", "pubmed", doi="10.test/b"),
                 ),
                 CoverageReceipt(
                     hits=2,
@@ -382,7 +382,7 @@ def test_build_memo_skips_redundant_verify_when_discovery_is_complete() -> None:
             raise AssertionError(f"redundant verify query: {query}")
 
     run = build_memo(
-        "tool accuracy",
+        "tool benchmark accuracy",
         client=CompleteDiscoveryClient(),
         verify_client=VerifyClient(),
         query_limit=1,
@@ -1020,6 +1020,7 @@ def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch)
     assert calls[0][0] == "http://fullraw/search"
     assert calls[0][1]["cache_only"] is True
     assert calls[0][1]["queue_if_missing"] is True
+    assert calls[0][1]["priority"] is True
     assert calls[0][1]["rank_mode"] == "relevance"
     assert calls[0][1]["limit"] == 5
     assert calls[0][2]["Authorization"] == "Bearer index-token"
@@ -1050,6 +1051,7 @@ def test_fullraw_from_env_can_disable_cache_only_for_fast_discovery(monkeypatch:
 
     assert calls[0]["cache_only"] is False
     assert calls[0]["queue_if_missing"] is False
+    assert calls[0]["priority"] is True
     assert result.papers
 
 
@@ -1095,6 +1097,7 @@ def test_live_clients_default_to_two_tier_search(monkeypatch: pytest.MonkeyPatch
     assert calls[0]["queue_if_missing"] is False
     assert calls[1]["cache_only"] is True
     assert calls[1]["queue_if_missing"] is True
+    assert calls[1]["priority"] is True
     assert urls == ["http://discovery/search", "http://fullraw/search"]
 
 
@@ -1553,6 +1556,22 @@ def test_build_memo_rejects_weak_pair_when_minimax_vetoes(monkeypatch: pytest.Mo
 
     with pytest.raises(RuntimeError, match="MiniMax rejected all receipt pairs"):
         build_memo("tool accuracy", client=DemoClient(), writer="minimax")
+
+
+def test_build_memo_rejects_minimax_selected_pair_below_publish_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
+    pair = mine_pairs((
+        Paper("a", "Tool X improves accuracy", "Tool X improved accuracy.", "openalex"),
+        Paper("b", "Tool X produces mixed accuracy results", "Tool X had mixed results.", "pubmed"),
+    ))[0]
+    weak = ScoredPair(pair, 75, "shared_anchor", "weak update", ("shared_anchor:tool",))
+
+    monkeypatch.setattr(v6_run, "score_pairs", lambda pairs, **kwargs: (weak,))
+    monkeypatch.setattr(v6_run, "judge_with_minimax", lambda pairs: pairs[:1])
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("tool accuracy", client=DemoClient(), writer="minimax")
+
+    assert exc.value.trace["blocked_stage"] == "score_below_publish_threshold"
 
 
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:

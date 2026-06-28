@@ -95,6 +95,7 @@ class FullrawSearchClient:
         require_complete: bool = False,
         cache_only: bool = True,
         queue_if_missing: bool = True,
+        priority: bool = True,
         cache_dir: str | None = None,
         early_stop_shards: int = 0,
         opener: RequestOpener | None = None,
@@ -110,6 +111,7 @@ class FullrawSearchClient:
         self.require_complete = require_complete
         self.cache_only = cache_only
         self.queue_if_missing = queue_if_missing
+        self.priority = priority
         self.cache_dir = Path(cache_dir).expanduser() if cache_dir else None
         self.early_stop_shards = max(0, early_stop_shards)
         self._opener = opener or cast(RequestOpener, urlopen)
@@ -128,6 +130,7 @@ class FullrawSearchClient:
             require_complete=False,
             cache_only=False,
             queue_if_missing=False,
+            priority=self.priority,
             cache_dir=str(self.cache_dir) if self.cache_dir else None,
             early_stop_shards=self.early_stop_shards,
             opener=self._opener,
@@ -166,6 +169,7 @@ class FullrawSearchClient:
             require_complete=os.environ.get("V6_FULLRAW_REQUIRE_COMPLETE", "1") != "0",
             cache_only=_env_bool("V6_FULLRAW_CACHE_ONLY", True),
             queue_if_missing=_env_bool("V6_FULLRAW_QUEUE_IF_MISSING", True),
+            priority=_env_bool("V6_FULLRAW_PRIORITY", True),
             cache_dir=os.environ.get("V6_FULLRAW_RESULT_CACHE_DIR"),
             early_stop_shards=int(os.environ.get("V6_FULLRAW_EARLY_STOP_SHARDS", "0")),
         )
@@ -263,6 +267,7 @@ class FullrawSearchClient:
             "rank_mode": "relevance",
             "cache_only": self.cache_only,
             "queue_if_missing": self.queue_if_missing,
+            "priority": self.priority,
         }
         headers = {"Content-Type": "application/json", "User-Agent": "v6-alpha-memo/0.1"}
         if self.token:

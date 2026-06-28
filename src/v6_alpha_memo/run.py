@@ -22,6 +22,8 @@ from v6_alpha_memo.search import (
 )
 from v6_alpha_memo.write import judge_with_minimax, render_memo
 
+_PUBLISH_SCORE_FLOOR = 85
+
 
 @dataclass(frozen=True, slots=True)
 class V6Run:
@@ -107,8 +109,18 @@ def build_memo(
         judged = judge_with_minimax(scored)
         if judged:
             scored = judged
-        elif scored[0].score < 85:
+        elif scored[0].score < _PUBLISH_SCORE_FLOOR:
             raise RuntimeError("MiniMax rejected all receipt pairs")
+    if scored[0].score < _PUBLISH_SCORE_FLOOR:
+        trace = _trace(
+            results,
+            scored,
+            paper_count=len(papers),
+            pair_count=len(pairs),
+            scored_count=len(scored),
+        )
+        trace["blocked_stage"] = "score_below_publish_threshold"
+        raise NoMemoError(trace)
     if verify_client is not None:
         covered = _complete_receipt_covering_pair(results, scored[0])
         if covered is None:
