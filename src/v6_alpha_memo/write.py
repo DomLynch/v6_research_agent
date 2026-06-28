@@ -35,14 +35,13 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         f"{_brief_finding(pair.b)} in {_setting(pair.b)}. The comparison is bounded to {anchor}, "
         "and should not be read as advice, settled science, or a broad class claim.",
         f"**Bounded contrast:** Receipt 1 axes: {_evidence_axes(pair.a)}. Receipt 2 axes: {_evidence_axes(pair.b)}.",
-        "**Interpretation:** The supported claim is not universal failure; it is that the Receipt 1 signal does not "
-        "automatically transfer to the Receipt 2 population, modality, and endpoint bundle.",
+        f"**Interpretation:** {_logical_move(scored)}",
         "",
         f"**Why this is surprising:** {_why_surprising(scored)}",
         "",
         f"**Limitations:** This pair does not isolate which axis drives the split: {_boundary_axes(pair.a, pair.b)}.",
         "",
-        "**Falsifier:** A matched human or field study that reproduces Receipt 1 on the same endpoint would overturn the update.",
+        f"**Falsifier:** {_falsifier(scored)}",
         "",
         "**Evidence gap:** The missing study is one matched design with the same population, protocol, dose, duration, and endpoint.",
         "",
@@ -137,6 +136,11 @@ def _title(scored: ScoredPair) -> str:
 
 
 def _alpha_sentence(scored: ScoredPair) -> str:
+    if scored.shape == "mechanism_to_human_failure" and _combined_protocol(scored.pair.a):
+        return (
+            f"Receipt 1 supports a combined-protocol {_axis_label(scored.pair.a)} signal in {_setting_label(scored.pair.a)}; "
+            f"Receipt 2 separates the components and limits transfer to {_axis_label(scored.pair.b)} in {_setting_label(scored.pair.b)}."
+        )
     if scored.expectation_update:
         return scored.expectation_update
     anchor = _display_anchor(scored, limit=2)
@@ -169,7 +173,7 @@ def _first_sentence(text: str) -> str:
 
 def _evidence_axes(paper: Paper) -> str:
     terms = _paper_terms(paper)
-    axes = [term for term in _AXIS_TERMS if term in terms]
+    axes = [term for term in _AXIS_TERMS if term in terms and not (term == "healthy" and _has_disease_axis(paper))]
     return ", ".join(axes[:8]) if axes else "endpoint not explicit in title"
 
 
@@ -276,6 +280,28 @@ def _why_surprising(scored: ScoredPair) -> str:
         "The same named anchor is not enough. The useful signal is the boundary between "
         f"the two receipt settings and endpoints, not a literature-average claim about {anchor}."
     )
+
+
+def _logical_move(scored: ScoredPair) -> str:
+    pair = scored.pair
+    return (
+        f"Receipt 1 establishes {_axis_label(pair.a)} in {_setting_label(pair.a)}; "
+        f"Receipt 2 establishes {_axis_label(pair.b)} in {_setting_label(pair.b)}; "
+        "the update is the boundary between those receipt-owned axes, not a universal benefit or failure claim."
+    )
+
+
+def _falsifier(scored: ScoredPair) -> str:
+    pair = scored.pair
+    return (
+        f"A matched {_setting_label(pair.b)} study where {_axis_label(pair.b)} endpoints improve under the same "
+        "isolated intervention would overturn the update."
+    )
+
+
+def _combined_protocol(paper: Paper) -> bool:
+    text = f" {paper.title.casefold().replace('-', ' ')} "
+    return any(marker in text for marker in (" and ", " plus ", " combined ", " combination ", " with "))
 
 
 def _receipt_line(paper: Paper) -> str:

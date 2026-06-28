@@ -1539,6 +1539,10 @@ def test_writer_title_names_setting_and_endpoint_boundary() -> None:
     memo = render_memo(scored)
 
     assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise animal-disease cardiac/aortic-to-aged-men skeletal/metabolic boundary"
+    assert "combined-protocol cardiac/aortic signal in animal-disease" in memo
+    assert "Receipt 1 axes: mice, mouse, disease, alzheimer, exercise, training, aortic, cardiac" in memo
+    assert "Receipt 1 establishes cardiac/aortic in animal-disease; Receipt 2 establishes skeletal/metabolic in aged-men" in memo
+    assert "A matched aged-men study where skeletal/metabolic endpoints improve" in memo
     assert "single-component attribution if a receipt tests a combined protocol" in memo
     assert not v6_run._claim_contract_flags("resveratrol human exercise training blunting", memo, scored)
 

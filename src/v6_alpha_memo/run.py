@@ -430,13 +430,13 @@ _SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | _BOUNDARY_AXIS_TERMS | f
 })
 _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
     "adaptation", "adaptations", "after", "alpha", "anchor", "animal", "antidiabetes", "attenuate", "attenuated", "attenuates", "benefit", "beneficial", "blunted", "blunting", "blocks",
-    "and", "compound", "compounds",
+    "and", "combined", "component", "components", "compound", "compounds",
     "across", "bounded", "boundary", "but", "can", "carry", "claim", "cleanly", "comparison", "context", "deficit", "dependent", "different", "direction", "disease", "effect", "endpoint", "expect",
     "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "impair", "impaired", "impairment", "impairs", "intervention", "may", "mechanism",
     "gains", "harm", "healthy", "improve", "improved", "improves", "longevity", "memo", "model", "modality", "negative", "null", "one", "outcome",
     "limited", "limit", "limits", "looks", "positive", "preserved", "promise", "protect", "protected", "protection", "protective",
     "automatically", "does", "not", "rather", "receipt", "receipts", "reduced", "reversal", "reverse", "signal", "setting", "settings", "species",
-    "population", "recovery", "same", "sentence", "split", "splits", "stable", "study", "supported", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
+    "population", "protocol", "recovery", "same", "sentence", "separates", "split", "splits", "stable", "study", "supported", "supports", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
     "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "would",
 })
 _CROSS_COMPARISON_MARKERS = (
