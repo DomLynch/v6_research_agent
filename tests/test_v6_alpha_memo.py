@@ -199,6 +199,41 @@ def test_build_memo_uses_strict_verification_receipt_before_writing() -> None:
     assert coverage[-1]["shards_searched"] == 1525
 
 
+def test_build_memo_skips_redundant_verify_when_discovery_is_complete() -> None:
+    class CompleteDiscoveryClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            del query, limit
+            return SearchResult(
+                "tool accuracy",
+                (
+                    Paper("a", "Tool X improved benchmark accuracy", "Tool X improved accuracy.", "openalex", doi="10.test/a"),
+                    Paper("b", "Tool X failed to improve human accuracy", "Tool X failed in a human trial.", "pubmed", doi="10.test/b"),
+                ),
+                CoverageReceipt(
+                    hits=2,
+                    async_status="hit",
+                    shards_searched=1525,
+                    shards_total=1525,
+                    sweep_failed_shards=0,
+                    source_count_searched=5,
+                ),
+            )
+
+    class VerifyClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            raise AssertionError(f"redundant verify query: {query}")
+
+    run = build_memo(
+        "tool accuracy",
+        client=CompleteDiscoveryClient(),
+        verify_client=VerifyClient(),
+        query_limit=1,
+    )
+
+    assert run.scored_count == 1
+    assert len(run.results) == 1
+
+
 def test_build_memo_searches_discovery_queries_in_parallel() -> None:
     active = 0
     peak = 0

@@ -90,10 +90,18 @@ def build_memo(
             trace
         )
     receipt = _best_receipt(results)
+    if writer == "minimax":
+        scored = judge_with_minimax(scored)
+        if not scored:
+            raise RuntimeError("MiniMax rejected all receipt pairs")
     if verify_client is not None:
-        verify_result = verify_client.search(_verify_query(scored[0]), limit=verify_limit)
-        results = (*results, verify_result)
-        receipt = verify_result.receipt
+        covered = _complete_receipt_covering_pair(results, scored[0])
+        if covered is None:
+            verify_result = verify_client.search(_verify_query(scored[0]), limit=verify_limit)
+            results = (*results, verify_result)
+            receipt = verify_result.receipt
+        else:
+            receipt = covered
         if not _receipt_complete(receipt):
             trace = _trace(
                 results,
@@ -105,9 +113,6 @@ def build_memo(
             trace["blocked_stage"] = "verification_cache_waiting"
             raise NoMemoError(trace)
     if writer == "minimax":
-        scored = judge_with_minimax(scored)
-        if not scored:
-            raise RuntimeError("MiniMax rejected all receipt pairs")
         memo = render_with_minimax(scored, receipt=receipt, judge=False)
     else:
         memo = render_memo(scored[0], receipt=receipt)
@@ -263,6 +268,17 @@ def _receipt_complete(receipt: CoverageReceipt) -> bool:
         and receipt.source_count_searched >= 5
         and not receipt.partial
     )
+
+
+def _complete_receipt_covering_pair(
+    results: tuple[SearchResult, ...],
+    pair: ScoredPair,
+) -> CoverageReceipt | None:
+    needed = {pair.pair.a.key, pair.pair.b.key}
+    for result in results:
+        if _receipt_complete(result.receipt) and needed <= {paper.key for paper in result.papers}:
+            return result.receipt
+    return None
 
 
 def _search_waiting(results: tuple[SearchResult, ...]) -> bool:
