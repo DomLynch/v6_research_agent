@@ -214,6 +214,11 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
             f"{a.title} made us expect {anchor} would help recovery or performance; "
             f"{b.title} forces the update that the same intervention may be bounded by training modality or adaptation endpoint."
         )
+    if shape == "mechanism_to_human_failure":
+        return (
+            f"{a.title} made us expect a positive signal in that intervention context; "
+            f"{b.title} forces the update that the same anchor may be bounded by model, population, or endpoint."
+        )
     return (
         f"{a.title} made us expect {anchor} would travel cleanly as a positive signal; "
         f"{b.title} forces the update that the same anchor can fail, reverse, or split by context."

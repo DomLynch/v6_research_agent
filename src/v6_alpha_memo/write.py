@@ -38,8 +38,7 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         "**Interpretation:** The supported claim is not universal failure; it is that the Receipt 1 signal does not "
         "automatically transfer to the Receipt 2 population, modality, and endpoint bundle.",
         "",
-        "**Why this is surprising:** The same named anchor is not enough. The useful signal is the boundary between "
-        f"the two receipt settings and endpoints, not a literature-average claim about {anchor}.",
+        f"**Why this is surprising:** {_why_surprising(scored)}",
         "",
         f"**Limitations:** This pair does not isolate which axis drives the split: {_boundary_axes(pair.a, pair.b)}.",
         "",
@@ -176,6 +175,10 @@ def _evidence_axes(paper: Paper) -> str:
 
 def _boundary_label(a: Paper, b: Paper) -> str:
     a_kind, b_kind = _setting_kind(a), _setting_kind(b)
+    if _has_disease_axis(a) != _has_disease_axis(b):
+        if _has_disease_axis(a):
+            return f"disease-model-to-{b_kind} boundary"
+        return f"{a_kind}-to-disease-model boundary"
     if a_kind != b_kind:
         return f"{a_kind}-to-{b_kind} boundary"
     a_terms, b_terms = _paper_terms(a), _paper_terms(b)
@@ -188,6 +191,8 @@ def _boundary_label(a: Paper, b: Paper) -> str:
 
 def _boundary_axes(a: Paper, b: Paper) -> str:
     axes = []
+    if _has_disease_axis(a) != _has_disease_axis(b):
+        axes.append("disease model/population health")
     if _setting_kind(a) != _setting_kind(b):
         axes.append("species/population")
     a_terms, b_terms = _paper_terms(a), _paper_terms(b)
@@ -230,8 +235,26 @@ def _setting_kind(paper: Paper) -> str:
     return "setting"
 
 
+def _has_disease_axis(paper: Paper) -> bool:
+    return bool(_paper_terms(paper) & _DISEASE_AXIS_TERMS)
+
+
 def _paper_terms(paper: Paper) -> set[str]:
     return set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
+
+
+def _why_surprising(scored: ScoredPair) -> str:
+    pair = scored.pair
+    anchor = _display_anchor(scored, limit=3)
+    if _setting_kind(pair.a) != _setting_kind(pair.b):
+        return (
+            "The surprise is not generic translation failure; it is the receipt-owned boundary between "
+            f"Receipt 1's intervention/model setting and Receipt 2's population and endpoints for {anchor}."
+        )
+    return (
+        "The same named anchor is not enough. The useful signal is the boundary between "
+        f"the two receipt settings and endpoints, not a literature-average claim about {anchor}."
+    )
 
 
 def _receipt_line(paper: Paper) -> str:
@@ -325,9 +348,10 @@ def _content_text(data: object) -> str:
 _TITLE_ANCHOR_DROP = frozenset({"cell", "cells", "muscle", "skeletal", "study", "trial"})
 _RESULT_MARKERS = re.compile(r"\b(but not|did not|failed|improved|reduced|blunted|increased|decreased|null|result)", re.I)
 _AXIS_TERMS = (
-    "rats", "mice", "mouse", "men", "women", "adults", "aged", "human", "sprint", "cycling", "strength",
-    "resistance", "endurance", "exercise", "training", "cardiac", "metabolic", "inflammatory", "performance",
-    "adaptation", "adaptations", "function", "tolerance",
+    "rats", "mice", "mouse", "men", "women", "adults", "aged", "human", "healthy", "disease", "alzheimer",
+    "diabetic", "sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training", "cardiac",
+    "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance",
 )
 _MODALITY_AXIS_TERMS = frozenset({"sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training"})
 _ENDPOINT_AXIS_TERMS = frozenset({"cardiac", "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance"})
+_DISEASE_AXIS_TERMS = frozenset({"alzheimer", "diabetic", "disease", "neuropathy", "myopathy", "pathology"})
