@@ -1540,6 +1540,7 @@ def test_writer_title_names_setting_and_endpoint_boundary() -> None:
 
     assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise animal-disease cardiac/aortic-to-aged-men skeletal/metabolic boundary"
     assert "single-component attribution if a receipt tests a combined protocol" in memo
+    assert not v6_run._claim_contract_flags("resveratrol human exercise training blunting", memo, scored)
 
 
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:

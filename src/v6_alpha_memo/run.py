@@ -421,7 +421,11 @@ def _explicit_cross_comparison(text: str) -> bool:
 _GENERIC_TOPIC_TERMS = frozenset({"aging", "adult", "adults", "function", "human", "humans", "mitochondrial", "older", "primary", "trial", "trials"})
 _MODALITY_TERMS = frozenset({"aerobic", "cycling", "endurance", "heat", "resistance", "sprint", "strength"})
 _OUTCOME_TERMS = frozenset({"accuracy", "damage", "forecast", "hypertrophy", "insulin", "performance", "sensitivity", "tolerance"})
-_SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | frozenset({
+_BOUNDARY_AXIS_TERMS = frozenset({
+    "aged", "aortic", "cardiac", "cardiovascular", "inflammatory", "men", "metabolic",
+    "mouse", "mice", "rat", "rats", "skeletal", "women",
+})
+_SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | _BOUNDARY_AXIS_TERMS | frozenset({
     "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
 })
 _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
