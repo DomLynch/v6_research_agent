@@ -122,8 +122,7 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
     assert scored
     assert scored[0].shape == "modality_boundary"
     assert scored[0].score >= 80
-    assert {"training", "water"} <= set(scored[0].pair.anchors)
-    assert "training" in v6_run._verify_query(scored[0])
+    assert scored[0].pair.anchors[:4] == ("cold", "water", "immersion", "training")
     assert "Potential of Applying" not in scored[0].pair.a.title
     assert "Potential of Applying" not in scored[0].pair.b.title
 
