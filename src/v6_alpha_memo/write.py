@@ -41,7 +41,7 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         "**Why this is surprising:** The same named anchor is not enough. The useful signal is the boundary between "
         f"the two receipt settings and endpoints, not a literature-average claim about {anchor}.",
         "",
-        "**Limitations:** This pair does not isolate whether species, population, dose, duration, modality, or endpoint class explains the split.",
+        f"**Limitations:** This pair does not isolate which axis drives the split: {_boundary_axes(pair.a, pair.b)}.",
         "",
         "**Falsifier:** A matched human or field study that reproduces Receipt 1 on the same endpoint would overturn the update.",
         "",
@@ -134,7 +134,7 @@ def _title(scored: ScoredPair) -> str:
     anchors = anchors or list(scored.pair.anchors)
     phrase = _contiguous_phrase(anchors, f"{scored.pair.a.title} {scored.pair.b.title}")
     anchor = phrase or " ".join(anchors[:2]) or "receipt"
-    return f"Alpha memo: {anchor} signal"
+    return f"Alpha memo: {anchor} {_boundary_label(scored.pair.a, scored.pair.b)}"
 
 
 def _alpha_sentence(scored: ScoredPair) -> str:
@@ -169,9 +169,34 @@ def _first_sentence(text: str) -> str:
 
 
 def _evidence_axes(paper: Paper) -> str:
-    terms = set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
+    terms = _paper_terms(paper)
     axes = [term for term in _AXIS_TERMS if term in terms]
     return ", ".join(axes[:8]) if axes else "endpoint not explicit in title"
+
+
+def _boundary_label(a: Paper, b: Paper) -> str:
+    a_kind, b_kind = _setting_kind(a), _setting_kind(b)
+    if a_kind != b_kind:
+        return f"{a_kind}-to-{b_kind} boundary"
+    a_terms, b_terms = _paper_terms(a), _paper_terms(b)
+    for terms, label in ((_MODALITY_AXIS_TERMS, "modality"), (_ENDPOINT_AXIS_TERMS, "endpoint")):
+        left, right = sorted(a_terms & terms), sorted(b_terms & terms)
+        if left and right and left[0] != right[0]:
+            return f"{left[0]}-to-{right[0]} {label} boundary"
+    return "endpoint boundary"
+
+
+def _boundary_axes(a: Paper, b: Paper) -> str:
+    axes = []
+    if _setting_kind(a) != _setting_kind(b):
+        axes.append("species/population")
+    a_terms, b_terms = _paper_terms(a), _paper_terms(b)
+    if (a_terms & _MODALITY_AXIS_TERMS) != (b_terms & _MODALITY_AXIS_TERMS):
+        axes.append("modality")
+    if (a_terms & _ENDPOINT_AXIS_TERMS) != (b_terms & _ENDPOINT_AXIS_TERMS):
+        axes.append("endpoint class")
+    axes.extend(["dose", "duration"])
+    return ", ".join(dict.fromkeys(axes))
 
 
 def _contiguous_phrase(anchors: list[str], text: str) -> str:
@@ -184,7 +209,7 @@ def _contiguous_phrase(anchors: list[str], text: str) -> str:
 
 
 def _setting(paper: Paper) -> str:
-    terms = set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
+    terms = _paper_terms(paper)
     if terms & {"rat", "rats", "mouse", "mice"}:
         return "an animal model"
     if terms & {"adult", "adults", "aged", "human", "men", "participants", "trial", "women"}:
@@ -192,6 +217,21 @@ def _setting(paper: Paper) -> str:
     if terms & {"field", "firm", "firms", "manager", "management", "worker", "workers"}:
         return "a field setting"
     return "a different study setting"
+
+
+def _setting_kind(paper: Paper) -> str:
+    terms = _paper_terms(paper)
+    if terms & {"rat", "rats", "mouse", "mice"}:
+        return "animal"
+    if terms & {"adult", "adults", "aged", "human", "men", "participants", "trial", "women"}:
+        return "human"
+    if terms & {"field", "firm", "firms", "manager", "management", "worker", "workers"}:
+        return "field"
+    return "setting"
+
+
+def _paper_terms(paper: Paper) -> set[str]:
+    return set(re.findall(r"[a-z][a-z0-9]{2,}", f"{paper.title} {paper.abstract}".casefold()))
 
 
 def _receipt_line(paper: Paper) -> str:
@@ -289,3 +329,5 @@ _AXIS_TERMS = (
     "resistance", "endurance", "exercise", "training", "cardiac", "metabolic", "inflammatory", "performance",
     "adaptation", "adaptations", "function", "tolerance",
 )
+_MODALITY_AXIS_TERMS = frozenset({"sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training"})
+_ENDPOINT_AXIS_TERMS = frozenset({"cardiac", "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance"})

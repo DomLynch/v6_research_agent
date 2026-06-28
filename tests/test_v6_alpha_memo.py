@@ -1485,7 +1485,7 @@ def test_writer_stays_receipt_owned() -> None:
 
     assert "longevity/business/AI" not in memo
     assert "Resveratrol" in memo
-    assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise signal"
+    assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise animal-to-human boundary"
     assert "bounded update" not in memo.splitlines()[0]
     assert "/" not in memo.splitlines()[0]
 
