@@ -1192,6 +1192,38 @@ def test_minimax_judge_rejects_all(monkeypatch: pytest.MonkeyPatch) -> None:
     assert judge_with_minimax(run.top_pairs[:1]) == ()
 
 
+def test_build_memo_keeps_minimax_selected_pair(monkeypatch: pytest.MonkeyPatch) -> None:
+    class TwoPairClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del query, limit
+            papers = (
+                Paper("x1", "Tool X improves benchmark accuracy in a mechanistic model", "Tool X improved accuracy.", "openalex", doi="10.test/x1"),
+                Paper("x2", "Tool X failed to improve human analyst accuracy", "Tool X failed in a human field trial.", "pubmed", doi="10.test/x2"),
+                Paper("y1", "Tool Y improves forecast accuracy in a pilot", "Tool Y improved forecast accuracy.", "openalex", doi="10.test/y1"),
+                Paper("y2", "Tool Y failed in a randomized field experiment", "Tool Y had null field results.", "pubmed", doi="10.test/y2"),
+            )
+            return SearchResult("tool", papers, CoverageReceipt(hits=4))
+
+    selected: dict[str, tuple[object, ...]] = {}
+
+    def fake_judge(pairs: tuple[object, ...]) -> tuple[object, ...]:
+        selected["pair"] = (pairs[1],)
+        return selected["pair"]
+
+    def fake_render(pairs: tuple[object, ...], **kwargs: object) -> str:
+        assert pairs == selected["pair"]
+        assert kwargs["judge"] is False
+        return "memo\n"
+
+    monkeypatch.setattr(v6_run, "judge_with_minimax", fake_judge)
+    monkeypatch.setattr(v6_run, "render_with_minimax", fake_render)
+
+    run = build_memo("tool", client=TwoPairClient(), writer="minimax")
+
+    assert run.memo == "memo\n"
+    assert run.top_pairs == selected["pair"]
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
