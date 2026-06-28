@@ -109,6 +109,14 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
         ),
         Paper(
             "c",
+            "Cold-water immersion in combination with lower-body negative pressure in endurance training",
+            "",
+            "semantic_scholar",
+            2018,
+            "10.test/lower-body-pressure",
+        ),
+        Paper(
+            "d",
             "The Potential of Applying Cold Water Immersion as a Benefit of Sport Performance Training and Teaching Physical Education",
             "The potential of applying cold water immersion as a benefit of sport performance training and teaching physical education.",
             "openalex",
@@ -121,8 +129,9 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
 
     assert scored
     assert scored[0].shape == "modality_boundary"
-    assert scored[0].score >= 80
+    assert scored[0].score >= 85
     assert scored[0].pair.anchors[:4] == ("cold", "water", "immersion", "training")
+    assert scored[0].pair.b.title.startswith("Does Cold-Water Immersion")
     assert "Potential of Applying" not in scored[0].pair.a.title
     assert "Potential of Applying" not in scored[0].pair.b.title
 

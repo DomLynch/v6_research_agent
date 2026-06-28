@@ -17,7 +17,7 @@ _PROMISE = frozenset({
 })
 _FAILURE = frozenset({
     "attenuate", "attenuated", "attenuates", "blunt", "blunted", "decrease",
-    "decreased", "failed", "failure", "impair", "impaired", "limited", "lower",
+    "decreased", "failed", "failure", "impair", "impaired", "limited",
     "lowered", "null", "reduce", "reduced", "unchanged", "worse", "worsened",
 })
 _MECHANISM = frozenset({
@@ -161,6 +161,9 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if a.source.casefold() != b.source.casefold():
         score += 5
         reasons.append("source_diverse")
+    if a.doi and b.doi and a.doi != b.doi:
+        score += 5
+        reasons.append("doi_distinct")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
