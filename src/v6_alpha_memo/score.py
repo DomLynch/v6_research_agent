@@ -26,8 +26,8 @@ _MECHANISM = frozenset({
 })
 _HUMAN_OUTCOME = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
-    "human", "humans", "participants", "patient", "patients", "randomized",
-    "trial", "workers",
+    "human", "humans", "men", "participants", "patient", "patients", "randomized",
+    "trial", "women", "workers",
 })
 _PROTOCOL = frozenset({"expected", "hypothesis", "intended", "planned", "protocol"})
 _RESULT = frozenset({"found", "observed", "result", "results", "showed", "shows"})
@@ -44,10 +44,15 @@ _MODALITY = frozenset({
     "strength", "training-load",
 })
 _ENDPOINT = _ADAPTATION | frozenset({
-    "accuracy", "biomarker", "biomarkers", "damage", "forecast", "function",
+    "accuracy", "biomarker", "biomarkers", "cardiac", "damage", "forecast", "function",
     "glutathione", "hypertrophy", "insulin", "mitochondrial", "performance",
-    "productivity", "sensitivity", "strength", "tolerance",
+    "productivity", "sensitivity", "strength", "tolerance", "aortic", "metabolic", "inflammatory",
 })
+_ENDPOINT_DISPLAY = (
+    "cardiac", "aortic", "metabolic", "inflammatory", "mitochondrial", "glutathione",
+    "insulin", "sensitivity", "performance", "strength", "hypertrophy", "adaptation",
+    "function", "tolerance", "accuracy", "forecast", "productivity",
+)
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
     "conclusion", "control", "divided", "elisa", "older", "primary", "retrospective",
@@ -216,8 +221,8 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
         )
     if shape == "mechanism_to_human_failure":
         return (
-            f"{a.title} made us expect a positive signal in that intervention context; "
-            f"{b.title} forces the update that the same anchor may be bounded by model, population, or endpoint."
+            f"{a.title} made us expect a positive {_endpoint_phrase(a)} signal in {_context_phrase(a)}; "
+            f"{b.title} forces the update that the same anchor may not transfer to {_endpoint_phrase(b)} in {_context_phrase(b)}."
         )
     return (
         f"{a.title} made us expect {anchor} would travel cleanly as a positive signal; "
@@ -231,6 +236,24 @@ def _best_anchor(a: Paper, b: Paper) -> str:
         if word not in _PROMISE and word not in _FAILURE:
             return word
     return "the shared intervention"
+
+
+def _endpoint_phrase(paper: Paper) -> str:
+    hits = [term for term in _ENDPOINT_DISPLAY if term in _tokens(paper)]
+    return "/".join(hits[:3]) if hits else "endpoint"
+
+
+def _context_phrase(paper: Paper) -> str:
+    tokens = _tokens(paper)
+    if _has(tokens, _ANIMAL) and _has(tokens, frozenset({"alzheimer", "disease", "diabetic", "neuropathy", "myopathy"})):
+        return "animal disease model"
+    if _has(tokens, _ANIMAL):
+        return "animal model"
+    if "men" in tokens and "aged" in tokens:
+        return "aged men"
+    if _has(tokens, _HUMAN_DESIGN):
+        return "human study"
+    return "tested setting"
 
 
 def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str, ...]:

@@ -135,6 +135,32 @@ def test_animal_disease_baseline_words_do_not_create_human_reversal() -> None:
     assert scored == ()
 
 
+def test_mechanism_human_update_names_endpoint_and_context() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function in the 3xTg mouse model",
+            "Resveratrol and exercise training improved cardiac and aortic function in mice with Alzheimer disease.",
+            "openalex",
+            doi="10.test/a",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle of aged men",
+            "Exercise training but not resveratrol improved metabolic and inflammatory status in skeletal muscle of aged men.",
+            "pubmed",
+            doi="10.test/b",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "human", "exercise", "training"})
+
+    assert scored
+    assert scored[0].shape == "mechanism_to_human_failure"
+    assert "cardiac/aortic/function signal in animal disease model" in scored[0].expectation_update
+    assert "metabolic/inflammatory in aged men" in scored[0].expectation_update
+
+
 def test_positive_human_title_does_not_become_failure_from_abstract_baseline() -> None:
     papers = (
         Paper(

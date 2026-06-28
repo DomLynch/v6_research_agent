@@ -432,7 +432,7 @@ _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
     "gains", "harm", "healthy", "improve", "improved", "improves", "longevity", "memo", "model", "modality", "negative", "null", "one", "outcome",
     "limited", "limit", "limits", "looks", "positive", "preserved", "promise", "protect", "protected", "protection", "protective",
     "automatically", "does", "not", "rather", "receipt", "receipts", "reduced", "reversal", "reverse", "signal", "setting", "settings", "species",
-    "population", "recovery", "same", "sentence", "split", "splits", "stable", "supported", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
+    "population", "recovery", "same", "sentence", "split", "splits", "stable", "study", "supported", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
     "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "would",
 })
 _CROSS_COMPARISON_MARKERS = (
