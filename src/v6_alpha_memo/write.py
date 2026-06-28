@@ -61,7 +61,11 @@ def render_with_minimax(
         "model": os.environ.get("V6_MINIMAX_MODEL", "MiniMax-M3"),
         "max_tokens": 900,
         "temperature": 0.2,
-        "system": "Pick the strongest receipt pair and write only the required concise memo. Use only supplied receipts.",
+        "system": (
+            "Pick the strongest receipt pair and write only the required concise memo. Use only supplied receipts. "
+            "Distinguish protection/damage-marker signals from performance or adaptation gains. Include why the pair "
+            "was selected and one concrete next-test gap."
+        ),
         "thinking": {"type": "disabled"},
         "messages": [{"role": "user", "content": [{"type": "text", "text": _prompt(top_pairs[:5])}]}],
     }
@@ -148,7 +152,9 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         )
     return (
         "Return a short memo with: title, one-sentence alpha, receipt 1, receipt 2, "
-        "why surprising, caveats/falsifiers. No broad framing beyond receipts.\n"
+        "why surprising, caveats/falsifiers. No broad framing beyond receipts. Do not call a protective "
+        "or safety-marker result beneficial unless the receipt reports improvement in the claimed endpoint. "
+        "Add one short selection-basis line and one concrete next test or gap.\n"
         + json.dumps(rows, ensure_ascii=False)
     )
 

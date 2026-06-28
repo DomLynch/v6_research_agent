@@ -1192,6 +1192,16 @@ def test_minimax_judge_rejects_all(monkeypatch: pytest.MonkeyPatch) -> None:
     assert judge_with_minimax(run.top_pairs[:1]) == ()
 
 
+def test_writer_prompt_requires_endpoint_precision() -> None:
+    run = build_memo("longevity exercise adaptation", client=DemoClient())
+    prompt = v6_write._prompt(run.top_pairs[:1])
+
+    assert "protective" in prompt
+    assert "claimed endpoint" in prompt
+    assert "selection-basis" in prompt
+    assert "next test" in prompt
+
+
 def test_build_memo_keeps_minimax_selected_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     class TwoPairClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
