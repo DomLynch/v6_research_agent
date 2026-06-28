@@ -130,11 +130,16 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = _display_anchor(scored, limit=2)
-    return f"Alpha memo: {anchor} bounded update"
+    anchors = [anchor for anchor in scored.pair.anchors if anchor not in _TITLE_ANCHOR_DROP]
+    anchors = anchors or list(scored.pair.anchors)
+    phrase = _contiguous_phrase(anchors, f"{scored.pair.a.title} {scored.pair.b.title}")
+    anchor = phrase or " ".join(anchors[:2]) or "receipt"
+    return f"Alpha memo: {anchor} signal"
 
 
 def _alpha_sentence(scored: ScoredPair) -> str:
+    if scored.expectation_update:
+        return scored.expectation_update
     anchor = _display_anchor(scored, limit=2)
     return (
         f"{anchor} does not carry one stable direction across the two receipts; the supported alpha is "

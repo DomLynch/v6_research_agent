@@ -113,6 +113,74 @@ def test_rejects_same_drug_unrelated_protocol_bridge() -> None:
     assert scored == ()
 
 
+def test_animal_disease_baseline_words_do_not_create_human_reversal() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function in the 3xTg mouse model",
+            "Resveratrol and exercise training improved cardiac function in mice.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Synergistic role of resveratrol and exercise training in management of diabetic neuropathy and myopathy",
+            "Patients with diabetic neuropathy need treatment, but in rats the disease group showed decreased SIRT1 and NGF before treatment.",
+            "pubmed",
+            doi="10.1016/j.tice.2023.102014",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "mitochondrial", "exercise", "training"})
+
+    assert scored == ()
+
+
+def test_positive_human_title_does_not_become_failure_from_abstract_baseline() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Effects of Urolithin A on Mitochondrial Parameters in a Cellular Model of Early Alzheimer Disease",
+            "Urolithin A improved mitochondrial quality in a cellular model.",
+            "openalex",
+            doi="10.1016/j.isci.2025.111814",
+        ),
+        Paper(
+            "b",
+            "Urolithin A improves human cardiovascular health biomarkers",
+            "Some baseline biomarkers were lower, but the intervention improved human cardiovascular biomarkers.",
+            "pubmed",
+            doi="10.3390/ijms22158333",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"urolithin", "mitochondrial"})
+
+    assert scored == ()
+
+
+def test_preclinical_only_resveratrol_inflammation_pair_is_not_alpha() -> None:
+    papers = (
+        Paper(
+            "a",
+            "The Impact of Resveratrol Supplementation on Inflammation Induced by Acute Exercise in Rats",
+            "Protocol result markers changed after acute exercise in rats.",
+            "pubmed",
+            doi="10.22037/ijpr.2019.1100684",
+        ),
+        Paper(
+            "b",
+            "Resveratrol attenuated high intensity exercise training-induced inflammation in intestine of mice",
+            "Resveratrol attenuated inflammation in mice.",
+            "openalex",
+            doi="10.55730/1300-0144.5604",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "inflammation"})
+
+    assert scored == ()
+
+
 def test_rejects_topic_entity_missing_from_receipt_titles() -> None:
     papers = (
         Paper(
@@ -338,7 +406,7 @@ def test_claim_contract_rejects_modality_mismatch() -> None:
                 ),
                 Paper(
                     "b",
-                    "The Effects of Daily Cold-Water Recovery and Postexercise Hot-Water Immersion on Training-Load Tolerance During 5 Days of Heat-Based Training",
+                    "Cold-water recovery blunted cycling training adaptation during heat-based training",
                     "Cold-water immersion blunted cycling training adaptation while changing training load tolerance.",
                     "pubmed",
                     doi="10.test/b",
@@ -374,7 +442,7 @@ def test_claim_contract_rejects_single_drug_title_on_cross_drug_pair(
                 ),
                 Paper(
                     "b",
-                    "Metformin protects rat skeletal muscle from exercise-induced injury",
+                    "Metformin blunted rat skeletal muscle exercise adaptation while protecting injury markers",
                     "Metformin blunted exercise adaptation while protecting damage markers without improving performance.",
                     "openalex",
                     doi="10.test/b",
@@ -414,7 +482,7 @@ def test_claim_contract_allows_explicit_cross_compound_title() -> None:
         ),
         Paper(
             "b",
-            "Metformin protects rat skeletal muscle from exercise-induced injury",
+            "Metformin blunted rat skeletal muscle exercise adaptation while protecting injury markers",
             "Metformin blunted exercise adaptation while protecting damage markers without improving performance.",
             "openalex",
             doi="10.test/b",
@@ -1387,6 +1455,9 @@ def test_writer_stays_receipt_owned() -> None:
 
     assert "longevity/business/AI" not in memo
     assert "Resveratrol" in memo
+    assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise signal"
+    assert "bounded update" not in memo.splitlines()[0]
+    assert "/" not in memo.splitlines()[0]
 
 
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
