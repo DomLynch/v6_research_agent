@@ -21,6 +21,7 @@ from v6_alpha_memo import (
     score_pairs,
 )
 from v6_alpha_memo import run as v6_run
+from v6_alpha_memo import search as v6_search
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
@@ -460,6 +461,50 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.receipt.source_count_searched == 2
     assert "openalex" in result.receipt.sources_searched
     assert result.papers[0].doi == "10.test/metformin"
+
+
+def test_fullraw_client_backfills_empty_doi_abstract(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "hit"},
+            "shard_receipt": {
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+                "sources_searched": {"semantic_scholar": 1},
+                "partial_shard_search": False,
+            },
+        },
+        "results": [
+            {
+                "id": "W1",
+                "title": "Does Cold-Water Immersion After Strength Training Attenuate Training Adaptation?",
+                "abstract": "",
+                "source": "semantic_scholar",
+                "year": 2020,
+                "doi": "10.1123/ijspp.2019-0965",
+            }
+        ],
+    }
+
+    def fake_backfill(request: Request, timeout: float) -> _Response:
+        assert timeout > 0
+        assert "api.semanticscholar.org" in request.full_url
+        return _Response({"abstract": "Backfilled abstract with strength adaptation outcomes.", "venue": "IJSPP"})
+
+    monkeypatch.setattr(v6_search, "urlopen", fake_backfill)
+    client = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        token="token",
+        opener=_fake_opener(payload),
+        require_complete=True,
+    )
+
+    result = client.search("cold water immersion training", limit=1)
+
+    assert result.papers[0].abstract.startswith("Backfilled abstract")
+    assert result.papers[0].venue == "IJSPP"
 
 
 def test_fullraw_client_reuses_cached_discovery_results() -> None:

@@ -14,6 +14,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -75,6 +76,7 @@ class SearchResult:
 
 _FULLRAW_REQUIRED_SHARDS = 1525
 _FULLRAW_REQUIRED_SOURCES = 5
+_BACKFILL_LIMIT = 4
 
 
 class FullrawSearchClient:
@@ -215,7 +217,7 @@ class FullrawSearchClient:
             receipt = CoverageReceipt(**{**data["receipt"], "sources_searched": tuple(data["receipt"].get("sources_searched", ()))})
             if not _coverage_complete(receipt):
                 return None
-            papers = tuple(Paper(**paper) for paper in data.get("papers", ()))
+            papers = _backfill_missing_abstracts(tuple(Paper(**paper) for paper in data.get("papers", ())))
             return SearchResult(query=str(data.get("query") or key[0]), papers=papers, receipt=receipt)
         except (OSError, TypeError, KeyError, json.JSONDecodeError):
             return None
@@ -274,7 +276,7 @@ class FullrawSearchClient:
             paper = _parse_paper(item)
             if paper is not None:
                 parsed.append(paper)
-        papers = tuple(parsed)
+        papers = _backfill_missing_abstracts(tuple(parsed))
         receipt = _receipt(data, hits=len(papers))
         if not papers and _early_stop(receipt, self.early_stop_shards):
             receipt = replace(receipt, error=receipt.error or "early_stop_no_hits")
@@ -404,6 +406,41 @@ def _paper_rank(paper: Paper) -> int:
     if any(marker in text for marker in ("commentary", "editorial", "in brief", "research highlight")):
         score -= 3
     return score
+
+
+def _backfill_missing_abstracts(papers: tuple[Paper, ...]) -> tuple[Paper, ...]:
+    if not _env_bool("V6_SEMANTIC_SCHOLAR_BACKFILL", True):
+        return papers
+    remaining = int(os.environ.get("V6_SEMANTIC_SCHOLAR_BACKFILL_LIMIT", str(_BACKFILL_LIMIT)))
+    enriched: list[Paper] = []
+    for paper in papers:
+        if remaining > 0 and paper.doi and not paper.abstract:
+            enriched.append(_semantic_scholar_backfill(paper))
+            remaining -= 1
+        else:
+            enriched.append(paper)
+    return tuple(enriched)
+
+
+def _semantic_scholar_backfill(paper: Paper) -> Paper:
+    url = (
+        "https://api.semanticscholar.org/graph/v1/paper/"
+        f"DOI:{quote(paper.doi, safe='')}?fields=title,abstract,year,venue,url"
+    )
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "v6-alpha-memo/0.1"}), timeout=10) as response:
+            data = json.loads(response.read().decode())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return paper
+    if not isinstance(data, dict):
+        return paper
+    return replace(
+        paper,
+        abstract=_clean(data.get("abstract"), limit=4000) or paper.abstract,
+        venue=_clean(data.get("venue")) or paper.venue,
+        url=_clean(data.get("url")) or paper.url,
+        year=_int(data.get("year")) or paper.year,
+    )
 
 
 def _query_variants(query: str) -> tuple[str, ...]:
