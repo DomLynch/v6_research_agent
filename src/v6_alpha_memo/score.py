@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.search import Paper
 
-_WORD_RE = re.compile(r"[a-z][a-z0-9-]{2,}")
+_WORD_RE = re.compile(r"[a-z][a-z0-9]{2,}")
 _PROMISE = frozenset({
     "activate", "activated", "benefit", "enhance", "enhanced", "improve",
     "improved", "increase", "increased", "mimetic", "mimic", "promote",
