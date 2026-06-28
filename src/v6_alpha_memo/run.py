@@ -116,6 +116,18 @@ def build_memo(
         memo = render_with_minimax(scored, receipt=receipt, judge=False)
     else:
         memo = render_memo(scored[0], receipt=receipt)
+    flags = _claim_contract_flags(topic, memo, scored[0])
+    if flags:
+        trace = _trace(
+            results,
+            scored,
+            paper_count=len(papers),
+            pair_count=len(pairs),
+            scored_count=len(scored),
+        )
+        trace["blocked_stage"] = "claim_contract_failed"
+        trace["claim_contract_flags"] = flags
+        raise NoMemoError(trace)
     return V6Run(
         memo=memo,
         top_pairs=scored,
@@ -316,7 +328,82 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
     return len(shared) >= (2 if len(strong_terms) >= 3 else 1)
 
 
+def _claim_contract_flags(topic: str, memo: str, scored: ScoredPair) -> tuple[str, ...]:
+    claim = f"{topic} {_memo_claim_surface(memo)}"
+    receipt_text = f"{scored.pair.a.text} {scored.pair.b.text}".casefold()
+    receipt_title_tokens = (_tokens(scored.pair.a.title), _tokens(scored.pair.b.title))
+    receipt_tokens = _tokens(receipt_text)
+    flags: list[str] = []
+    for term in _specific_claim_terms(claim):
+        if term not in receipt_tokens:
+            flags.append(f"unsupported_core_term:{term}")
+    if not _explicit_cross_comparison(claim):
+        for term in _entity_terms(f"{topic} {_memo_title(memo)}"):
+            if term in _SOFT_ANCHOR_TERMS:
+                continue
+            title_hits = sum(term in tokens for tokens in receipt_title_tokens)
+            if title_hits == 1:
+                flags.append(f"weak_direct_anchor:{term}")
+    return tuple(dict.fromkeys(flags))
+
+
+def _memo_claim_surface(memo: str) -> str:
+    return " ".join(line for line in memo.splitlines() if line.startswith(("# ", "**Memo", "**Alpha", "**One-sentence alpha")))
+
+
+def _memo_title(memo: str) -> str:
+    for line in memo.splitlines():
+        if line.startswith("# "):
+            return line[2:]
+        if line.startswith("**Memo"):
+            return line.strip("* ")
+    return ""
+
+
+def _specific_claim_terms(text: str) -> tuple[str, ...]:
+    return tuple(word for word in _tokens(text) if word not in _CLAIM_DROP)
+
+
+def _entity_terms(text: str) -> tuple[str, ...]:
+    anchor_keep = _MODALITY_TERMS | _OUTCOME_TERMS | {
+        "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
+    }
+    anchor_drop = _CLAIM_DROP - anchor_keep
+    return tuple(word for word in _tokens(text) if word not in anchor_drop)
+
+
+def _tokens(text: str) -> set[str]:
+    return set(re.findall(r"[a-z][a-z0-9]{2,}", text.casefold().replace("-", " ")))
+
+
+def _explicit_cross_comparison(text: str) -> bool:
+    lowered = f" {text.casefold()} "
+    for left, right in re.findall(r"\b([a-z][a-z0-9]{2,})\s+(?:vs|versus)\s+([a-z][a-z0-9]{2,})\b", lowered):
+        if left not in _CLAIM_DROP and right not in _CLAIM_DROP:
+            return True
+    return any(marker in lowered for marker in _CROSS_COMPARISON_MARKERS)
+
+
 _GENERIC_TOPIC_TERMS = frozenset({"aging", "adult", "adults", "function", "human", "humans", "mitochondrial", "older", "primary", "trial", "trials"})
+_MODALITY_TERMS = frozenset({"aerobic", "cycling", "endurance", "heat", "resistance", "sprint", "strength"})
+_OUTCOME_TERMS = frozenset({"accuracy", "damage", "forecast", "hypertrophy", "insulin", "performance", "sensitivity", "tolerance"})
+_SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | frozenset({
+    "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
+})
+_CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
+    "adaptation", "adaptations", "alpha", "anchor", "antidiabetes", "benefit", "beneficial", "blunted", "blocks",
+    "and", "compound", "compounds",
+    "bounded", "boundary", "can", "claim", "cleanly", "context", "deficit", "different", "effect", "endpoint", "expect",
+    "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "intervention", "may", "mechanism",
+    "gains", "improve", "improved", "improves", "longevity", "memo", "modality", "negative", "null", "one", "outcome",
+    "positive", "preserved", "promise", "protect", "protected", "protection", "protective", "reduced", "reversal", "reverse", "signal",
+    "recovery", "same", "sentence", "split", "splits", "that", "the", "tool", "training", "travel", "trial",
+    "under", "uniformly", "update", "versus", "would",
+})
+_CROSS_COMPARISON_MARKERS = (
+    " compared ", " comparison ", "split by compound",
+    "drug class", "same class", "cross compound", "cross-compound", "different drug",
+)
 
 
 def _demo_papers(query: str) -> tuple[Paper, ...]:

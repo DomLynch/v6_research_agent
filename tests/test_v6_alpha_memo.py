@@ -234,6 +234,108 @@ def test_build_memo_skips_redundant_verify_when_discovery_is_complete() -> None:
     assert len(run.results) == 1
 
 
+def test_claim_contract_rejects_modality_mismatch() -> None:
+    class CyclingCwiClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Cold-water immersion after training sessions: effects on fiber type-specific adaptations in muscle K+ transport proteins to sprint-interval training in men",
+                    "Cold-water immersion improved sprint interval cycling training-load tolerance and preserved adaptation.",
+                    "pubmed",
+                    doi="10.test/a",
+                ),
+                Paper(
+                    "b",
+                    "The Effects of Daily Cold-Water Recovery and Postexercise Hot-Water Immersion on Training-Load Tolerance During 5 Days of Heat-Based Training",
+                    "Cold-water immersion blunted cycling training adaptation while changing training load tolerance.",
+                    "pubmed",
+                    doi="10.test/b",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2))
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo(
+            "cold water immersion resistance training adaptation",
+            client=CyclingCwiClient(),
+            query_limit=1,
+        )
+
+    assert exc.value.trace["blocked_stage"] == "claim_contract_failed"
+    flags = cast(tuple[str, ...], exc.value.trace["claim_contract_flags"])
+    assert "unsupported_core_term:resistance" in flags
+
+
+def test_claim_contract_rejects_single_drug_title_on_cross_drug_pair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class CrossDrugClient:
+        def search(self, query: str, *, limit: int = 5) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Dapagliflozin preserves endurance exercise adaptation",
+                    "Dapagliflozin improved endurance exercise adaptation, while the introduction notes metformin exercise adaptation concerns.",
+                    "pubmed",
+                    doi="10.test/a",
+                ),
+                Paper(
+                    "b",
+                    "Metformin protects rat skeletal muscle from exercise-induced injury",
+                    "Metformin blunted exercise adaptation while protecting damage markers without improving performance.",
+                    "openalex",
+                    doi="10.test/b",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2))
+
+    def fake_render(pairs: tuple[object, ...], **kwargs: object) -> str:
+        del pairs, kwargs
+        return "**Memo: Metformin + Exercise -- Protection Signal vs Adaptation Deficit**\n\n**Alpha:** Metformin splits protection and adaptation under exercise.\n"
+
+    monkeypatch.setattr(v6_run, "render_with_minimax", fake_render)
+    monkeypatch.setattr(v6_run, "judge_with_minimax", lambda pairs: pairs[:1])
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo(
+            "metformin exercise adaptation",
+            client=CrossDrugClient(),
+            writer="minimax",
+            query_limit=1,
+        )
+
+    assert exc.value.trace["blocked_stage"] == "claim_contract_failed"
+    flags = cast(tuple[str, ...], exc.value.trace["claim_contract_flags"])
+    assert "weak_direct_anchor:metformin" in flags
+
+
+def test_claim_contract_allows_explicit_cross_compound_title() -> None:
+    memo = "**Memo: SGLT2i vs Metformin under Endurance Exercise**\n\n**Alpha:** Antidiabetes drugs split by compound under exercise.\n"
+    papers = (
+        Paper(
+            "a",
+            "Dapagliflozin preserves endurance exercise adaptation",
+            "SGLT2i dapagliflozin improved endurance exercise adaptation while metformin is discussed as a foil.",
+            "pubmed",
+            doi="10.test/a",
+        ),
+        Paper(
+            "b",
+            "Metformin protects rat skeletal muscle from exercise-induced injury",
+            "Metformin blunted exercise adaptation while protecting damage markers without improving performance.",
+            "openalex",
+            doi="10.test/b",
+        ),
+    )
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "exercise", "adaptation"})
+
+    assert scored
+    assert "weak_direct_anchor:metformin" not in v6_run._claim_contract_flags("metformin exercise adaptation", memo, scored[0])
+
+
 def test_build_memo_searches_discovery_queries_in_parallel() -> None:
     active = 0
     peak = 0
