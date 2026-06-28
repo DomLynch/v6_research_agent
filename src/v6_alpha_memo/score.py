@@ -56,7 +56,8 @@ _CONTEXT_ANCHOR = frozenset({
 })
 _NONPRIMARY_PHRASES = (
     "case report", "commentary", "dispatch", "editorial", "in brief", "meta-analysis",
-    "news and views", "news & views", "perspective", "research highlight", "systematic review",
+    "news and views", "news & views", "perspective", "potential of applying",
+    "research highlight", "systematic review",
 )
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
@@ -112,6 +113,16 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         reasons.append("primary_endpoint_or_subgroup_split")
         first, second = b, a
 
+    if shape == "shared_anchor" and _roles_fit("modality_boundary", a, b, topic_terms):
+        score += 40
+        shape = "modality_boundary"
+        reasons.append("same_intervention_modality_boundary")
+    elif shape == "shared_anchor" and _roles_fit("modality_boundary", b, a, topic_terms):
+        score += 40
+        shape = "modality_boundary"
+        reasons.append("same_intervention_modality_boundary")
+        first, second = b, a
+
     if shape == "shared_anchor" and _has(at, _PROMISE) and _has(bt, _FAILURE) and _roles_fit("promise_reversal", a, b, topic_terms):
         score += 40
         shape = "promise_reversal"
@@ -134,15 +145,6 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         score += 35
         shape = "translation_boundary"
         reasons.append("animal_or_mechanism_to_bounded_human_evidence")
-        first, second = b, a
-    if shape == "shared_anchor" and _roles_fit("modality_boundary", a, b, topic_terms):
-        score += 40
-        shape = "modality_boundary"
-        reasons.append("same_intervention_modality_boundary")
-    elif shape == "shared_anchor" and _roles_fit("modality_boundary", b, a, topic_terms):
-        score += 40
-        shape = "modality_boundary"
-        reasons.append("same_intervention_modality_boundary")
         first, second = b, a
     if _has(at, _PROTOCOL) and _has(bt, _RESULT | _FAILURE) and _roles_fit("protocol_result_mismatch", a, b, topic_terms):
         score += 20

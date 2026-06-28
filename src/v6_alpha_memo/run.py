@@ -60,10 +60,13 @@ def build_memo(
     per_query_limit: int = 20,
     writer: str = "template",
 ) -> V6Run:
-    results = tuple(
-        client.search(query, limit=per_query_limit)
-        for query in query_shapes(topic, limit=query_limit)
-    )
+    collected: list[SearchResult] = []
+    for query in query_shapes(topic, limit=query_limit):
+        result = client.search(query, limit=per_query_limit)
+        collected.append(result)
+        if result.receipt.error:
+            break
+    results = tuple(collected)
     papers = merge_results(results)
     pairs = mine_pairs(papers)
     topic_terms = _topic_terms(topic)
@@ -134,10 +137,14 @@ def _trace(
         "coverage": [
             {
                 "hits": result.receipt.hits,
+                "async_status": result.receipt.async_status,
                 "shards_searched": result.receipt.shards_searched,
+                "shards_total": result.receipt.shards_total,
+                "source_count_searched": result.receipt.source_count_searched,
                 "sources_searched": result.receipt.sources_searched,
                 "papers_searched": result.receipt.papers_searched,
                 "partial": result.receipt.partial,
+                "sweep_failed_shards": result.receipt.sweep_failed_shards,
                 "error": result.receipt.error,
             }
             for result in results

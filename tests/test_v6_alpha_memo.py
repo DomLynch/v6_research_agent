@@ -87,6 +87,43 @@ def test_rejects_background_efficacy_as_promise_receipt() -> None:
     assert scored == ()
 
 
+def test_scores_same_intervention_training_modality_boundary() -> None:
+    papers = (
+        Paper(
+            "a",
+            "The Effects of Daily Cold-Water Recovery and Postexercise Hot-Water Immersion on Training-Load Tolerance During 5 Days of Heat-Based Training",
+            "",
+            "semantic_scholar",
+            2020,
+            "10.1123/IJSPP.2019-0313",
+        ),
+        Paper(
+            "b",
+            "Does Cold-Water Immersion After Strength Training Attenuate Training Adaptation?",
+            "",
+            "semantic_scholar",
+            2020,
+            "10.1123/ijspp.2019-0965",
+        ),
+        Paper(
+            "c",
+            "The Potential of Applying Cold Water Immersion as a Benefit of Sport Performance Training and Teaching Physical Education",
+            "The potential of applying cold water immersion as a benefit of sport performance training and teaching physical education.",
+            "openalex",
+            2019,
+            "10.21125/iceri.2019.0231",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "immersion", "training", "adaptation"})
+
+    assert scored
+    assert scored[0].shape == "modality_boundary"
+    assert scored[0].score >= 80
+    assert "Potential of Applying" not in scored[0].pair.a.title
+    assert "Potential of Applying" not in scored[0].pair.b.title
+
+
 def test_rejects_review_keyword_overlap_before_writing() -> None:
     papers = (
         Paper("a", "Systematic review of leadership and productivity", "productivity evidence", "openalex"),

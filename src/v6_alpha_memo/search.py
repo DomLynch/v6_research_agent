@@ -51,12 +51,15 @@ class Paper:
 @dataclass(frozen=True, slots=True)
 class CoverageReceipt:
     hits: int = 0
+    async_status: str = ""
     shards_searched: int = 0
     shards_total: int = 0
     papers_searched: int = 0
     papers_total: int = 0
+    source_count_searched: int = 0
     sources_searched: tuple[str, ...] = ()
     partial: bool = False
+    sweep_failed_shards: int = 0
     error: str = ""
 
 
@@ -117,6 +120,8 @@ class FullrawSearchClient:
                     )
                     continue
                 last = result
+                if result.receipt.error:
+                    return result
                 if result.papers and _result_matches_query(result, variant):
                     return result
         return last
@@ -126,6 +131,8 @@ class FullrawSearchClient:
             "query": query[:1024],
             "limit": max(1, min(limit, 200)),
             "top_k": max(1, min(limit, 200)),
+            "rank_mode": "relevance",
+            "cache_only": True,
             "queue_if_missing": True,
             "corpus": "full_raw_5tb",
             "timeout_seconds": self.timeout,
@@ -143,6 +150,12 @@ class FullrawSearchClient:
             if cached is None:
                 raise
             data = cached
+        coverage_error = _coverage_error(data)
+        if coverage_error and self.sweep_wait_seconds and _waitable_coverage_error(coverage_error):
+            data = self._wait_for_sweep_hit(search_url, payload, headers) or data
+            coverage_error = _coverage_error(data)
+        if coverage_error:
+            return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0, error=coverage_error))
         parsed: list[Paper] = []
         for item in _items(data):
             paper = _parse_paper(item)
@@ -171,10 +184,10 @@ class FullrawSearchClient:
         cache_payload = {**payload, "cache_only": True, "queue_if_missing": True}
         while time.monotonic() < deadline:
             data = self._post(search_url, cache_payload, headers)
-            status = _async_status(data)
-            if status == "hit":
+            error = _coverage_error(data)
+            if not error:
                 return data
-            if status in {"disabled", "error", "failed"}:
+            if not _waitable_coverage_error(error):
                 return None
             time.sleep(min(max(self.sweep_poll_seconds, 0.1), max(deadline - time.monotonic(), 0.1)))
         return None
@@ -225,6 +238,35 @@ def _async_status(data: object) -> str:
     if not isinstance(sweep, dict):
         return ""
     return str(sweep.get("status") or "")
+
+
+def _coverage_error(data: object) -> str:
+    if not isinstance(data, dict):
+        return "invalid_fullraw_response"
+    meta = data.get("meta")
+    meta = meta if isinstance(meta, dict) else {}
+    shard = meta.get("shard_receipt")
+    shard = shard if isinstance(shard, dict) else {}
+    status = _async_status(data)
+    if status != "hit":
+        return f"async_sweep_{status or 'missing'}"
+    shards = _int(shard.get("shards_searched")) or 0
+    total = _int(shard.get("shards_total")) or 0
+    if shards < 1525 or total < 1525 or shards != total:
+        return f"fullraw_incomplete:{shards}/{total}"
+    if bool(shard.get("partial_shard_search") or meta.get("partial")):
+        return "fullraw_partial"
+    failed = _int(shard.get("sweep_failed_shards")) or 0
+    if failed:
+        return f"fullraw_failed_shards:{failed}"
+    source_count = _int(shard.get("source_count_searched")) or len(_sources(shard.get("sources_searched")))
+    if source_count < 5:
+        return f"fullraw_low_source_count:{source_count}"
+    return ""
+
+
+def _waitable_coverage_error(error: str) -> bool:
+    return error in {"async_sweep_busy", "async_sweep_queued", "async_sweep_running", "async_sweep_started"}
 
 
 def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
@@ -332,21 +374,26 @@ def _parse_paper(item: object) -> Paper | None:
     )
 
 
-def _receipt(data: object, *, hits: int) -> CoverageReceipt:
+def _receipt(data: object, *, hits: int, error: str = "") -> CoverageReceipt:
     if not isinstance(data, dict):
-        return CoverageReceipt(hits=hits)
+        return CoverageReceipt(hits=hits, error=error)
     meta = data.get("meta")
     meta = meta if isinstance(meta, dict) else {}
     shard = meta.get("shard_receipt")
     shard = shard if isinstance(shard, dict) else {}
+    sources = _sources(shard.get("sources_searched"))
     return CoverageReceipt(
         hits=hits,
+        async_status=_async_status(data),
         shards_searched=_int(shard.get("shards_searched")) or 0,
         shards_total=_int(shard.get("shards_total")) or 0,
         papers_searched=_int(shard.get("papers_searched")) or 0,
         papers_total=_int(shard.get("papers_total")) or 0,
-        sources_searched=_sources(shard.get("sources_searched")),
+        source_count_searched=_int(shard.get("source_count_searched")) or len(sources),
+        sources_searched=sources,
         partial=bool(shard.get("partial_shard_search") or meta.get("partial")),
+        sweep_failed_shards=_int(shard.get("sweep_failed_shards")) or 0,
+        error=error,
     )
 
 
