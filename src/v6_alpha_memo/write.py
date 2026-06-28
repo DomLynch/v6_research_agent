@@ -174,12 +174,15 @@ def _evidence_axes(paper: Paper) -> str:
 
 
 def _boundary_label(a: Paper, b: Paper) -> str:
-    a_kind, b_kind = _setting_kind(a), _setting_kind(b)
+    a_kind, b_kind = _setting_label(a), _setting_label(b)
+    a_endpoint, b_endpoint = _axis_label(a), _axis_label(b)
+    if a_endpoint != b_endpoint:
+        return f"{a_kind} {a_endpoint}-to-{b_kind} {b_endpoint} boundary"
     if _has_disease_axis(a) != _has_disease_axis(b):
         if _has_disease_axis(a):
             return f"disease-model-to-{b_kind} boundary"
         return f"{a_kind}-to-disease-model boundary"
-    if a_kind != b_kind:
+    if _setting_kind(a) != _setting_kind(b):
         return f"{a_kind}-to-{b_kind} boundary"
     a_terms, b_terms = _paper_terms(a), _paper_terms(b)
     for terms, label in ((_MODALITY_AXIS_TERMS, "modality"), (_ENDPOINT_AXIS_TERMS, "endpoint")):
@@ -201,6 +204,7 @@ def _boundary_axes(a: Paper, b: Paper) -> str:
     if (a_terms & _ENDPOINT_AXIS_TERMS) != (b_terms & _ENDPOINT_AXIS_TERMS):
         axes.append("endpoint class")
     axes.extend(["dose", "duration"])
+    axes.append("single-component attribution if a receipt tests a combined protocol")
     return ", ".join(dict.fromkeys(axes))
 
 
@@ -233,6 +237,23 @@ def _setting_kind(paper: Paper) -> str:
     if terms & {"field", "firm", "firms", "manager", "management", "worker", "workers"}:
         return "field"
     return "setting"
+
+
+def _setting_label(paper: Paper) -> str:
+    terms = _paper_terms(paper)
+    if terms & {"rat", "rats", "mouse", "mice"}:
+        return "animal-disease" if _has_disease_axis(paper) else "animal"
+    if {"aged", "men"} <= terms:
+        return "aged-men"
+    if terms & {"adult", "adults", "human", "men", "participants", "trial", "women"}:
+        return "human"
+    return _setting_kind(paper)
+
+
+def _axis_label(paper: Paper) -> str:
+    terms = _paper_terms(paper)
+    hits = [term for term in _ENDPOINT_DISPLAY_TERMS if term in terms]
+    return "/".join(hits[:2]) if hits else "endpoint"
 
 
 def _has_disease_axis(paper: Paper) -> bool:
@@ -349,9 +370,11 @@ _TITLE_ANCHOR_DROP = frozenset({"cell", "cells", "muscle", "skeletal", "study", 
 _RESULT_MARKERS = re.compile(r"\b(but not|did not|failed|improved|reduced|blunted|increased|decreased|null|result)", re.I)
 _AXIS_TERMS = (
     "rats", "mice", "mouse", "men", "women", "adults", "aged", "human", "healthy", "disease", "alzheimer",
-    "diabetic", "sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training", "cardiac",
-    "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance",
+    "diabetic", "sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training", "aortic",
+    "cardiac", "cardiovascular", "skeletal", "structure", "metabolic", "inflammatory", "performance",
+    "adaptation", "adaptations", "function", "tolerance",
 )
 _MODALITY_AXIS_TERMS = frozenset({"sprint", "cycling", "strength", "resistance", "endurance", "exercise", "training"})
-_ENDPOINT_AXIS_TERMS = frozenset({"cardiac", "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance"})
+_ENDPOINT_AXIS_TERMS = frozenset({"aortic", "cardiac", "cardiovascular", "skeletal", "structure", "metabolic", "inflammatory", "performance", "adaptation", "adaptations", "function", "tolerance"})
+_ENDPOINT_DISPLAY_TERMS = ("cardiac", "aortic", "cardiovascular", "skeletal", "metabolic", "inflammatory", "performance", "adaptation", "function", "tolerance")
 _DISEASE_AXIS_TERMS = frozenset({"alzheimer", "diabetic", "disease", "neuropathy", "myopathy", "pathology"})

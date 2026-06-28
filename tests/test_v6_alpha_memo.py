@@ -1516,6 +1516,32 @@ def test_writer_stays_receipt_owned() -> None:
     assert "/" not in memo.splitlines()[0]
 
 
+def test_writer_title_names_setting_and_endpoint_boundary() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function and structure in the 3xTg mouse model of Alzheimer's disease",
+            "Resveratrol and exercise training improved cardiac and aortic function in mice with Alzheimer disease.",
+            "openalex",
+            2019,
+            "10.test/a",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle of aged men",
+            "Exercise training but not resveratrol improved metabolic and inflammatory status in skeletal muscle of aged men.",
+            "pubmed",
+            2014,
+            "10.test/b",
+        ),
+    )
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "human", "exercise", "training"})[0]
+    memo = render_memo(scored)
+
+    assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise animal-disease cardiac/aortic-to-aged-men skeletal/metabolic boundary"
+    assert "single-component attribution if a receipt tests a combined protocol" in memo
+
+
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     top_pair = run.top_pairs[0]
