@@ -660,9 +660,33 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
     prompt = v6_write._prompt(run.top_pairs[:1])
 
+    assert "Return this exact Markdown skeleton" in prompt
     assert "summarize one concrete finding/result" in prompt
     assert "Never use a paper title as the finding" in prompt
     assert '"finding"' in prompt
+
+
+def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharp"}'}]})
+        return _Response({"content": [{"type": "text", "text": "**Memo:** bad\\n\\n**Alpha:** not strict"}]})
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    memo = v6_write.render_with_minimax(run.top_pairs[:1])
+
+    assert memo.startswith("# Alpha memo:")
+    assert "**One-sentence alpha:**" in memo
+    assert "**Receipt 1:**" in memo
+    assert calls == 2
 
 
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
