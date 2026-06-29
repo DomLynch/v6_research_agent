@@ -212,7 +212,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} benchmark improvement replication failure",
         "{seed} same intervention different modality adaptation",
     )
-    base = (animal_query, rct_query, " ".join(words[:4]), healthy_query) if gero else (" ".join(words[:4]), seed)
+    base = (animal_query, rct_query, " ".join(words[:4]), healthy_query) if gero else (seed, " ".join(words[:4]))
     queries = [*base, *(template.format(seed=seed) for template in templates if seed)]
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 
