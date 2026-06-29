@@ -47,6 +47,13 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
     assert any("endpoint split" in query for query in queries)
 
 
+def test_query_shapes_prioritize_seed_falsifier_terms() -> None:
+    queries = query_shapes("glynac healthy older adults glutathione null subgroup", limit=3)
+
+    assert queries[0] == "glynac glutathione null primary endpoint"
+    assert queries[1] == "glynac glutathione subgroup baseline"
+
+
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
     papers = (
         Paper(

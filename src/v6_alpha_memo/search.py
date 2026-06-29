@@ -328,7 +328,18 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     terms = _content_terms(seed)
     anchor = seed if len(seed.split()) <= 5 else " ".join(terms)
     anchor = anchor or seed
-    modifiers = (
+    seed_terms = set(re.findall(r"[a-z][a-z0-9]{2,}", seed.casefold().replace("-", " ")))
+    falsifiers = []
+    if seed_terms & {"null", "primary", "endpoint"}:
+        falsifiers.append("null primary endpoint")
+    if seed_terms & {"subgroup", "baseline"}:
+        falsifiers.append("subgroup baseline")
+    if seed_terms & {"failed", "failure", "replication"}:
+        falsifiers.append("failed replication")
+    if seed_terms & {"blunted", "blunting", "attenuated"}:
+        falsifiers.append("blunted")
+    modifiers = tuple(dict.fromkeys((
+        *falsifiers,
         "",
         "human trial",
         "null primary endpoint",
@@ -338,7 +349,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "mechanism human",
         "endpoint split",
         "modality boundary",
-    )
+    )))
     queries = (f"{anchor} {modifier}".strip() for modifier in modifiers)
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 
