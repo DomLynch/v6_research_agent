@@ -298,7 +298,8 @@ def _receipt_role_check(scored: ScoredPair) -> str:
     if _combined_protocol(scored.pair.a):
         return (
             "Receipt 1 is treated as the full combined protocol named in its title, not isolated "
-            "single-component causality; it cannot attribute the signal to one component alone."
+            "single-component causality; it cannot attribute the signal to one component alone, and cannot support "
+            "single-component efficacy in the other receipt's setting."
         )
     return "Each receipt is interpreted only within its named intervention, comparator, population, and endpoint setting."
 
