@@ -146,8 +146,8 @@ def test_mechanism_human_update_names_endpoint_and_context() -> None:
     papers = (
         Paper(
             "a",
-            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function in the 3xTg mouse model",
-            "Resveratrol and exercise training improved cardiac and aortic function in mice with Alzheimer disease.",
+            "Resveratrol improves exercise-training cardiac function in the 3xTg mouse model",
+            "Resveratrol improved cardiac and aortic function during exercise training in mice with Alzheimer disease.",
             "openalex",
             doi="10.test/a",
         ),
@@ -748,6 +748,31 @@ def test_protocol_mismatch_requires_titled_protocol_receipt() -> None:
     scored = score_pairs(mine_pairs(papers), topic_terms={"glynac", "glutathione", "inflammation"})
 
     assert not any(pair.shape == "protocol_result_mismatch" for pair in scored)
+
+
+def test_rejects_multi_axis_combined_animal_to_human_boundary() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function in Alzheimer mice",
+            "The combined protocol improved cardiac and aortic endpoints in an animal disease model.",
+            "openalex",
+            2019,
+            "10.test/resv-combined",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic status in skeletal muscle of aged men",
+            "The human trial found exercise, not resveratrol, improved skeletal muscle metabolic status.",
+            "pubmed",
+            2014,
+            "10.test/resv-human",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
+
+    assert scored == ()
 
 
 def test_positive_only_human_overlap_does_not_publish_as_alpha() -> None:
@@ -1625,7 +1650,8 @@ def test_writer_title_names_setting_and_endpoint_boundary() -> None:
             "10.test/b",
         ),
     )
-    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "human", "exercise", "training"})[0]
+    pair = CandidatePair(papers[0], papers[1], ("resveratrol", "exercise", "training"))
+    scored = ScoredPair(pair, 100, "mechanism_to_human_failure", "update", ())
     memo = render_memo(scored)
 
     assert memo.splitlines()[0] == "# Alpha memo: resveratrol exercise combined-protocol attribution boundary"

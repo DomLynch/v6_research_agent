@@ -78,6 +78,10 @@ _HUMAN_DESIGN = frozenset({
     "field", "firms", "human", "humans", "men", "participants", "patient",
     "patients", "placebo", "randomized", "trial", "women", "workers",
 })
+_COMBINED_PROTOCOL_RE = re.compile(
+    r"\b(?:plus|combined|combination|with)\b"
+    r"|\band\s+(?:exercise|training|resistance|endurance|aerobic|glycine|n\s+acetylcysteine|acetylcysteine|supplementation|therapy|treatment)\b"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +188,9 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if shape == "protocol_result_mismatch" and _shared_title_anchor_count(a, b, anchors) < 2:
         score = 0
         reasons.append("reject:weak_directness")
+    if shape != "shared_anchor" and _multi_axis_combined_boundary(first, second):
+        score = 0
+        reasons.append("reject:multi_axis_combined_protocol")
     if shape != "shared_anchor" and _mechanism_only(first) and _mechanism_only(second):
         score = 0
         reasons.append("reject:preclinical_only_pair")
@@ -365,6 +372,15 @@ def _human_title(paper: Paper) -> bool:
 
 def _protocol_title(paper: Paper) -> bool:
     return _has(set(_WORD_RE.findall(paper.title.casefold())), _PROTOCOL)
+
+
+def _combined_title(paper: Paper) -> bool:
+    text = f" {paper.title.casefold().replace('-', ' ')} "
+    return bool(_COMBINED_PROTOCOL_RE.search(text))
+
+
+def _multi_axis_combined_boundary(first: Paper, second: Paper) -> bool:
+    return _combined_title(first) and _animal_only(first) and _is_human(second) and not _shared_endpoint(first, second)
 
 
 def _human_topic(topic_terms: frozenset[str]) -> bool:

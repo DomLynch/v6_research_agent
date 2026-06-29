@@ -12,6 +12,10 @@ from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import CoverageReceipt, Paper
 
 _MINIMAX_BASE_URL = "https://api.minimax.io/anthropic"
+_COMBINED_PROTOCOL_RE = re.compile(
+    r"\b(?:plus|combined|combination|with)\b"
+    r"|\band\s+(?:exercise|training|resistance|endurance|aerobic|glycine|n\s+acetylcysteine|acetylcysteine|supplementation|therapy|treatment)\b"
+)
 
 
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
@@ -363,7 +367,7 @@ def _research_question(scored: ScoredPair) -> str:
 
 def _combined_protocol(paper: Paper) -> bool:
     text = f" {paper.title.casefold().replace('-', ' ')} "
-    return any(marker in text for marker in (" and ", " plus ", " combined ", " combination ", " with "))
+    return bool(_COMBINED_PROTOCOL_RE.search(text))
 
 
 def _receipt_line(paper: Paper) -> str:
