@@ -70,9 +70,6 @@ class SearchResult:
     receipt: CoverageReceipt
 
 
-_GERO_HINTS = frozenset({"aging", "glutathione", "mitochondrial", "oxidative", "redox"})
-
-
 class FullrawSearchClient:
     """Tiny POST client for the 5TB-backed fullraw search endpoint."""
 
@@ -197,11 +194,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     """Turn a domain/topic seed into targeted novelty-search shapes."""
     seed = " ".join(seed.split())
     words = seed.split()
-    lead = words[:3]
-    gero = bool(_GERO_HINTS & {word.casefold() for word in words})
-    animal_query = " ".join((*lead, "supplementation", "mice", "length", "of", "life", "glutathione", "deficiency", "oxidative", "stress")) if lead else seed
-    rct_query = " ".join(("randomized", "controlled", "clinical", "trial", "healthy", "older", "adults", "determine", "efficacy", *lead, "supplementation", "glutathione", "redox", "status", "oxidative", "damage")) if lead else seed
-    healthy_query = " ".join(("healthy", "older", "adults", *words[1:3], words[-3], "redox")) if gero and len(words) > 5 else seed
+    compact = " ".join(words[:4])
     templates = (
         "{seed} randomized placebo no effect primary endpoint",
         "{seed} baseline subgroup high low response",
@@ -212,7 +205,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} benchmark improvement replication failure",
         "{seed} same intervention different modality adaptation",
     )
-    base = (animal_query, rct_query, " ".join(words[:4]), healthy_query) if gero else (seed, " ".join(words[:4]))
+    base = (seed, compact)
     queries = [*base, *(template.format(seed=seed) for template in templates if seed)]
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 

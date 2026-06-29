@@ -26,17 +26,13 @@ from v6_alpha_memo.write import judge_with_minimax
 
 def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
     queries = query_shapes("marketing attribution incrementality")
-    gero_queries = query_shapes("glynac glycine n-acetylcysteine aging glutathione older adults", limit=8)
+    aging_queries = query_shapes("everolimus aging immune function", limit=8)
 
     assert len(queries) >= 6
     assert queries[0] == "marketing attribution incrementality"
     assert all("marketing attribution incrementality" in query for query in queries)
-    assert "glynac glycine n-acetylcysteine supplementation mice length of life glutathione deficiency oxidative stress" in gero_queries
-    assert "randomized controlled clinical trial healthy older adults determine efficacy glynac glycine n-acetylcysteine supplementation glutathione redox status oxidative damage" in gero_queries
-    assert gero_queries[:2] == (
-        "glynac glycine n-acetylcysteine supplementation mice length of life glutathione deficiency oxidative stress",
-        "randomized controlled clinical trial healthy older adults determine efficacy glynac glycine n-acetylcysteine supplementation glutathione redox status oxidative damage",
-    )
+    assert aging_queries[0] == "everolimus aging immune function"
+    assert all("glynac" not in query and "glutathione" not in query for query in aging_queries)
     assert any("randomized placebo no effect primary endpoint" in query for query in queries)
     assert any("baseline subgroup high low response" in query for query in queries)
     assert any("mechanism model human failed translation" in query for query in queries)
