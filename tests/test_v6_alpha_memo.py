@@ -692,6 +692,33 @@ def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyP
     assert calls == 2
 
 
+def test_minimax_writer_falls_back_on_inline_title_memo(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharp"}'}]})
+        return _Response({
+            "content": [{
+                "type": "text",
+                "text": "# Alpha memo: bad **One-sentence alpha:** inline **Receipt 1:** x **Receipt 2:** y **Why this is surprising:** z **Caveats/falsifiers:** q",
+            }]
+        })
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    memo = v6_write.render_with_minimax(run.top_pairs[:1])
+
+    assert memo.startswith("# Alpha memo:")
+    assert "**One-sentence alpha:**" in memo.splitlines()[2]
+    assert calls == 2
+
+
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     top_pair = run.top_pairs[0]

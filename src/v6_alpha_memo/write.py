@@ -145,10 +145,13 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
             }
         )
     return (
-        "Return this exact Markdown skeleton: # Alpha memo: <receipt-owned title>; "
-        "**One-sentence alpha:** <one sentence>; **Receipt 1:** <paper plus finding>; "
-        "**Receipt 2:** <paper plus finding>; **Why this is surprising:** <short>; "
-        "**Caveats/falsifiers:** <bullets>. Each receipt line must name the paper "
+        "Return this exact Markdown skeleton, with each label on its own line:\n"
+        "# Alpha memo: <receipt-owned title>\n"
+        "**One-sentence alpha:** <one sentence>\n"
+        "**Receipt 1:** <paper plus finding>\n"
+        "**Receipt 2:** <paper plus finding>\n"
+        "**Why this is surprising:** <short>\n"
+        "**Caveats/falsifiers:**\n- <bullet>\n- <bullet>. Each receipt line must name the paper "
         "and summarize one concrete finding/result from its abstract. Never use a "
         "paper title as the finding. Keep title and alpha cautious: use suggests/may/"
         "bounded, not proves/refutes/flips/overturns. Explicitly distinguish what "
@@ -209,17 +212,19 @@ def _finding(paper: Paper) -> str:
 
 
 def _valid_memo(text: str) -> bool:
-    return all(
-        marker in text
-        for marker in (
-            "# Alpha memo:",
-            "**One-sentence alpha:**",
-            "**Receipt 1:**",
-            "**Receipt 2:**",
-            "**Why this is surprising:**",
-            "**Caveats/falsifiers:**",
-        )
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines or not lines[0].startswith("# Alpha memo:"):
+        return False
+    if len(lines[0]) > 160 or "**One-sentence alpha:**" in lines[0]:
+        return False
+    markers = (
+        "**One-sentence alpha:**",
+        "**Receipt 1:**",
+        "**Receipt 2:**",
+        "**Why this is surprising:**",
+        "**Caveats/falsifiers:**",
     )
+    return all(any(line.startswith(marker) for line in lines) for marker in markers)
 
 
 def _minimax_key() -> str:
