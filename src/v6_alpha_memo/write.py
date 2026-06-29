@@ -158,6 +158,7 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         "bounded, not proves/refutes/flips/overturns. Explicitly distinguish what "
         "Receipt 1 made plausible from what Receipt 2 updates. Caveats must name "
         "the population/dose/timescale limits and one decisive future falsifier. "
+        "Do not call interventions equivalent across species/doses unless receipts directly establish equivalence. "
         "Do not mention dose-equivalent scaling unless the supplied receipts quantify it. "
         "No broad framing beyond receipts.\n"
         + json.dumps(rows, ensure_ascii=False)
