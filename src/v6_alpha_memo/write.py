@@ -254,7 +254,7 @@ def _setting_label(paper: Paper) -> str:
     if terms & {"rat", "rats", "mouse", "mice"}:
         return "animal-disease" if _has_disease_axis(paper) else "animal"
     if {"aged", "men"} <= terms:
-        return "aged-men"
+        return "aged men"
     if terms & {"adult", "adults", "human", "men", "participants", "trial", "women"}:
         return "human"
     return _setting_kind(paper)
@@ -264,6 +264,11 @@ def _axis_label(paper: Paper) -> str:
     terms = _paper_terms(paper)
     hits = [term for term in _ENDPOINT_DISPLAY_TERMS if term in terms]
     return "/".join(hits[:2]) if hits else "endpoint"
+
+
+def _endpoint_label(paper: Paper) -> str:
+    axis = _axis_label(paper)
+    return "tested endpoints" if axis == "endpoint" else f"{axis} endpoints"
 
 
 def _has_disease_axis(paper: Paper) -> bool:
@@ -293,8 +298,8 @@ def _logical_move(scored: ScoredPair) -> str:
     if _combined_protocol(pair.a):
         return (
             f"Receipt 1 establishes a non-decomposed combined-protocol {_axis_label(pair.a)} signal in "
-            f"{_setting_label(pair.a)}; Receipt 2 tests component attribution in {_setting_label(pair.b)} on "
-            f"{_axis_label(pair.b)} endpoints; the update is attribution asymmetry across receipt-owned settings."
+            f"{_setting_label(pair.a)}; Receipt 2 tests isolated-component attribution in {_setting_label(pair.b)} on "
+            f"{_endpoint_label(pair.b)}; the update is attribution asymmetry across receipt-owned settings."
         )
     return (
         f"Receipt 1 establishes {_axis_label(pair.a)} in {_setting_label(pair.a)}; "
@@ -337,7 +342,7 @@ def _falsifier(scored: ScoredPair) -> str:
     if _combined_protocol(pair.a):
         return (
             f"A matched {_setting_label(pair.b)} study where the isolated shared component improves "
-            f"{_axis_label(pair.b)} endpoints versus placebo and adds benefit beyond the comparator arm would "
+            f"{_endpoint_label(pair.b)} versus placebo and adds benefit beyond the comparator arm would "
             "overturn the attribution-boundary update."
         )
     return (
@@ -350,8 +355,8 @@ def _research_question(scored: ScoredPair) -> str:
     pair = scored.pair
     if _combined_protocol(pair.a):
         return (
-            f"Does the combined-protocol {_axis_label(pair.a)} signal in {_setting_label(pair.a)} transfer to "
-            f"component-attributed {_axis_label(pair.b)} endpoints in {_setting_label(pair.b)}?"
+            f"Does the combined-protocol {_axis_label(pair.a)} signal in {_setting_label(pair.a)} hold when "
+            f"the shared component is isolated for {_endpoint_label(pair.b)} in {_setting_label(pair.b)}?"
         )
     return "How far does the Receipt 1 signal transfer across the setting tested by Receipt 2?"
 

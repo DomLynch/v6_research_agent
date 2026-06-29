@@ -725,6 +725,31 @@ def test_scores_subgroup_endpoint_split_without_manual_topic_fix() -> None:
     assert "baseline-, subgroup-, or endpoint-gated" in scored[0].expectation_update
 
 
+def test_protocol_mismatch_requires_titled_protocol_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "GlyNAC improves glutathione deficiency in older adults",
+            "The trial protocol included 24 weeks of supplementation and showed improved glutathione.",
+            "openalex",
+            2021,
+            "10.test/glynac-a",
+        ),
+        Paper(
+            "b",
+            "GlyNAC supplementation improves glutathione and inflammation in aging",
+            "The results showed improved glutathione and inflammation after GlyNAC.",
+            "pubmed",
+            2024,
+            "10.test/glynac-b",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"glynac", "glutathione", "inflammation"})
+
+    assert not any(pair.shape == "protocol_result_mismatch" for pair in scored)
+
+
 def test_positive_only_human_overlap_does_not_publish_as_alpha() -> None:
     class PositiveOnlyClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
@@ -1610,6 +1635,9 @@ def test_writer_title_names_setting_and_endpoint_boundary() -> None:
     assert "the update is attribution asymmetry across receipt-owned settings" in memo
     assert "versus placebo and adds benefit beyond the comparator arm" in memo
     assert "single-component attribution if a receipt tests a combined protocol" in memo
+    assert "aged-men" not in memo
+    assert "endpoint endpoints" not in memo
+    assert "aged men" in memo
     assert not v6_run._claim_contract_flags("resveratrol human exercise training blunting", memo, scored)
 
 
