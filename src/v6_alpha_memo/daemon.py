@@ -167,10 +167,11 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict
         "body_markdown": memo,
         "markdown": memo,
         "source_bundle": bundle,
-        "novelty_score": round(score / 100, 3),
-        "confidence_score": 0.75,
+        "novelty_score": float(score),
+        "confidence_score": 80.0,
         "metadata": {"article_type": "alpha_memo", "domain_slug": domain, "topic": _slug(topic)},
         "evidence_bundle": {
+            "sources": bundle,
             "direct_source_count": len(bundle),
             "v6_score": score,
             "v6_shape": str(selected.shape),
@@ -180,7 +181,12 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict
                 "maturity_level": "L5",
                 "confidence_label": "evidence_backed_signal",
                 "blockers": [],
-                "axes": {"bound_receipts": len(bundle), "a_core_receipts": len(bundle)},
+                "axes": {
+                    "bound_receipts": len(bundle),
+                    "a_core_receipts": len(bundle),
+                    "available_bound_receipts": len(bundle),
+                    "source_papers": bundle,
+                },
             },
         },
     }
