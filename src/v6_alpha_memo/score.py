@@ -222,6 +222,8 @@ def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str
 def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str:
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
+    if not _has_finding_text(a) or not _has_finding_text(b):
+        return "reject:title_only_receipt"
     title_a = set(_WORD_RE.findall(a.title.casefold()))
     title_b = set(_WORD_RE.findall(b.title.casefold()))
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
@@ -232,6 +234,10 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
 def _nonprimary(paper: Paper) -> bool:
     text = paper.text.casefold()
     return any(phrase in text for phrase in _NONPRIMARY_PHRASES)
+
+
+def _has_finding_text(paper: Paper) -> bool:
+    return len(_WORD_RE.findall(paper.abstract.casefold())) >= 6
 
 
 def _tokens(paper: Paper) -> set[str]:
