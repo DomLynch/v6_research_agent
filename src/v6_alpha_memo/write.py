@@ -74,6 +74,8 @@ def render_with_minimax(top_pairs: tuple[ScoredPair, ...], *, receipt: CoverageR
     with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
         data = json.loads(response.read().decode())
     text = _content_text(data).strip()
+    if not _valid_memo(text):
+        return render_memo(top_pairs[0], receipt=receipt)
     return text + ("\n" if text else "")
 
 
@@ -143,8 +145,10 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
             }
         )
     return (
-        "Return a short memo with: title, one-sentence alpha, receipt 1, receipt 2, "
-        "why surprising, caveats/falsifiers. Each receipt line must name the paper "
+        "Return this exact Markdown skeleton: # Alpha memo: <receipt-owned title>; "
+        "**One-sentence alpha:** <one sentence>; **Receipt 1:** <paper plus finding>; "
+        "**Receipt 2:** <paper plus finding>; **Why this is surprising:** <short>; "
+        "**Caveats/falsifiers:** <bullets>. Each receipt line must name the paper "
         "and summarize one concrete finding/result from its abstract. Never use a "
         "paper title as the finding. No broad framing beyond receipts.\n"
         + json.dumps(rows, ensure_ascii=False)
@@ -197,6 +201,20 @@ def _paper_json(paper: Paper) -> dict[str, object]:
 
 def _finding(paper: Paper) -> str:
     return " ".join(paper.abstract.split())[:260]
+
+
+def _valid_memo(text: str) -> bool:
+    return all(
+        marker in text
+        for marker in (
+            "# Alpha memo:",
+            "**One-sentence alpha:**",
+            "**Receipt 1:**",
+            "**Receipt 2:**",
+            "**Why this is surprising:**",
+            "**Caveats/falsifiers:**",
+        )
+    )
 
 
 def _minimax_key() -> str:
