@@ -22,7 +22,7 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
     lines = [
         f"# {title}",
         "",
-        "**Research question:** How far does the Receipt 1 signal transfer across the setting tested by Receipt 2?",
+        f"**Research question:** {_research_question(scored)}",
         "",
         f"**One-sentence alpha:** {_alpha_sentence(scored)}",
         "",
@@ -135,14 +135,17 @@ def _title(scored: ScoredPair) -> str:
     anchors = anchors or list(scored.pair.anchors)
     phrase = _contiguous_phrase(anchors, f"{scored.pair.a.title} {scored.pair.b.title}")
     anchor = phrase or " ".join(anchors[:2]) or "receipt"
+    if _combined_protocol(scored.pair.a):
+        return f"Alpha memo: {anchor} combined-protocol attribution boundary"
     return f"Alpha memo: {anchor} {_boundary_label(scored.pair.a, scored.pair.b)}"
 
 
 def _alpha_sentence(scored: ScoredPair) -> str:
     if scored.shape == "mechanism_to_human_failure" and _combined_protocol(scored.pair.a):
         return (
-            f"Receipt 1 supports a combined-protocol {_axis_label(scored.pair.a)} signal in {_setting_label(scored.pair.a)}; "
-            f"Receipt 2 separates the components and limits transfer to {_axis_label(scored.pair.b)} in {_setting_label(scored.pair.b)}."
+            f"Receipt 1 reports a combined-protocol {_axis_label(scored.pair.a)} signal in {_setting_label(scored.pair.a)} "
+            f"that cannot be decomposed into single components; Receipt 2 tests component attribution in "
+            f"{_setting_label(scored.pair.b)} and bounds whether the shared anchor adds {_axis_label(scored.pair.b)} benefit."
         )
     if scored.expectation_update:
         return scored.expectation_update
@@ -287,6 +290,12 @@ def _why_surprising(scored: ScoredPair) -> str:
 
 def _logical_move(scored: ScoredPair) -> str:
     pair = scored.pair
+    if _combined_protocol(pair.a):
+        return (
+            f"Receipt 1 establishes a non-decomposed combined-protocol {_axis_label(pair.a)} signal in "
+            f"{_setting_label(pair.a)}; Receipt 2 tests component attribution in {_setting_label(pair.b)} on "
+            f"{_axis_label(pair.b)} endpoints; the update is attribution asymmetry across receipt-owned settings."
+        )
     return (
         f"Receipt 1 establishes {_axis_label(pair.a)} in {_setting_label(pair.a)}; "
         f"Receipt 2 establishes {_axis_label(pair.b)} in {_setting_label(pair.b)}; "
@@ -325,10 +334,26 @@ def _enforce_receipt_caveats(text: str, scored: ScoredPair) -> str:
 
 def _falsifier(scored: ScoredPair) -> str:
     pair = scored.pair
+    if _combined_protocol(pair.a):
+        return (
+            f"A matched {_setting_label(pair.b)} study where the isolated shared component improves "
+            f"{_axis_label(pair.b)} endpoints versus placebo and adds benefit beyond the comparator arm would "
+            "overturn the attribution-boundary update."
+        )
     return (
         f"A matched {_setting_label(pair.b)} study where {_axis_label(pair.b)} endpoints improve under the same "
         "isolated intervention would overturn the update."
     )
+
+
+def _research_question(scored: ScoredPair) -> str:
+    pair = scored.pair
+    if _combined_protocol(pair.a):
+        return (
+            f"Does the combined-protocol {_axis_label(pair.a)} signal in {_setting_label(pair.a)} transfer to "
+            f"component-attributed {_axis_label(pair.b)} endpoints in {_setting_label(pair.b)}?"
+        )
+    return "How far does the Receipt 1 signal transfer across the setting tested by Receipt 2?"
 
 
 def _combined_protocol(paper: Paper) -> bool:

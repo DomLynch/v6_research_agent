@@ -429,15 +429,15 @@ _SOFT_ANCHOR_TERMS = _MODALITY_TERMS | _OUTCOME_TERMS | _BOUNDARY_AXIS_TERMS | f
     "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
 })
 _CLAIM_DROP = _GENERIC_TOPIC_TERMS | _OUTCOME_TERMS | frozenset({
-    "adaptation", "adaptations", "after", "alpha", "anchor", "animal", "antidiabetes", "attenuate", "attenuated", "attenuates", "benefit", "beneficial", "blunted", "blunting", "blocks",
-    "and", "combined", "component", "components", "compound", "compounds",
-    "across", "bounded", "boundary", "but", "can", "carry", "claim", "cleanly", "comparison", "context", "deficit", "dependent", "different", "direction", "disease", "effect", "endpoint", "expect",
-    "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "impair", "impaired", "impairment", "impairs", "intervention", "may", "mechanism",
+    "adaptation", "adaptations", "adds", "after", "alpha", "alone", "anchor", "animal", "antidiabetes", "attribution", "attributed", "attenuate", "attenuated", "attenuates", "benefit", "beneficial", "blunted", "blunting", "blocks", "bounds",
+    "and", "cannot", "combined", "component", "components", "compound", "compounds",
+    "across", "bounded", "boundary", "but", "can", "carry", "claim", "cleanly", "comparison", "context", "decomposed", "decompose", "deficit", "dependent", "different", "direction", "disease", "effect", "efficacy", "endpoint", "expect",
+    "drug", "drugs", "failure", "fail", "forces", "made", "exercise", "failed", "help", "helps", "impair", "impaired", "impairment", "impairs", "intervention", "into", "may", "mechanism",
     "gains", "harm", "healthy", "improve", "improved", "improves", "longevity", "memo", "model", "modality", "negative", "null", "one", "outcome",
     "limited", "limit", "limits", "looks", "positive", "preserved", "promise", "protect", "protected", "protection", "protective",
     "automatically", "does", "not", "rather", "receipt", "receipts", "reduced", "reversal", "reverse", "signal", "setting", "settings", "species",
-    "population", "protocol", "recovery", "same", "sentence", "separates", "split", "splits", "stable", "study", "supported", "supports", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
-    "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "would",
+    "owned", "population", "protocol", "recovery", "reports", "same", "sentence", "separates", "shared", "single", "split", "splits", "stable", "study", "supported", "supports", "tests", "than", "that", "the", "tool", "trained", "training", "travel", "trial", "two",
+    "transfer", "translation", "under", "uniformly", "universal", "update", "versus", "whether", "would",
 })
 _CROSS_COMPARISON_MARKERS = (
     " compared ", " comparison ", "split by compound",
