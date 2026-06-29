@@ -131,6 +131,7 @@ class FullrawSearchClient:
             "rank_mode": "relevance",
             "cache_only": True,
             "queue_if_missing": True,
+            "priority": _truthy(os.environ.get("V6_FULLRAW_PRIORITY", "1")),
             "corpus": "full_raw_5tb",
             "timeout_seconds": self.timeout,
         }
@@ -314,6 +315,10 @@ def _query_variants(query: str) -> tuple[str, ...]:
 
 def _search_urls(value: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(url.strip() for url in value.split(",") if url.strip()))
+
+
+def _truthy(value: str) -> bool:
+    return value.strip().casefold() in {"1", "true", "yes", "on"}
 
 
 _QUERY_DROP = frozenset({

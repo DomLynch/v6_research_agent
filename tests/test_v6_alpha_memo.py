@@ -376,6 +376,19 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.papers[0].doi == "10.test/metformin"
 
 
+def test_fullraw_client_marks_requests_priority_by_default() -> None:
+    payloads: list[dict[str, object]] = []
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        payloads.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        return _Response({"meta": _strict_meta({"openalex": 1}), "results": []})
+
+    FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search("taurine aging")
+
+    assert payloads[0]["priority"] is True
+
+
 def test_fullraw_from_env_uses_v6_native_search(monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {
         "meta": _strict_meta({"semantic_scholar": 1}),
