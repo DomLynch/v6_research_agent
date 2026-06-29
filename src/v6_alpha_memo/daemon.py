@@ -65,6 +65,8 @@ def _run_pass(
     board: dict[str, object],
 ) -> None:
     rows = _rows(board, topics)
+    waiting = 0
+    max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in rows:
         if row.get("public") or row.get("blocked_final"):
             continue
@@ -75,7 +77,9 @@ def _run_pass(
             stage = _blocked_stage(exc.trace)
             row.update({"blocked_stage": stage, "trace": exc.trace})
             if stage == "search_cache_waiting":
-                break
+                waiting += 1
+                if waiting >= max_waiting:
+                    break
         except Exception as exc:
             row.update({
                 "blocked_stage": "exception",
