@@ -185,6 +185,9 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if shape == "subgroup_endpoint_split" and not _shared_endpoint(a, b):
         score = 0
         reasons.append("reject:endpoint_mismatch")
+    if shape == "mechanism_to_human_failure" and _endpoint_conflict(first, second):
+        score = 0
+        reasons.append("reject:endpoint_mismatch")
     if shape == "protocol_result_mismatch" and _shared_title_anchor_count(a, b, anchors) < 2:
         score = 0
         reasons.append("reject:weak_directness")
@@ -293,6 +296,12 @@ def _shared_title_anchor_count(a: Paper, b: Paper, anchors: tuple[str, ...]) -> 
 
 def _shared_endpoint(a: Paper, b: Paper) -> bool:
     return bool((_tokens(a) & _tokens(b)) & _ENDPOINT)
+
+
+def _endpoint_conflict(a: Paper, b: Paper) -> bool:
+    left = _tokens(a) & _ENDPOINT
+    right = _tokens(b) & _ENDPOINT
+    return bool(left and right and not left & right)
 
 
 def _nonprimary(paper: Paper) -> bool:

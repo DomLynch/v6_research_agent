@@ -99,6 +99,29 @@ def test_rejects_background_efficacy_as_promise_receipt() -> None:
     assert scored == ()
 
 
+def test_rejects_animal_human_failure_without_shared_endpoint_family() -> None:
+    papers = (
+        Paper(
+            paper_id="a",
+            title="Improvements in skeletal muscle strength and cardiac function induced by resveratrol during exercise training contribute to enhanced exercise performance in rats",
+            abstract="Resveratrol during exercise training improved strength, cardiac function, and performance in rats.",
+            source="openalex",
+            doi="10.example/a",
+        ),
+        Paper(
+            paper_id="b",
+            title="Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle of aged men",
+            abstract="In aged men, exercise training improved metabolic and inflammatory status, but resveratrol had null effects.",
+            source="pubmed",
+            doi="10.example/b",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
+
+    assert scored == ()
+
+
 def test_rejects_same_drug_unrelated_protocol_bridge() -> None:
     papers = (
         Paper(
@@ -153,8 +176,8 @@ def test_mechanism_human_update_names_endpoint_and_context() -> None:
         ),
         Paper(
             "b",
-            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle of aged men",
-            "Exercise training but not resveratrol improved metabolic and inflammatory status in skeletal muscle of aged men.",
+            "Exercise training, but not resveratrol, improves cardiac function in aged men",
+            "Exercise training but not resveratrol improved cardiac function in aged men.",
             "pubmed",
             doi="10.test/b",
         ),
@@ -165,7 +188,7 @@ def test_mechanism_human_update_names_endpoint_and_context() -> None:
     assert scored
     assert scored[0].shape == "mechanism_to_human_failure"
     assert "cardiac/aortic/function signal in animal disease model" in scored[0].expectation_update
-    assert "metabolic/inflammatory in aged men" in scored[0].expectation_update
+    assert "cardiac/function in aged men" in scored[0].expectation_update
 
 
 def test_positive_human_title_does_not_become_failure_from_abstract_baseline() -> None:
