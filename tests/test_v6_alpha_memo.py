@@ -17,6 +17,7 @@ from v6_alpha_memo import (
     render_memo,
     score_pairs,
 )
+from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
@@ -777,6 +778,81 @@ def test_minimax_judge_rejects_all(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
 
     assert judge_with_minimax(run.top_pairs[:1]) == ()
+
+
+def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MultiPairClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Dashboard improves forecast accuracy in a pilot",
+                    "The dashboard improved forecast accuracy and analyst confidence in a pilot.",
+                    "openalex",
+                ),
+                Paper(
+                    "b",
+                    "Dashboard failed to improve forecast accuracy in a randomized field trial",
+                    "The dashboard produced null forecast accuracy gains and reduced analyst quality in a human field trial.",
+                    "pubmed",
+                ),
+                Paper(
+                    "c",
+                    "Dashboard accuracy tool improves human decisions in a benchmark",
+                    "The dashboard accuracy tool improved human decision performance and accuracy in a benchmark.",
+                    "openalex",
+                ),
+                Paper(
+                    "d",
+                    "Dashboard accuracy tool failed in a randomized human trial",
+                    "The dashboard accuracy tool had null effects and reduced decision quality in a randomized human trial.",
+                    "semantic_scholar",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
+
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 2, "reason": "sharper"}'}]})
+        return _Response({
+            "content": [{
+                "type": "text",
+                "text": "# Alpha memo: chosen\n\n**One-sentence alpha:** x\n\n**Receipt 1:** y\n\n**Receipt 2:** z\n\n**Why this is surprising:** q\n\n**Caveats/falsifiers:**\n- w",
+            }]
+        })
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    run = build_memo("dashboard forecast accuracy", client=MultiPairClient(), query_limit=1, writer="minimax")
+
+    assert len(run.top_pairs) == 1
+    assert run.top_pairs[0].pair.a.paper_id == "a"
+    assert run.top_pairs[0].pair.b.paper_id == "b"
+    assert run.memo.splitlines()[0] == f"# {v6_write._title(run.top_pairs[0])}"
+    assert calls == 2
+
+
+def test_daemon_payload_uses_selected_pair_receipts() -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    selected = run.top_pairs[0]
+
+    payload = v6_daemon._payload("management dashboard forecast accuracy", "agent-v6", run.memo, selected)
+    bundle = payload["source_bundle"]
+
+    assert isinstance(bundle, list)
+    assert [item["title"] for item in bundle if isinstance(item, dict)] == [
+        selected.pair.a.title,
+        selected.pair.b.title,
+    ]
+    assert payload["agent_id"] == "agent-v6"
+    assert payload["artifact_type"] == "alpha_memo"
 
 
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:

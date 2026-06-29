@@ -18,7 +18,7 @@ from v6_alpha_memo.search import (
     merge_results,
     query_shapes,
 )
-from v6_alpha_memo.write import render_memo, render_with_minimax
+from v6_alpha_memo.write import judge_with_minimax, render_memo, render_with_minimax
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +82,21 @@ def build_memo(
             )
         )
     receipt = _best_receipt(results)
-    memo = render_with_minimax(scored, receipt=receipt) if writer == "minimax" else render_memo(scored[0], receipt=receipt)
+    if writer == "minimax":
+        scored = judge_with_minimax(scored)
+        if not scored:
+            raise NoMemoError(
+                _trace(
+                    results,
+                    (),
+                    paper_count=len(papers),
+                    pair_count=len(pairs),
+                    scored_count=0,
+                )
+            )
+        memo = render_with_minimax(scored, receipt=receipt, judge=False)
+    else:
+        memo = render_memo(scored[0], receipt=receipt)
     return V6Run(
         memo=memo,
         top_pairs=scored,

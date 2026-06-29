@@ -44,11 +44,17 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
     return "\n".join(lines).strip() + "\n"
 
 
-def render_with_minimax(top_pairs: tuple[ScoredPair, ...], *, receipt: CoverageReceipt | None = None) -> str:
-    judged = judge_with_minimax(top_pairs)
-    if not judged:
-        raise RuntimeError("MiniMax rejected all receipt pairs")
-    top_pairs = judged
+def render_with_minimax(
+    top_pairs: tuple[ScoredPair, ...],
+    *,
+    receipt: CoverageReceipt | None = None,
+    judge: bool = True,
+) -> str:
+    if judge:
+        judged = judge_with_minimax(top_pairs)
+        if not judged:
+            raise RuntimeError("MiniMax rejected all receipt pairs")
+        top_pairs = judged
     api_key = _minimax_key()
     if not api_key:
         return render_memo(top_pairs[0], receipt=receipt)
