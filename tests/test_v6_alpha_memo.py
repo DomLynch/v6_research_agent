@@ -624,6 +624,32 @@ def test_fullraw_client_does_not_fan_out_when_sweep_is_busy() -> None:
     assert result.receipt.error == "async_sweep_busy"
 
 
+def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "shard_receipt": {
+                "shards_searched": 415,
+                "shards_total": 1525,
+                "papers_searched": 68991456,
+                "papers_total": 1456919317,
+                "source_count_searched": 4,
+                "sweep_failed_shards": 0,
+                "sources_searched": {"openalex": 168, "pubmed": 243, "semantic_scholar": 2},
+                "partial_shard_search": True,
+            }
+        },
+        "results": [],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "taurine aging biomarker supplementation"
+    )
+
+    assert result.receipt.shards_searched == 415
+    assert result.receipt.shards_total == 1525
+    assert result.receipt.error == "fullraw_incomplete:415/1525"
+
+
 def test_build_memo_stops_query_fanout_when_fullraw_is_waiting() -> None:
     class WaitingClient:
         def __init__(self) -> None:

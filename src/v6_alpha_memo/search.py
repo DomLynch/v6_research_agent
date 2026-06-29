@@ -242,7 +242,7 @@ def _coverage_error(data: object) -> str:
     shard = meta.get("shard_receipt")
     shard = shard if isinstance(shard, dict) else {}
     status = _async_status(data)
-    if status != "hit":
+    if status and status != "hit":
         return f"async_sweep_{status or 'missing'}"
     shards = _int(shard.get("shards_searched")) or 0
     total = _int(shard.get("shards_total")) or 0
@@ -260,7 +260,11 @@ def _coverage_error(data: object) -> str:
 
 
 def _waitable_coverage_error(error: str) -> bool:
-    return error in {"async_sweep_busy", "async_sweep_queued", "async_sweep_running", "async_sweep_started"}
+    return (
+        error in {"async_sweep_busy", "async_sweep_queued", "async_sweep_running", "async_sweep_started"}
+        or error.startswith("fullraw_incomplete:")
+        or error in {"fullraw_partial", "fullraw_low_source_count:0"}
+    )
 
 
 def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
