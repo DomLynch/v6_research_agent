@@ -150,7 +150,11 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         "**Receipt 2:** <paper plus finding>; **Why this is surprising:** <short>; "
         "**Caveats/falsifiers:** <bullets>. Each receipt line must name the paper "
         "and summarize one concrete finding/result from its abstract. Never use a "
-        "paper title as the finding. No broad framing beyond receipts.\n"
+        "paper title as the finding. Keep title and alpha cautious: use suggests/may/"
+        "bounded, not proves/refutes/flips/overturns. Explicitly distinguish what "
+        "Receipt 1 made plausible from what Receipt 2 updates. Caveats must name "
+        "the population/dose/timescale limits and one decisive future falsifier. "
+        "No broad framing beyond receipts.\n"
         + json.dumps(rows, ensure_ascii=False)
     )
 

@@ -663,6 +663,8 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Return this exact Markdown skeleton" in prompt
     assert "summarize one concrete finding/result" in prompt
     assert "Never use a paper title as the finding" in prompt
+    assert "Keep title and alpha cautious" in prompt
+    assert "one decisive future falsifier" in prompt
     assert '"finding"' in prompt
 
 
