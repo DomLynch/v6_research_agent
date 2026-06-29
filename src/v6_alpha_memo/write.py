@@ -36,6 +36,7 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         "and should not be read as advice, settled science, or a broad class claim.",
         f"**Bounded contrast:** Receipt 1 axes: {_evidence_axes(pair.a)}. Receipt 2 axes: {_evidence_axes(pair.b)}.",
         f"**Receipt-role check:** {_receipt_role_check(scored)}",
+        f"**Boundary scope:** {_boundary_scope(scored)}",
         f"**Interpretation:** {_logical_move(scored)}",
         "",
         f"**Why this is surprising:** {_why_surprising(scored)}",
@@ -70,8 +71,9 @@ def render_with_minimax(
         "temperature": 0.2,
         "system": (
             "Pick the strongest receipt pair and write only the required concise memo. Use only supplied receipts. "
-            "Distinguish protection/damage-marker signals from performance or adaptation gains. Include why the pair "
-            "was selected and one concrete next-test gap."
+            "Distinguish protection/damage-marker signals from performance or adaptation gains. If a receipt tests a "
+            "combined protocol, explicitly say it cannot attribute the signal to one component alone, and state every "
+            "major boundary axis at once. Include why the pair was selected and one concrete next-test gap."
         ),
         "thinking": {"type": "disabled"},
         "messages": [{"role": "user", "content": [{"type": "text", "text": _prompt(top_pairs[:5])}]}],
@@ -89,7 +91,7 @@ def render_with_minimax(
     )
     with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
         data = json.loads(response.read().decode())
-    text = _content_text(data).strip()
+    text = _enforce_receipt_caveats(_content_text(data).strip(), top_pairs[0])
     return text + ("\n" if text else "")
 
 
@@ -294,8 +296,30 @@ def _logical_move(scored: ScoredPair) -> str:
 
 def _receipt_role_check(scored: ScoredPair) -> str:
     if _combined_protocol(scored.pair.a):
-        return "Receipt 1 is treated as the full combined protocol named in its title, not isolated single-component causality."
+        return (
+            "Receipt 1 is treated as the full combined protocol named in its title, not isolated "
+            "single-component causality; it cannot attribute the signal to one component alone."
+        )
     return "Each receipt is interpreted only within its named intervention, comparator, population, and endpoint setting."
+
+
+def _boundary_scope(scored: ScoredPair) -> str:
+    return (
+        f"The update crosses {_boundary_axes(scored.pair.a, scored.pair.b)} at once, so the falsifier must match "
+        "those axes before overturning the memo."
+    )
+
+
+def _enforce_receipt_caveats(text: str, scored: ScoredPair) -> str:
+    if not text or not _combined_protocol(scored.pair.a):
+        return text
+    additions = []
+    lowered = text.casefold()
+    if "cannot attribute" not in lowered and "component alone" not in lowered:
+        additions.append(f"**Receipt-role check:** {_receipt_role_check(scored)}")
+    if "boundary scope" not in lowered and "axes" not in lowered:
+        additions.append(f"**Boundary scope:** {_boundary_scope(scored)}")
+    return "\n".join((text, *additions)).strip()
 
 
 def _falsifier(scored: ScoredPair) -> str:

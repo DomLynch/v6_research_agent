@@ -596,6 +596,34 @@ def test_build_memo_waits_when_strict_verification_is_still_queued() -> None:
     assert exc.value.trace["top_pairs"]
 
 
+def test_minimax_output_gets_combined_protocol_caveat() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Beneficial effects of resveratrol and exercise training on cardiac and aortic function in mice",
+            "The combined protocol improved cardiac endpoints.",
+            "openalex",
+            2019,
+            "10.test/combined",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic status in aged men",
+            "The human trial separated exercise and resveratrol.",
+            "pubmed",
+            2014,
+            "10.test/human",
+        ),
+    )
+    pair = CandidatePair(papers[0], papers[1], ("resveratrol", "exercise", "training"))
+    scored = ScoredPair(pair, 100, "mechanism_to_human_failure", "update", ())
+
+    memo = v6_write._enforce_receipt_caveats("# Alpha memo: resveratrol boundary", scored)
+
+    assert "cannot attribute the signal to one component alone" in memo
+    assert "**Boundary scope:**" in memo
+
+
 def test_build_memo_marks_queued_search_as_cache_waiting() -> None:
     class QueuedSearchClient:
         def search(self, query: str, *, limit: int = 5) -> SearchResult:
