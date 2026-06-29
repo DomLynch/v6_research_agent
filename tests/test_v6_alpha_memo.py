@@ -233,6 +233,27 @@ def test_positive_only_human_overlap_does_not_publish_as_alpha() -> None:
     assert exc.value.trace["scored_count"] == 0
 
 
+def test_positive_disease_improvement_is_not_false_reversal() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Urolithin A induces cardioprotection and enhanced mitochondrial quality during natural aging",
+            "Urolithin A improved mitochondrial quality and cardioprotection in aging and heart failure models.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Methylated urolithin A mitigates cognitive impairment and mitochondrial dysfunction in aging mice",
+            "Methylated urolithin A improved cognition by inhibiting NLRP3 inflammasome and reducing oxidative damage.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"urolithin", "mitochondrial", "aging"})
+
+    assert scored == ()
+
+
 def test_generic_older_adult_primary_care_overlap_does_not_publish() -> None:
     papers = (
         Paper(

@@ -123,11 +123,11 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         reasons.append("same_intervention_modality_boundary")
         first, second = b, a
 
-    if shape == "shared_anchor" and _has(at, _PROMISE) and _has(bt, _FAILURE) and _roles_fit("promise_reversal", a, b, topic_terms):
+    if shape == "shared_anchor" and _has(at, _PROMISE) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
-    elif shape == "shared_anchor" and _has(bt, _PROMISE) and _has(at, _FAILURE) and _roles_fit("promise_reversal", b, a, topic_terms):
+    elif shape == "shared_anchor" and _has(bt, _PROMISE) and _negative_result(a) and _roles_fit("promise_reversal", b, a, topic_terms):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
@@ -251,7 +251,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if _human_topic(topic_terms) and not _is_human(second):
         return False
     if shape == "mechanism_to_human_failure":
-        return _has(ft, _MECHANISM) and _is_human(second) and _has(st, _FAILURE)
+        return _has(ft, _MECHANISM) and _is_human(second) and _negative_result(second)
     if shape == "translation_boundary":
         return (
             _has(ft, _ANIMAL | _MECHANISM)
@@ -260,15 +260,15 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             and _has(st, _LIMITED_HUMAN | _BOUNDARY)
         )
     if shape == "subgroup_endpoint_split":
-        return _is_human(first) and _is_human(second) and _has(ft, _PROMISE) and _negative(st) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+        return _is_human(first) and _is_human(second) and _has(ft, _PROMISE) and _negative_result(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
     if shape == "modality_boundary":
-        return _has(ft, _PROMISE) and _has(st, _FAILURE) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
+        return _has(ft, _PROMISE) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
         return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE)
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
-        return _has(ft, _PROMISE) and _has(st, _FAILURE)
+        return _has(ft, _PROMISE) and _negative_result(second)
     return False
 
 
@@ -295,6 +295,16 @@ def _has(tokens: set[str], needles: frozenset[str]) -> bool:
 
 def _negative(tokens: set[str]) -> bool:
     return _has(tokens, _FAILURE) or ("not" in tokens and _has(tokens, _PROMISE))
+
+
+def _negative_result(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    phrases = (
+        "adverse effect", "attenuated", "blunted", "did not", "does not",
+        "failed", "no evidence", "no significant", "not improve",
+        "null", "unchanged", "worse", "worsened",
+    )
+    return any(phrase in text for phrase in phrases)
 
 
 def _human_topic(topic_terms: frozenset[str]) -> bool:
