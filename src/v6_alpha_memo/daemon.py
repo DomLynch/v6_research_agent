@@ -72,7 +72,10 @@ def _run_pass(
         try:
             _run_topic(run_dir, topic, agent_id, client, publisher, row)
         except NoMemoError as exc:
-            row.update({"blocked_stage": _blocked_stage(exc.trace), "trace": exc.trace})
+            stage = _blocked_stage(exc.trace)
+            row.update({"blocked_stage": stage, "trace": exc.trace})
+            if stage == "search_cache_waiting":
+                break
         except Exception as exc:
             row.update({
                 "blocked_stage": "exception",
