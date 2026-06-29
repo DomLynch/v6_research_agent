@@ -76,6 +76,7 @@ def render_with_minimax(top_pairs: tuple[ScoredPair, ...], *, receipt: CoverageR
     text = _content_text(data).strip()
     if not _valid_memo(text):
         return render_memo(top_pairs[0], receipt=receipt)
+    text = _normalize_title(text, top_pairs[0])
     return text + ("\n" if text else "")
 
 
@@ -115,8 +116,8 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = " / ".join(scored.pair.anchors[:2]) or "receipt pair"
-    return f"Alpha memo: {anchor} {scored.shape.replace('_', ' ')}"
+    anchor = " ".join(scored.pair.anchors[:5]) or "receipt pair"
+    return f"Alpha memo: {anchor}"
 
 
 def _receipt_line(paper: Paper) -> str:
@@ -225,6 +226,13 @@ def _valid_memo(text: str) -> bool:
         "**Caveats/falsifiers:**",
     )
     return all(any(line.startswith(marker) for line in lines) for marker in markers)
+
+
+def _normalize_title(text: str, scored: ScoredPair) -> str:
+    lines = text.splitlines()
+    if lines:
+        lines[0] = f"# {_title(scored)}"
+    return "\n".join(lines).strip()
 
 
 def _minimax_key() -> str:

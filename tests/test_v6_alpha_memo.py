@@ -719,6 +719,32 @@ def test_minimax_writer_falls_back_on_inline_title_memo(monkeypatch: pytest.Monk
     assert calls == 2
 
 
+def test_minimax_writer_normalizes_title_to_receipt_anchors(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharp"}'}]})
+        return _Response({
+            "content": [{
+                "type": "text",
+                "text": "# Alpha memo: unsupported framing artifact\n\n**One-sentence alpha:** x\n\n**Receipt 1:** y\n\n**Receipt 2:** z\n\n**Why this is surprising:** q\n\n**Caveats/falsifiers:**\n- w",
+            }]
+        })
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    memo = v6_write.render_with_minimax(run.top_pairs[:1])
+
+    assert memo.splitlines()[0] == f"# {v6_write._title(run.top_pairs[0])}"
+    assert "unsupported framing artifact" not in memo.splitlines()[0]
+
+
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     top_pair = run.top_pairs[0]
