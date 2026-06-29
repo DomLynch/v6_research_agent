@@ -1606,13 +1606,14 @@ def test_build_memo_keeps_minimax_selected_pair(monkeypatch: pytest.MonkeyPatch)
         selected["pair"] = (pairs[1],)
         return selected["pair"]
 
-    def fake_render(pair: object, **kwargs: object) -> str:
-        assert pair == selected["pair"][0]
+    def fake_render(pairs: tuple[object, ...], **kwargs: object) -> str:
+        assert pairs == selected["pair"]
         assert "receipt" in kwargs
+        assert kwargs["judge"] is False
         return "memo\n"
 
     monkeypatch.setattr(v6_run, "judge_with_minimax", fake_judge)
-    monkeypatch.setattr(v6_run, "render_memo", fake_render)
+    monkeypatch.setattr(v6_run, "render_with_minimax", fake_render)
 
     run = build_memo("tool", client=TwoPairClient(), writer="minimax")
 
