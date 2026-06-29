@@ -459,6 +459,36 @@ def test_claim_contract_rejects_modality_mismatch() -> None:
     assert "unsupported_core_term:resistance" in flags
 
 
+def test_claim_contract_allows_resistance_strength_equivalence() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Cold-water immersion after training sessions and sprint-interval adaptation",
+            "Cold-water immersion altered sprint interval training adaptation in men.",
+            "pubmed",
+            doi="10.test/a",
+        ),
+        Paper(
+            "b",
+            "Does Cold-Water Immersion After Strength Training Attenuate Training Adaptation?",
+            "Cold-water immersion after strength training tested attenuation of training adaptation.",
+            "openalex",
+            doi="10.test/b",
+        ),
+    )
+    scored = ScoredPair(
+        CandidatePair(papers[0], papers[1], ("cold", "water", "immersion", "training")),
+        85,
+        "modality_boundary",
+        "Cold-water immersion has a resistance-training boundary.",
+        ("same_intervention_modality_boundary",),
+    )
+
+    flags = v6_run._claim_contract_flags("cold water immersion resistance training", "# Alpha memo: cold water immersion boundary", scored)
+
+    assert "unsupported_core_term:resistance" not in flags
+
+
 def test_claim_contract_rejects_single_drug_title_on_cross_drug_pair(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -360,7 +360,7 @@ def _claim_contract_flags(topic: str, memo: str, scored: ScoredPair) -> tuple[st
     receipt_tokens = _tokens(receipt_text)
     flags: list[str] = []
     for term in _specific_claim_terms(claim):
-        if term not in receipt_tokens:
+        if not _term_supported(term, receipt_tokens):
             flags.append(f"unsupported_core_term:{term}")
     if not _explicit_cross_comparison(claim):
         for term in _entity_terms(f"{topic} {_memo_title(memo)}"):
@@ -398,6 +398,10 @@ def _specific_claim_terms(text: str) -> tuple[str, ...]:
     return tuple(word for word in _tokens(text) if word not in _CLAIM_DROP)
 
 
+def _term_supported(term: str, receipt_tokens: set[str]) -> bool:
+    return term in receipt_tokens or bool(_CLAIM_EQUIVALENTS.get(term, frozenset()) & receipt_tokens)
+
+
 def _entity_terms(text: str) -> tuple[str, ...]:
     anchor_keep = _MODALITY_TERMS | _OUTCOME_TERMS | {
         "adaptation", "adaptations", "exercise", "protect", "protected", "protection", "protective", "training",
@@ -421,6 +425,10 @@ def _explicit_cross_comparison(text: str) -> bool:
 _GENERIC_TOPIC_TERMS = frozenset({"aging", "adult", "adults", "function", "human", "humans", "mitochondrial", "older", "primary", "trial", "trials"})
 _MODALITY_TERMS = frozenset({"aerobic", "cycling", "endurance", "heat", "resistance", "sprint", "strength"})
 _OUTCOME_TERMS = frozenset({"accuracy", "damage", "forecast", "hypertrophy", "insulin", "performance", "sensitivity", "tolerance"})
+_CLAIM_EQUIVALENTS = {
+    "resistance": frozenset({"strength"}),
+    "strength": frozenset({"resistance"}),
+}
 _BOUNDARY_AXIS_TERMS = frozenset({
     "aged", "aortic", "cardiac", "cardiovascular", "inflammatory", "men", "metabolic",
     "mouse", "mice", "rat", "rats", "skeletal", "women",
