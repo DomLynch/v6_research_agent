@@ -92,7 +92,7 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
         Paper(
             "a",
             "The Effects of Daily Cold-Water Recovery and Postexercise Hot-Water Immersion on Training-Load Tolerance During 5 Days of Heat-Based Training",
-            "",
+            "Daily cold-water recovery improved training-load tolerance during heat-based training.",
             "semantic_scholar",
             2020,
             "10.1123/IJSPP.2019-0313",
@@ -100,7 +100,7 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
         Paper(
             "b",
             "Does Cold-Water Immersion After Strength Training Attenuate Training Adaptation?",
-            "",
+            "Cold-water immersion after strength training attenuated resistance training adaptation.",
             "semantic_scholar",
             2020,
             "10.1123/ijspp.2019-0965",
@@ -623,6 +623,39 @@ def test_writer_stays_receipt_owned() -> None:
 
     assert "longevity/business/AI" not in memo
     assert "Resveratrol" in memo
+    assert "finding:" in memo
+
+
+def test_score_rejects_title_only_receipts() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Cold-water recovery improves training-load tolerance",
+            "",
+            "semantic_scholar",
+            2020,
+            "10.test/a",
+        ),
+        Paper(
+            "b",
+            "Cold-water immersion after strength training attenuates training adaptation",
+            "",
+            "semantic_scholar",
+            2020,
+            "10.test/b",
+        ),
+    )
+
+    assert score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "training"}) == ()
+
+
+def test_minimax_prompt_requires_receipt_findings() -> None:
+    run = build_memo("longevity exercise adaptation", client=DemoClient())
+    prompt = v6_write._prompt(run.top_pairs[:1])
+
+    assert "summarize one concrete finding/result" in prompt
+    assert "Never use a paper title as the finding" in prompt
+    assert '"finding"' in prompt
 
 
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:

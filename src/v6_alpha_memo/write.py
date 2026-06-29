@@ -123,6 +123,7 @@ def _receipt_line(paper: Paper) -> str:
         bits.append(str(paper.year))
     if paper.doi:
         bits.append(paper.doi)
+    bits.append(f"finding: {_finding(paper)}")
     return " | ".join(bits)
 
 
@@ -143,7 +144,9 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         )
     return (
         "Return a short memo with: title, one-sentence alpha, receipt 1, receipt 2, "
-        "why surprising, caveats/falsifiers. No broad framing beyond receipts.\n"
+        "why surprising, caveats/falsifiers. Each receipt line must name the paper "
+        "and summarize one concrete finding/result from its abstract. Never use a "
+        "paper title as the finding. No broad framing beyond receipts.\n"
         + json.dumps(rows, ensure_ascii=False)
     )
 
@@ -183,7 +186,17 @@ def _parse_choice(text: str) -> int | None:
 
 
 def _paper_json(paper: Paper) -> dict[str, object]:
-    return {"title": paper.title, "abstract": paper.abstract[:900], "year": paper.year, "doi": paper.doi}
+    return {
+        "title": paper.title,
+        "finding": _finding(paper),
+        "abstract": paper.abstract[:900],
+        "year": paper.year,
+        "doi": paper.doi,
+    }
+
+
+def _finding(paper: Paper) -> str:
+    return " ".join(paper.abstract.split())[:260]
 
 
 def _minimax_key() -> str:
