@@ -20,7 +20,7 @@ from v6_alpha_memo.search import (
     merge_results,
     query_shapes,
 )
-from v6_alpha_memo.write import judge_with_minimax, render_memo, render_with_minimax
+from v6_alpha_memo.write import judge_with_minimax, render_memo
 
 _PUBLISH_SCORE_FLOOR = 85
 
@@ -105,12 +105,10 @@ def build_memo(
         raise NoMemoError(trace)
     scored = safe_scored
     receipt = _best_receipt(results)
-    use_minimax_writer = False
     if writer == "minimax":
         judged = judge_with_minimax(scored)
         if judged:
             scored = judged
-            use_minimax_writer = True
         elif scored[0].score < _PUBLISH_SCORE_FLOOR:
             raise RuntimeError("MiniMax rejected all receipt pairs")
     if scored[0].score < _PUBLISH_SCORE_FLOOR:
@@ -141,11 +139,7 @@ def build_memo(
             )
             trace["blocked_stage"] = "verification_cache_waiting"
             raise NoMemoError(trace)
-    memo = (
-        render_with_minimax(scored[:1], receipt=receipt, judge=False)
-        if use_minimax_writer
-        else render_memo(scored[0], receipt=receipt)
-    )
+    memo = render_memo(scored[0], receipt=receipt)
     flags = _claim_contract_flags(topic, memo, scored[0])
     if flags:
         trace = _trace(
