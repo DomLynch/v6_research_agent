@@ -11,6 +11,9 @@ PYTHONPATH=src python3 -m v6_alpha_memo --demo --topic "resveratrol exercise ada
 For live fullraw search, set:
 
 ```bash
-export V6_FULLRAW_SEARCH_URL="http://127.0.0.1:9903/search"
+export V6_FULLRAW_SEARCH_URL="http://127.0.0.1:9917/search"
 export V6_MINIMAX_API_KEY="..."
 ```
+
+Live VPS deployment uses `deploy/v6-alpha-memo-live.service` with the
+isolated `deploy/v6-fullraw-search.service` lane on port `9917`.
