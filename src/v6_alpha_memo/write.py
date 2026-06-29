@@ -79,6 +79,7 @@ def render_with_minimax(top_pairs: tuple[ScoredPair, ...], *, receipt: CoverageR
         return render_memo(top_pairs[0], receipt=receipt)
     text = _normalize_title(text, top_pairs[0])
     text = _remove_unsupported_dose_equivalence(text)
+    text = _add_omitted_interference_signal(text, top_pairs[0])
     return text + ("\n" if text else "")
 
 
@@ -151,6 +152,29 @@ def _remove_unsupported_dose_equivalence(text: str) -> str:
         text,
         flags=re.IGNORECASE,
     )
+
+
+def _add_omitted_interference_signal(text: str, scored: ScoredPair) -> str:
+    if re.search(r"\b(blunt|blunted|impair|impaired|interfer|carbonyl|tnf)\b", text, flags=re.IGNORECASE):
+        return text
+    signal = _interference_sentence(scored.pair.a) or _interference_sentence(scored.pair.b)
+    if not signal:
+        return text
+    bullet = f"- Secondary receipt signal: {signal}"
+    lines = text.splitlines()
+    for idx, line in enumerate(lines):
+        if line.strip() == "**Caveats/falsifiers:**":
+            lines.insert(idx + 1, bullet)
+            return "\n".join(lines).strip()
+    return f"{text.rstrip()}\n\n**Caveats/falsifiers:**\n{bullet}"
+
+
+def _interference_sentence(paper: Paper) -> str:
+    text = " ".join(paper.abstract.split())
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if re.search(r"\b(blunt|blunted|impair|impaired|interfer|protein carbonyl|tnf)", sentence, flags=re.IGNORECASE):
+            return sentence[:320].rstrip()
+    return ""
 
 
 def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
