@@ -785,6 +785,41 @@ def test_minimax_writer_removes_unsupported_dose_equivalence(monkeypatch: pytest
     assert "matched tissue exposure" in memo
 
 
+def test_minimax_writer_adds_omitted_interference_signal() -> None:
+    papers = (
+        Paper(
+            paper_id="a",
+            title="Resveratrol improves muscle metabolism in mice",
+            abstract="Resveratrol improved lipid metabolism in the mouse model.",
+            source="openalex",
+        ),
+        Paper(
+            paper_id="b",
+            title="Exercise training but not resveratrol improves aged human muscle",
+            abstract=(
+                "Exercise improved mitochondrial markers. Notably, however, resveratrol blunted "
+                "an exercise training-induced decrease in protein carbonylation and TNF alpha mRNA."
+            ),
+            source="openalex",
+        ),
+    )
+    scored = score_pairs(mine_pairs(papers))[0]
+    text = (
+        "# Alpha memo: resveratrol exercise muscle\n\n"
+        "**One-sentence alpha:** x\n\n"
+        "**Receipt 1:** y\n\n"
+        "**Receipt 2:** z\n\n"
+        "**Why this is surprising:** resveratrol alone did not improve endpoints.\n\n"
+        "**Caveats/falsifiers:**\n- w"
+    )
+
+    memo = v6_write._add_omitted_interference_signal(text, scored)
+
+    assert "Secondary receipt signal" in memo
+    assert "resveratrol blunted" in memo
+    assert "protein carbonylation" in memo
+
+
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     top_pair = run.top_pairs[0]
