@@ -139,6 +139,12 @@ def _remove_unsupported_dose_equivalence(text: str) -> str:
         text,
         flags=re.IGNORECASE,
     )
+    text = re.sub(
+        r"\b[\w/.-]+-equivalent dosing\b",
+        "matched tissue exposure",
+        text,
+        flags=re.IGNORECASE,
+    )
     return re.sub(
         r"\b(?:human|mouse|dose)-equivalent\b",
         "cross-species",

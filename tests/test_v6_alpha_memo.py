@@ -765,6 +765,7 @@ def test_minimax_writer_removes_unsupported_dose_equivalence(monkeypatch: pytest
                     "**Receipt 1:** y\n\n"
                     "**Receipt 2:** z\n\n"
                     "**Why this is surprising:** a changed while a 25x higher human-equivalent dose added nothing, suggesting q.\n\n"
+                    "**Caveat note:** tested at 10 mg/kg-equivalent dosing.\n\n"
                     "**Caveats/falsifiers:**\n- w"
                 ),
             }]
@@ -776,7 +777,9 @@ def test_minimax_writer_removes_unsupported_dose_equivalence(monkeypatch: pytest
     memo = v6_write.render_with_minimax(run.top_pairs[:1])
 
     assert "human-equivalent" not in memo
+    assert "mg/kg-equivalent" not in memo
     assert "dosing regimens differ across receipts" in memo
+    assert "matched tissue exposure" in memo
 
 
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
