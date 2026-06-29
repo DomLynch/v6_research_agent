@@ -746,6 +746,39 @@ def test_minimax_writer_normalizes_title_to_receipt_anchors(monkeypatch: pytest.
     assert "unsupported framing artifact" not in memo.splitlines()[0]
 
 
+def test_minimax_writer_removes_unsupported_dose_equivalence(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharp"}'}]})
+        return _Response({
+            "content": [{
+                "type": "text",
+                "text": (
+                    "# Alpha memo: unsupported framing artifact\n\n"
+                    "**One-sentence alpha:** x\n\n"
+                    "**Receipt 1:** y\n\n"
+                    "**Receipt 2:** z\n\n"
+                    "**Why this is surprising:** a changed while a 25x higher human-equivalent dose added nothing, suggesting q.\n\n"
+                    "**Caveats/falsifiers:**\n- w"
+                ),
+            }]
+        })
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    memo = v6_write.render_with_minimax(run.top_pairs[:1])
+
+    assert "human-equivalent" not in memo
+    assert "dosing regimens differ across receipts" in memo
+
+
 def test_minimax_judge_selects_one_pair(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     top_pair = run.top_pairs[0]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -77,6 +78,7 @@ def render_with_minimax(top_pairs: tuple[ScoredPair, ...], *, receipt: CoverageR
     if not _valid_memo(text):
         return render_memo(top_pairs[0], receipt=receipt)
     text = _normalize_title(text, top_pairs[0])
+    text = _remove_unsupported_dose_equivalence(text)
     return text + ("\n" if text else "")
 
 
@@ -128,6 +130,21 @@ def _receipt_line(paper: Paper) -> str:
         bits.append(paper.doi)
     bits.append(f"finding: {_finding(paper)}")
     return " | ".join(bits)
+
+
+def _remove_unsupported_dose_equivalence(text: str) -> str:
+    text = re.sub(
+        r"while [^.\n;]*\bhuman-equivalent\b[^,.\n;]*(,|;)?",
+        "while the dosing regimens differ across receipts,",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"\b(?:human|mouse|dose)-equivalent\b",
+        "cross-species",
+        text,
+        flags=re.IGNORECASE,
+    )
 
 
 def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
