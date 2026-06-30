@@ -994,21 +994,31 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> Non
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
 
 
-def test_fullraw_client_does_not_fan_out_when_sweep_is_busy() -> None:
+def test_fullraw_client_tries_compact_variant_when_sweep_is_busy() -> None:
     calls: list[str] = []
+    hit_payload: dict[str, object] = {
+        "meta": _strict_meta({"openalex": 1}),
+        "results": [{
+            "id": "W1",
+            "title": "Metformin blunted exercise adaptation",
+            "abstract": "Metformin reduced exercise adaptation in humans.",
+            "source": "openalex",
+        }],
+    }
 
     def opener(request: Request, timeout: float) -> _Response:
         del timeout
         calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
-        return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
+        if len(calls) == 1:
+            return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
+        return _Response(hit_payload)
 
     result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search(
         "metformin exercise adaptation expected improved null outcome randomized trial"
     )
 
-    assert calls == ["metformin exercise adaptation expected improved null outcome randomized trial"]
-    assert result.papers == ()
-    assert result.receipt.error == "async_sweep_busy"
+    assert calls[:2] == ["metformin exercise adaptation expected improved null outcome randomized trial", "metformin exercise"]
+    assert result.papers[0].title == "Metformin blunted exercise adaptation"
 
 
 def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
