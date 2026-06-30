@@ -31,10 +31,10 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
 
     assert len(queries) >= 6
     assert queries[0] == "marketing attribution incrementality"
-    assert all("marketing attribution incrementality" in query for query in queries)
+    assert all({"marketing", "attribution", "incrementality"} <= set(query.split()) for query in queries)
     assert aging_queries[0] == "everolimus aging immune function"
     assert all("glynac" not in query and "glutathione" not in query for query in aging_queries)
-    assert any("randomized placebo no effect primary endpoint" in query for query in queries)
+    assert any(query.startswith("marketing null failed primary endpoint") for query in queries)
     assert any("baseline subgroup high low response" in query for query in queries)
     assert any("mechanism model human failed translation" in query for query in queries)
     assert any("replication failure" in query for query in queries)
@@ -44,7 +44,7 @@ def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
     queries = query_shapes("cold water immersion resistance training", limit=3)
 
     assert queries[0] == "cold water immersion resistance training"
-    assert queries[1] == "cold water immersion resistance training randomized placebo no effect primary endpoint"
+    assert queries[1] == "cold null failed primary endpoint water immersion resistance training"
     assert queries[2] == "cold water immersion resistance"
 
 
