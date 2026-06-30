@@ -279,7 +279,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if shape == "modality_boundary":
         return _promise_signal(first) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
-        return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE)
+        return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE) and _negative_result(second)
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False

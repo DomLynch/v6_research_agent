@@ -198,6 +198,27 @@ def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
     assert scored == ()
 
 
+def test_protocol_result_shape_requires_negative_update_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol exercise protocol expected improved adaptation",
+            "The protocol expected resveratrol to improve exercise adaptation.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Resveratrol exercise trial showed improved adaptation",
+            "The trial results showed improved exercise adaptation.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "adaptation"})
+
+    assert not any(item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(
