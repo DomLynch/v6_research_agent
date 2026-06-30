@@ -699,7 +699,7 @@ def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
     assert result.receipt.error == "fullraw_incomplete:415/1525"
 
 
-def test_build_memo_queues_later_shapes_when_fullraw_is_waiting() -> None:
+def test_build_memo_defers_later_shapes_when_fullraw_is_waiting() -> None:
     class WaitingClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -714,8 +714,8 @@ def test_build_memo_queues_later_shapes_when_fullraw_is_waiting() -> None:
         build_memo("resveratrol exercise adaptation", client=client, query_limit=3)
 
     coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
-    assert client.queries == list(query_shapes("resveratrol exercise adaptation", limit=3))
-    assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
+    assert client.queries == ["resveratrol exercise adaptation"]
+    assert [row["error"] for row in coverage] == ["async_sweep_queued"]
 
 
 def test_build_memo_continues_after_no_hit_sweep_stop() -> None:
