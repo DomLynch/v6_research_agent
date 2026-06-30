@@ -651,7 +651,7 @@ def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
     assert result.receipt.error == "fullraw_incomplete:415/1525"
 
 
-def test_build_memo_stops_query_fanout_when_fullraw_is_waiting() -> None:
+def test_build_memo_queues_later_shapes_when_fullraw_is_waiting() -> None:
     class WaitingClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -663,23 +663,31 @@ def test_build_memo_stops_query_fanout_when_fullraw_is_waiting() -> None:
 
     client = WaitingClient()
     with pytest.raises(NoMemoError) as exc:
-        build_memo("resveratrol exercise adaptation", client=client)
+        build_memo("resveratrol exercise adaptation", client=client, query_limit=3)
 
-    assert client.queries == ["resveratrol exercise adaptation"]
-    assert exc.value.trace["coverage"] == [
-        {
-            "hits": 0,
-            "async_status": "",
-            "shards_searched": 0,
-            "shards_total": 0,
-            "source_count_searched": 0,
-            "sources_searched": (),
-            "papers_searched": 0,
-            "partial": False,
-            "sweep_failed_shards": 0,
-            "error": "async_sweep_queued",
-        }
-    ]
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert client.queries == list(query_shapes("resveratrol exercise adaptation", limit=3))
+    assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
+
+
+def test_build_memo_stops_query_fanout_on_non_waitable_search_error() -> None:
+    class ErrorClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(query, (), CoverageReceipt(error="URLError: Connection refused"))
+
+    client = ErrorClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("antioxidant exercise adaptation", client=client, query_limit=3)
+
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert client.queries == ["antioxidant exercise adaptation"]
+    assert len(coverage) == 1
+    assert coverage[0]["error"]
 
 
 def test_writer_stays_receipt_owned() -> None:
