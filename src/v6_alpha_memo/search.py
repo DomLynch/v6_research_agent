@@ -9,6 +9,7 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from http.client import RemoteDisconnected
+from pathlib import Path
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -106,6 +107,9 @@ class FullrawSearchClient:
             raise RuntimeError("V6_FULLRAW_SEARCH_URL is required")
         last = SearchResult(query=query, papers=(), receipt=CoverageReceipt())
         for variant in _query_variants(query):
+            cached = _completed_cached_result(variant, limit=limit)
+            if cached is not None:
+                return cached
             for search_url in self.search_urls:
                 try:
                     result = self._search_once(variant, limit=limit, search_url=search_url)
@@ -317,6 +321,31 @@ def _query_variants(query: str) -> tuple[str, ...]:
     if len(words) >= 3:
         variants.append(" ".join(words[:3]))
     return tuple(dict.fromkeys(variant for variant in variants if variant))
+
+
+def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
+    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
+    if not cache_dir:
+        return None
+    best: SearchResult | None = None
+    for path in Path(cache_dir).glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        receipt = data.get("receipt")
+        receipt = receipt if isinstance(receipt, dict) else {}
+        if query not in {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}:
+            continue
+        payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
+        if _coverage_error(payload):
+            continue
+        papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
+        if papers and (best is None or len(papers) > len(best.papers)):
+            best = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
+    return best
 
 
 def _search_urls(value: str) -> tuple[str, ...]:

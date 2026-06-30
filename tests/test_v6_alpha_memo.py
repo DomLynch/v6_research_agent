@@ -378,6 +378,53 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.papers[0].doi == "10.test/metformin"
 
 
+def test_fullraw_client_uses_completed_sweep_cache_before_remote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "cached.json").write_text(json.dumps({
+        "hits": [{
+            "id": "W1",
+            "title": "Omega-3 fatty acids and postoperative atrial fibrillation",
+            "abstract": "A randomized trial tested omega-3 fatty acids for atrial fibrillation prevention.",
+            "source": "openalex",
+            "year": 2015,
+        }],
+        "receipt": {
+            "sweep_original_query": "omega 3 atrial fibrillation cardiovascular prevention",
+            "sweep_query": "omega fibrillation prevention",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "papers_searched": 1_456_919_317,
+            "papers_total": 1_456_919_317,
+            "source_count_searched": 5,
+            "sources_searched": {
+                "openalex": 1,
+                "pubmed": 1,
+                "semantic_scholar": 1,
+                "semantic_scholar_abstracts": 1,
+                "biorxiv": 1,
+            },
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def opener(_request: Request, _timeout: float) -> _Response:
+        raise AssertionError("remote search should not be called for completed cache")
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=cast(RequestOpener, opener)).search(
+        "omega 3 atrial fibrillation cardiovascular prevention", limit=10
+    )
+
+    assert len(result.papers) == 1
+    assert result.receipt.shards_searched == 1525
+    assert result.receipt.source_count_searched == 5
+
+
 def test_fullraw_client_marks_requests_priority_by_default() -> None:
     payloads: list[dict[str, object]] = []
 
