@@ -180,7 +180,14 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     indexed = list(enumerate(searchable))
     started = [item for item in indexed if _attempt_count(item[1])]
     fresh = [item for item in indexed if not _attempt_count(item[1])]
-    ranked = sorted(started or fresh, key=lambda item: (-cache_progress.get(str(item[1].get("topic")), 0), item[0]))
+    ranked = sorted(
+        started or fresh,
+        key=lambda item: (
+            _awaiting_side_search(item[1]),
+            -cache_progress.get(str(item[1].get("topic")), 0),
+            item[0],
+        ),
+    )
     return [*submitted, *(row for _, row in ranked[:active_limit])]
 
 
@@ -323,7 +330,7 @@ def _blocked_stage(trace: dict[str, object]) -> str:
     coverage = trace.get("coverage")
     if isinstance(coverage, list) and coverage:
         if any(_strict_coverage(item) for item in coverage):
-            return "selector_rejected"
+            return "search_cache_waiting" if any(_waitable_coverage(item) for item in coverage) else "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
         if error_text == "async_sweep_stopped_no_hits":
@@ -336,6 +343,30 @@ def _blocked_stage(trace: dict[str, object]) -> str:
         ):
             return "search_cache_waiting"
     return "selector_rejected"
+
+
+def _awaiting_side_search(row: dict[str, object]) -> bool:
+    trace = row.get("trace")
+    coverage = trace.get("coverage") if isinstance(trace, dict) else None
+    return bool(
+        isinstance(coverage, list)
+        and any(_strict_coverage(item) for item in coverage)
+        and any(_waitable_coverage(item) for item in coverage)
+    )
+
+
+def _waitable_coverage(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    error_text = str(value.get("error") or "")
+    if error_text == "async_sweep_stopped_no_hits":
+        return False
+    return (
+        error_text.startswith("async_sweep_")
+        or error_text.startswith("fullraw_incomplete")
+        or "Connection refused" in error_text
+        or error_text.startswith(("URLError:", "TimeoutError:", "ConnectionResetError:"))
+    )
 
 
 def _strict_coverage(value: object) -> bool:

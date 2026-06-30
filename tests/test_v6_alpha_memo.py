@@ -1066,7 +1066,7 @@ def test_daemon_classifies_no_hit_sweep_stop_as_selector_rejected() -> None:
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
-def test_daemon_does_not_wait_after_strict_completed_receipt() -> None:
+def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     trace: dict[str, object] = {
         "coverage": [
             {
@@ -1078,6 +1078,24 @@ def test_daemon_does_not_wait_after_strict_completed_receipt() -> None:
                 "source_count_searched": 5,
             },
             {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
+        ]
+    }
+
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+
+
+def test_daemon_final_rejects_after_strict_receipt_without_waitable_search() -> None:
+    trace: dict[str, object] = {
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_stopped_no_hits", "shards_searched": 128, "source_count_searched": 0},
         ]
     }
 
@@ -1165,6 +1183,42 @@ def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.Monke
     v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention", "vitamin d fracture randomized trial older adults"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
 
     assert seen == ["vitamin d fracture randomized trial older adults"]
+
+
+def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    strict_then_waiting = {
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued"},
+        ]
+    }
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "5")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "omega 3 atrial fibrillation cardiovascular prevention", "trace": strict_then_waiting},
+            {"topic": "creatine cognitive function older adults", "trace": {"coverage": [{"error": "async_sweep_running"}]}},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention", "creatine cognitive function older adults"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["creatine cognitive function older adults"]
 
 
 def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
