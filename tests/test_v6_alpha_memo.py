@@ -1041,7 +1041,9 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Keep title and alpha cautious" in prompt
     assert "one decisive future falsifier" in prompt
     assert "name the exact endpoint instead of using generic weaker/inert language" in prompt
-    assert "secondary blunting/interference signals" in prompt
+    assert "Do not say blunted, interfered, worsened, or impaired unless the receipt uses that exact direction" in prompt
+    assert "preserve softer receipt language such as tendency" in prompt
+    assert "label it as expected/planned rather than an observed result" in prompt
     assert "analogous cross-context signal" in prompt
     assert "Do not call interventions equivalent across species/doses" in prompt
     assert "Do not mention dose-equivalent scaling" in prompt
