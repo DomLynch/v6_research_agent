@@ -196,8 +196,9 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     seed = " ".join(seed.split())
     words = seed.split()
     compact = " ".join(words[:4])
+    alpha_seed = " ".join((*words[:1], "null", "failed", "primary", "endpoint", *words[1:]))
     templates = (
-        "{seed} randomized placebo no effect primary endpoint",
+        alpha_seed,
         "{seed} baseline subgroup high low response",
         "{seed} mechanism model human failed translation",
         "{seed} endpoint split randomized trial placebo",
