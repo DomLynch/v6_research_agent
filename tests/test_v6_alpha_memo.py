@@ -204,7 +204,9 @@ def test_build_memo_rejects_compound_only_anchor_when_training_topic_missing() -
                     Paper(
                         "b",
                         "Adaptations to metformin use on fetal islets",
-                        "Metformin exposure changed fetal islet adaptation in a primate model.",
+                        "Metformin exposure changed fetal islet adaptation in a primate model. "
+                        + ("background " * 120)
+                        + "Training support was acknowledged.",
                         "pubmed",
                         doi="10.test/b",
                     ),

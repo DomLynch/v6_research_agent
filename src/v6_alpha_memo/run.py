@@ -222,8 +222,8 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
     shared = anchors & strong_terms
     context_terms = topic_terms & _CONTEXT_REQUIRED_TOPIC_TERMS
     if context_terms:
-        left = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.a.text.casefold()))
-        right = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.b.text.casefold()))
+        left = _topic_context_tokens(scored.pair.a)
+        right = _topic_context_tokens(scored.pair.b)
     required_context = (topic_terms & _MODALITY_REQUIRED_TOPIC_TERMS) or context_terms
     if required_context and not ((left & right) & required_context):
         return False
@@ -237,6 +237,11 @@ _GENERIC_TOPIC_TERMS = frozenset({
     "human", "humans", "longevity", "mitochondrial", "older", "performance", "primary",
     "resistance", "training", "trial", "trials",
 })
+
+
+def _topic_context_tokens(paper: Paper) -> set[str]:
+    text = f"{paper.title} {paper.abstract[:700]}"
+    return set(re.findall(r"[a-z][a-z0-9]{2,}", text.casefold()))
 
 
 def _demo_papers(query: str) -> tuple[Paper, ...]:
