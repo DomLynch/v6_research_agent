@@ -322,6 +322,8 @@ def _save_board(run_dir: Path, board: dict[str, object]) -> None:
 def _blocked_stage(trace: dict[str, object]) -> str:
     coverage = trace.get("coverage")
     if isinstance(coverage, list) and coverage:
+        if any(_strict_coverage(item) for item in coverage):
+            return "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
         if error_text == "async_sweep_stopped_no_hits":
@@ -334,6 +336,19 @@ def _blocked_stage(trace: dict[str, object]) -> str:
         ):
             return "search_cache_waiting"
     return "selector_rejected"
+
+
+def _strict_coverage(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return (
+        not value.get("error")
+        and _int(value.get("shards_searched")) >= 1525
+        and _int(value.get("shards_total")) >= 1525
+        and not value.get("partial")
+        and _int(value.get("sweep_failed_shards")) == 0
+        and _int(value.get("source_count_searched")) >= 5
+    )
 
 
 def _domain(topic: str) -> str:

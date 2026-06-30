@@ -1066,6 +1066,24 @@ def test_daemon_classifies_no_hit_sweep_stop_as_selector_rejected() -> None:
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
+def test_daemon_does_not_wait_after_strict_completed_receipt() -> None:
+    trace: dict[str, object] = {
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
+        ]
+    }
+
+    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
+
+
 def test_daemon_focuses_started_topics_before_fresh_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
