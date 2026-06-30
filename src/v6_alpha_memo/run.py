@@ -64,7 +64,11 @@ def build_memo(
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
-        if result.receipt.error and result.receipt.error != "async_sweep_stopped_no_hits":
+        if (
+            result.receipt.error
+            and result.receipt.error != "async_sweep_stopped_no_hits"
+            and not _waitable_search_error(result.receipt.error)
+        ):
             break
     results = tuple(collected)
     papers = merge_results(results)
@@ -175,6 +179,10 @@ def _trace(
             for pair in top_pairs[:5]
         ],
     }
+
+
+def _waitable_search_error(error: str) -> bool:
+    return error.startswith(("async_sweep_", "fullraw_incomplete:", "fullraw_low_source_count:")) or error == "fullraw_partial"
 
 
 class DemoClient(SearchClient):
