@@ -93,6 +93,27 @@ def test_rejects_background_efficacy_as_promise_receipt() -> None:
     assert scored == ()
 
 
+def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Intervention X improves training adaptation in randomized adults",
+            "A randomized trial found intervention x improved exercise adaptation and performance.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Attenuated effects of exercise with a supplement: too much of a good thing?",
+            "The benefits of exercise and natural pharmaceutical agents has long been a topic of interest.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"intervention", "exercise", "adaptation"})
+
+    assert scored == ()
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(
