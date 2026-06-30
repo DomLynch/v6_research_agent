@@ -114,6 +114,27 @@ def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     assert scored == ()
 
 
+def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Metformin alters skeletal muscle transcriptome adaptations to resistance training in older adults",
+            "Metformin changed resistance training adaptations in older adults.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Influence of sodium glucose cotransporter 2 inhibition on physiological adaptation to endurance exercise training",
+            "The comparator discussion mentioned metformin, but the intervention was SGLT2 inhibition.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "resistance", "training", "adaptation"})
+
+    assert scored == ()
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(

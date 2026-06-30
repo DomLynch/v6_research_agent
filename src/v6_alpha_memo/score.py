@@ -49,10 +49,11 @@ _BAD_ANCHOR = frozenset({
     "significant", "significantly",
 })
 _CONTEXT_ANCHOR = frozenset({
-    "adult", "adults", "aging", "biomarker", "biomarkers", "biology", "care", "cell",
-    "cells", "disease", "function", "functions", "gene", "genes", "health", "human",
-    "humans", "model", "models", "older", "outcome", "outcomes", "pathway", "pathways",
-    "primary", "protein", "proteins", "trial", "trials",
+    "adaptation", "adaptations", "adult", "adults", "aging", "biomarker", "biomarkers",
+    "biology", "care", "cell", "cells", "disease", "function", "functions", "gene",
+    "genes", "health", "human", "humans", "model", "models", "older", "outcome",
+    "outcomes", "pathway", "pathways", "primary", "protein", "proteins", "training",
+    "trial", "trials",
 })
 _NONPRIMARY_PHRASES = (
     "case report", "commentary", "dispatch", "editorial", "in brief", "meta-analysis",
@@ -162,6 +163,9 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if a.source.casefold() != b.source.casefold():
         score += 5
         reasons.append("source_diverse")
+    if shape != "shared_anchor" and any(anchor not in _CONTEXT_ANCHOR for anchor in anchors):
+        score += 5
+        reasons.append("direct_title_anchor")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
@@ -209,13 +213,13 @@ def _best_anchor(a: Paper, b: Paper) -> str:
 
 
 def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str, ...]:
-    title_a = set(_WORD_RE.findall(pair.a.title.casefold()))
-    title_b = set(_WORD_RE.findall(pair.b.title.casefold()))
+    title_a = _title_terms(pair.a)
+    title_b = _title_terms(pair.b)
     kept = []
     for anchor in pair.anchors:
         if anchor in _BAD_ANCHOR:
             continue
-        if (topic_terms and anchor in topic_terms) or (anchor in title_a and anchor in title_b):
+        if anchor in title_a and anchor in title_b:
             kept.append(anchor)
     return tuple(dict.fromkeys(kept))[:6]
 
@@ -225,8 +229,8 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
         return "reject:non_primary_receipt"
     if not _has_finding_text(a) or not _has_finding_text(b):
         return "reject:title_only_receipt"
-    title_a = set(_WORD_RE.findall(a.title.casefold()))
-    title_b = set(_WORD_RE.findall(b.title.casefold()))
+    title_a = _title_terms(a)
+    title_b = _title_terms(b)
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
         return "reject:name_or_context_only_anchor"
     return ""
@@ -235,6 +239,10 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
 def _nonprimary(paper: Paper) -> bool:
     text = paper.text.casefold()
     return any(phrase in text for phrase in _NONPRIMARY_PHRASES)
+
+
+def _title_terms(paper: Paper) -> set[str]:
+    return set(_WORD_RE.findall(paper.title.casefold().replace("-", " ")))
 
 
 def _has_finding_text(paper: Paper) -> bool:
