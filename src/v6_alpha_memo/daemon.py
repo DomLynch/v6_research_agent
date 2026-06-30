@@ -18,7 +18,7 @@ from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import FullrawSearchClient, Paper
 
 _DEFAULT_QUERY_LIMIT = 3
-_DEFAULT_PER_QUERY_LIMIT = 20
+_DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 
 
