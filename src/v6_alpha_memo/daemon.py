@@ -103,8 +103,8 @@ def _run_topic(
         run = build_memo(
             topic,
             client=client,
-            query_limit=int(os.environ.get("V6_DAEMON_QUERY_LIMIT", "1")),
-            per_query_limit=int(os.environ.get("V6_DAEMON_PER_QUERY_LIMIT", "5")),
+            query_limit=int(os.environ.get("V6_DAEMON_QUERY_LIMIT", "3")),
+            per_query_limit=int(os.environ.get("V6_DAEMON_PER_QUERY_LIMIT", "10")),
             writer=os.environ.get("V6_DAEMON_WRITER", "minimax"),
         )
         selected = run.top_pairs[0]
