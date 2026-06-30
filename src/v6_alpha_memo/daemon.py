@@ -17,6 +17,9 @@ from v6_alpha_memo.run import NoMemoError, build_memo
 from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import FullrawSearchClient, Paper
 
+_DEFAULT_QUERY_LIMIT = 3
+_DEFAULT_PER_QUERY_LIMIT = 10
+
 
 @dataclass(frozen=True, slots=True)
 class Publisher:
@@ -103,8 +106,8 @@ def _run_topic(
         run = build_memo(
             topic,
             client=client,
-            query_limit=int(os.environ.get("V6_DAEMON_QUERY_LIMIT", "3")),
-            per_query_limit=int(os.environ.get("V6_DAEMON_PER_QUERY_LIMIT", "10")),
+            query_limit=_int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT),
+            per_query_limit=_int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT),
             writer=os.environ.get("V6_DAEMON_WRITER", "minimax"),
         )
         selected = run.top_pairs[0]
@@ -309,6 +312,10 @@ def _slug(value: str) -> str:
 
 def _truthy(value: str) -> bool:
     return value.casefold() in {"1", "true", "yes", "on"}
+
+
+def _int_env(name: str, default: int) -> int:
+    return int(os.environ.get(name, str(default)))
 
 
 if __name__ == "__main__":

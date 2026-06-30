@@ -998,6 +998,25 @@ def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatc
     assert seen["per_query_limit"] == 10
 
 
+def test_daemon_query_limits_remain_env_overridable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(*args: object, **kwargs: object) -> object:
+        del args
+        seen.update(kwargs)
+        raise NoMemoError({"coverage": []})
+
+    monkeypatch.setenv("V6_DAEMON_QUERY_LIMIT", "4")
+    monkeypatch.setenv("V6_DAEMON_PER_QUERY_LIMIT", "12")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+
+    with pytest.raises(NoMemoError):
+        v6_daemon._run_topic(tmp_path, "omega 3 atrial fibrillation", "agent-v6", DemoClient(), object(), {})  # type: ignore[arg-type]
+
+    assert seen["query_limit"] == 4
+    assert seen["per_query_limit"] == 12
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
