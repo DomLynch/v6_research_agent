@@ -125,11 +125,11 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         reasons.append("same_intervention_modality_boundary")
         first, second = b, a
 
-    if shape == "shared_anchor" and _has(at, _PROMISE) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms):
+    if shape == "shared_anchor" and _promise_signal(a) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
-    elif shape == "shared_anchor" and _has(bt, _PROMISE) and _negative_result(a) and _roles_fit("promise_reversal", b, a, topic_terms):
+    elif shape == "shared_anchor" and _promise_signal(b) and _negative_result(a) and _roles_fit("promise_reversal", b, a, topic_terms):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
@@ -157,7 +157,7 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         shape = "protocol_result_mismatch"
         reasons.append("protocol_result_mismatch")
         first, second = b, a
-    if _has(at | bt, _BOUNDARY) and (_has(at, _PROMISE) != _has(bt, _PROMISE)):
+    if _has(at | bt, _BOUNDARY) and (_promise_signal(a) != _promise_signal(b)):
         score += 15
         reasons.append("boundary_or_endpoint_split")
     if a.source.casefold() != b.source.casefold():
@@ -215,9 +215,12 @@ def _best_anchor(a: Paper, b: Paper) -> str:
 def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str, ...]:
     title_a = _title_terms(pair.a)
     title_b = _title_terms(pair.b)
+    topic_anchor_terms = set(topic_terms) | {word[:-1] for word in topic_terms if word.endswith("s") and len(word) > 4}
     kept = []
     for anchor in pair.anchors:
         if anchor in _BAD_ANCHOR:
+            continue
+        if topic_anchor_terms and anchor not in topic_anchor_terms:
             continue
         if anchor in title_a and anchor in title_b:
             kept.append(anchor)
@@ -269,15 +272,15 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             and _has(st, _LIMITED_HUMAN | _BOUNDARY)
         )
     if shape == "subgroup_endpoint_split":
-        return _is_human(first) and _is_human(second) and _has(ft, _PROMISE) and _negative_result(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+        return _is_human(first) and _is_human(second) and _promise_signal(first) and _negative_result(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
     if shape == "modality_boundary":
-        return _has(ft, _PROMISE) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
+        return _promise_signal(first) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
         return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE)
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
-        return _has(ft, _PROMISE) and _negative_result(second)
+        return _promise_signal(first) and _negative_result(second)
     return False
 
 
@@ -314,6 +317,10 @@ def _negative_result(paper: Paper) -> bool:
         "null", "unchanged", "worse", "worsened",
     )
     return any(phrase in text for phrase in phrases)
+
+
+def _promise_signal(paper: Paper) -> bool:
+    return _has(_tokens(paper), _PROMISE) and not _negative_result(paper)
 
 
 def _human_topic(topic_terms: frozenset[str]) -> bool:

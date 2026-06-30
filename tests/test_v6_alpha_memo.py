@@ -135,6 +135,27 @@ def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     assert scored == ()
 
 
+def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Dashboard failed to improve forecast accuracy in a randomized field trial",
+            "The dashboard produced null forecast accuracy gains and reduced analyst quality in a human field trial.",
+            "pubmed",
+        ),
+        Paper(
+            "b",
+            "Dashboard accuracy tool failed in a randomized human trial",
+            "The dashboard accuracy tool had null effects and reduced decision quality in a randomized human trial.",
+            "semantic_scholar",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"dashboard", "forecast", "accuracy"})
+
+    assert scored == ()
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(
@@ -1042,7 +1063,7 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
         del request, timeout
         calls += 1
         if calls == 1:
-            return _Response({"content": [{"type": "text", "text": '{"choice": 2, "reason": "sharper"}'}]})
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharper"}'}]})
         return _Response({
             "content": [{
                 "type": "text",
