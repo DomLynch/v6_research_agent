@@ -671,6 +671,31 @@ def test_build_memo_queues_later_shapes_when_fullraw_is_waiting() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
 
 
+def test_build_memo_continues_after_no_hit_sweep_stop() -> None:
+    class NoHitThenHitClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            if len(self.queries) == 1:
+                return SearchResult(query, (), CoverageReceipt(error="async_sweep_stopped_no_hits"))
+            papers = (
+                Paper("a", "Tool X improves benchmark accuracy", "Tool X improved accuracy.", "openalex"),
+                Paper("b", "Tool X failed replication in a field trial", "Tool X had null results.", "pubmed"),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
+
+    client = NoHitThenHitClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("tool x benchmark accuracy", client=client, query_limit=2)
+
+    assert len(client.queries) == 2
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert coverage[0]["error"] == "async_sweep_stopped_no_hits"
+
+
 def test_build_memo_stops_query_fanout_on_non_waitable_search_error() -> None:
     class ErrorClient:
         def __init__(self) -> None:
@@ -986,6 +1011,12 @@ def test_daemon_classifies_transport_errors_as_waiting() -> None:
     trace: dict[str, object] = {"coverage": [{"error": "URLError: <urlopen error [Errno 111] Connection refused>"}]}
 
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+
+
+def test_daemon_classifies_no_hit_sweep_stop_as_selector_rejected() -> None:
+    trace: dict[str, object] = {"coverage": [{"error": "async_sweep_stopped_no_hits"}]}
+
+    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
 def test_daemon_focuses_started_topics_before_fresh_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

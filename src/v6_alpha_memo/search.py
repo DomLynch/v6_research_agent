@@ -265,6 +265,7 @@ def _waitable_coverage_error(error: str) -> bool:
         error in {"async_sweep_busy", "async_sweep_queued", "async_sweep_running", "async_sweep_started"}
         or error.startswith("fullraw_incomplete:")
         or error in {"fullraw_partial", "fullraw_low_source_count:0"}
+        or error == "async_sweep_stopped_no_hits"
     )
 
 

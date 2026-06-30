@@ -294,6 +294,8 @@ def _blocked_stage(trace: dict[str, object]) -> str:
     if isinstance(coverage, list) and coverage:
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
+        if error_text == "async_sweep_stopped_no_hits":
+            return "selector_rejected"
         if (
             error_text.startswith("async_sweep_")
             or error_text.startswith("fullraw_incomplete")
