@@ -68,9 +68,11 @@ def _run_pass(
     board: dict[str, object],
 ) -> None:
     rows = _rows(board, topics)
+    fresh = [row for row in rows if not row.get("trace") and not row.get("generated")]
+    fresh_ids = {id(row) for row in fresh}
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
-    for row in rows:
+    for row in (*fresh, *(row for row in rows if id(row) not in fresh_ids)):
         if row.get("public"):
             _clear_blocker(row)
             continue
