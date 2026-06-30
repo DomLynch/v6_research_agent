@@ -124,6 +124,7 @@ def _run_topic(
             "pair_count": run.pair_count,
             "scored_count": run.scored_count,
         })
+        _clear_blocker(row)
         response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected))
         row["submit_response"] = response
         if response.get("ok"):
@@ -147,6 +148,13 @@ def _run_topic(
                 "publication": publication,
                 "blocked_final": data.get("decision") != "accept",
             })
+            if data.get("decision") == "accept":
+                _clear_blocker(row)
+
+
+def _clear_blocker(row: dict[str, object]) -> None:
+    for key in ("blocked_stage", "blocked_final", "error", "traceback"):
+        row.pop(key, None)
 
 
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict[str, object]:
