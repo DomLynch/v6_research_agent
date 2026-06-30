@@ -988,7 +988,7 @@ def test_daemon_classifies_transport_errors_as_waiting() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_runs_fresh_topics_before_waiting_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_daemon_focuses_started_topics_before_fresh_rows(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
     def fake_build_memo(topic: str, **kwargs: object) -> object:
@@ -996,19 +996,36 @@ def test_daemon_runs_fresh_topics_before_waiting_rows(monkeypatch: pytest.Monkey
         seen.append(topic)
         raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
 
-    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "2")
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "2")
+    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "5")
     monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
     board: dict[str, object] = {
         "rows": [
             {"topic": "waiting one", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
             {"topic": "waiting two", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {"topic": "waiting three", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
             {"topic": "fresh topic"},
         ]
     }
 
-    v6_daemon._run_pass(tmp_path, ("waiting one", "waiting two", "fresh topic"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+    v6_daemon._run_pass(tmp_path, ("waiting one", "waiting two", "waiting three", "fresh topic"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
 
-    assert seen[0] == "fresh topic"
+    assert seen == ["waiting one", "waiting two"]
+
+
+def test_daemon_marks_selector_rejects_final(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del topic, kwargs
+        raise NoMemoError({"coverage": [{"error": ""}]})
+
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {"rows": [{"topic": "weak topic"}]}
+
+    v6_daemon._run_pass(tmp_path, ("weak topic",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert row["blocked_stage"] == "selector_rejected"
+    assert row["blocked_final"] is True
 
 
 def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -19,6 +19,7 @@ from v6_alpha_memo.search import FullrawSearchClient, Paper
 
 _DEFAULT_QUERY_LIMIT = 3
 _DEFAULT_PER_QUERY_LIMIT = 10
+_DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,12 +69,12 @@ def _run_pass(
     board: dict[str, object],
 ) -> None:
     rows = _rows(board, topics)
-    waiting = 0
-    max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
-    for row in sorted(rows, key=_attempt_count):
+    for row in rows:
         if row.get("public"):
             _clear_blocker(row)
-            continue
+    waiting = 0
+    max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
+    for row in _candidate_rows(rows):
         if row.get("blocked_final"):
             continue
         topic = str(row["topic"])
@@ -86,6 +87,8 @@ def _run_pass(
                 waiting += 1
                 if waiting >= max_waiting:
                     break
+            else:
+                row["blocked_final"] = True
         except Exception as exc:
             row.update({
                 "blocked_stage": "exception",
@@ -167,6 +170,15 @@ def _attempt_count(row: dict[str, object]) -> int:
     trace = row.get("trace")
     coverage = trace.get("coverage") if isinstance(trace, dict) else None
     return len(coverage) if isinstance(coverage, list) else 0
+
+
+def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
+    submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
+    searchable = [row for row in rows if not row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
+    started = [row for row in searchable if _attempt_count(row)]
+    fresh = [row for row in searchable if not _attempt_count(row)]
+    return [*submitted, *(started[:active_limit] or fresh[:active_limit])]
 
 
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict[str, object]:
