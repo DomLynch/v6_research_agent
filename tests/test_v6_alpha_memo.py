@@ -1570,11 +1570,23 @@ def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     cache_dir = tmp_path / "cache"
+    extra_dir = tmp_path / "extra"
     cache_dir.mkdir()
+    extra_dir.mkdir()
     (cache_dir / "done.json").write_text(json.dumps({
         "hits": [{"title": "A"}, {"title": "B"}],
         "receipt": {
             "sweep_original_query": "resveratrol blunts exercise training",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    (extra_dir / "extra.json").write_text(json.dumps({
+        "hits": [{"title": "A"}, {"title": "B"}],
+        "receipt": {
+            "sweep_original_query": "nicotinamide exercise performance",
             "shards_searched": 1525,
             "shards_total": 1525,
             "source_count_searched": 5,
@@ -1587,8 +1599,9 @@ def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     }))
 
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra_dir))
 
-    assert v6_daemon._cache_topics() == ("resveratrol blunts exercise training",)
+    assert v6_daemon._cache_topics() == ("resveratrol blunts exercise training", "nicotinamide exercise performance")
 
 
 def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

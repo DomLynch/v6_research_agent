@@ -350,24 +350,27 @@ def _topics() -> tuple[str, ...]:
 def _cache_topics() -> tuple[str, ...]:
     limit = max(0, _int_env("V6_DAEMON_MAX_CACHE_TOPICS", 25))
     topics: list[str] = []
-    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
-    if not cache_dir:
-        return ()
-    for path in Path(cache_dir).glob("*.json"):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        receipt = data.get("receipt") if isinstance(data, dict) else {}
-        receipt = receipt if isinstance(receipt, dict) else {}
-        if (
-            len(data.get("hits") or []) >= 2
-            and _int(receipt.get("shards_searched")) >= 1525
-            and _int(receipt.get("shards_total")) >= 1525
-            and _int(receipt.get("sweep_failed_shards")) == 0
-            and _int(receipt.get("source_count_searched")) >= 5
-        ):
-            topics.append(str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip())
+    cache_dirs = ",".join((
+        os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", ""),
+        os.environ.get("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", ""),
+        os.environ.get("RESEARKA_FULLRAW_SWEEP_CACHE_DIR", ""),
+    ))
+    for cache_dir in dict.fromkeys(path.strip() for path in re.split(r"[:,]", cache_dirs) if path.strip()):
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            receipt = data.get("receipt") if isinstance(data, dict) else {}
+            receipt = receipt if isinstance(receipt, dict) else {}
+            if (
+                len(data.get("hits") or []) >= 2
+                and _int(receipt.get("shards_searched")) >= 1525
+                and _int(receipt.get("shards_total")) >= 1525
+                and _int(receipt.get("sweep_failed_shards")) == 0
+                and _int(receipt.get("source_count_searched")) >= 5
+            ):
+                topics.append(str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip())
     return tuple(dict.fromkeys(topic for topic in topics if topic))[:limit]
 
 
