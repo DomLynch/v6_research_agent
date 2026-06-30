@@ -337,6 +337,9 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             receipt = receipt if isinstance(receipt, dict) else {}
             if query not in {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}:
                 continue
+            cached_limit = _int(receipt.get("sweep_result_limit"))
+            if cached_limit is not None and cached_limit < limit:
+                continue
             payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
             if _coverage_error(payload):
                 continue
