@@ -1237,7 +1237,7 @@ def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatc
         v6_daemon._run_topic(tmp_path, "omega 3 atrial fibrillation", "agent-v6", DemoClient(), object(), {})  # type: ignore[arg-type]
 
     assert seen["query_limit"] == 3
-    assert seen["per_query_limit"] == 10
+    assert seen["per_query_limit"] == 20
 
 
 def test_daemon_query_limits_remain_env_overridable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
