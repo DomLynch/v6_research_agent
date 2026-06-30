@@ -1185,6 +1185,45 @@ def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.Monke
     assert seen == ["vitamin d fracture randomized trial older adults"]
 
 
+def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    low = cache_dir / "low.json"
+    high = cache_dir / "high.json"
+    low.write_text(json.dumps({
+        "hits": [{"title": "Low progress"}],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time resistance mass",
+            "sweep_result_limit": 10,
+            "sweep_shard_limit": 1525,
+            "sweep_strategy": "profile_relaxed_v11",
+            "shards_searched": 74,
+            "source_count_searched": 3,
+        },
+    }))
+    high.write_text(json.dumps({
+        "hits": [{"title": "High progress"}],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time resistance mass",
+            "sweep_result_limit": 10,
+            "sweep_shard_limit": 1525,
+            "sweep_strategy": "profile_relaxed_v11",
+            "shards_searched": 408,
+            "source_count_searched": 4,
+        },
+    }))
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+
+    v6_daemon._promote_duplicate_cache_progress()
+
+    promoted = json.loads(low.read_text())
+    assert promoted["receipt"]["shards_searched"] == 408
+    assert promoted["hits"][0]["title"] == "High progress"
+
+
 def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 

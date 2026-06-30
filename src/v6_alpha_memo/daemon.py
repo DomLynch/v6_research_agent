@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 import traceback
 from dataclasses import dataclass
@@ -68,6 +69,7 @@ def _run_pass(
     publisher: Publisher,
     board: dict[str, object],
 ) -> None:
+    _promote_duplicate_cache_progress()
     rows = _rows(board, topics)
     for row in rows:
         if row.get("public") or (
@@ -213,6 +215,49 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
             if terms and len(terms & query_terms) >= min(2, len(terms)):
                 scores[topic] = max(scores.get(topic, 0), value)
     return scores
+
+
+def _promote_duplicate_cache_progress() -> None:
+    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
+    if not cache_dir:
+        return
+    groups: dict[tuple[str, str, int, int, str], list[tuple[tuple[int, int, int], Path]]] = {}
+    for path in Path(cache_dir).glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        receipt = data.get("receipt") if isinstance(data, dict) else {}
+        receipt = receipt if isinstance(receipt, dict) else {}
+        key = (
+            _cache_key_terms(str(receipt.get("sweep_original_query") or "")),
+            _cache_key_terms(str(receipt.get("sweep_query") or "")),
+            _int(receipt.get("sweep_result_limit")),
+            _int(receipt.get("sweep_shard_limit")),
+            str(receipt.get("sweep_strategy") or ""),
+        )
+        if not key[0] and not key[1]:
+            continue
+        hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
+        score = (1 if hits else 0, _int(receipt.get("shards_searched")), _int(receipt.get("source_count_searched")))
+        groups.setdefault(key, []).append((score, path))
+    for entries in groups.values():
+        if len(entries) < 2:
+            continue
+        best_score, best_path = max(entries, key=lambda item: item[0])
+        for score, path in entries:
+            if path == best_path or score >= best_score:
+                continue
+            tmp_path = path.with_suffix(path.suffix + ".tmp")
+            try:
+                shutil.copy2(best_path, tmp_path)
+                os.replace(tmp_path, path)
+            except OSError:
+                tmp_path.unlink(missing_ok=True)
+
+
+def _cache_key_terms(value: str) -> str:
+    return " ".join(sorted(_schedule_terms(value)))
 
 
 def _schedule_terms(value: str) -> set[str]:
