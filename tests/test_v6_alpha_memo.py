@@ -156,6 +156,48 @@ def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
     assert scored == ()
 
 
+def test_explicit_result_title_can_support_receipt_when_abstract_missing() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol improves exercise adaptation in a randomized mouse training study",
+            "Resveratrol improved exercise adaptation in a mouse training model.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Resveratrol blunted exercise training adaptations in older men",
+            "",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "adaptation"})
+
+    assert scored
+
+
+def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Omega-3 polyunsaturated fatty acids improved atrial fibrillation prevention after bypass surgery",
+            "Omega-3 supplementation improved atrial fibrillation prevention after surgery.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation: Results of a Double-Blind Randomized Clinical Trial",
+            "",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"omega", "atrial", "fibrillation", "prevention"})
+
+    assert scored == ()
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(
