@@ -15,7 +15,6 @@ from v6_alpha_memo.search import (
     FullrawSearchClient,
     Paper,
     SearchResult,
-    _waitable_coverage_error,
     merge_results,
     query_shapes,
 )
@@ -65,7 +64,7 @@ def build_memo(
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
-        if result.receipt.error and not _waitable_coverage_error(result.receipt.error):
+        if result.receipt.error and result.receipt.error != "async_sweep_stopped_no_hits":
             break
     results = tuple(collected)
     papers = merge_results(results)
