@@ -206,8 +206,8 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} benchmark improvement replication failure",
         "{seed} same intervention different modality adaptation",
     )
-    base = (seed, compact)
-    queries = [*base, *(template.format(seed=seed) for template in templates if seed)]
+    shaped = tuple(template.format(seed=seed) for template in templates if seed)
+    queries = [seed, *shaped[:1], compact, *shaped[1:]]
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 
 

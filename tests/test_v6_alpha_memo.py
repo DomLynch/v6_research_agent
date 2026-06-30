@@ -41,10 +41,11 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
 
 
 def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
-    queries = query_shapes("cold water immersion resistance training", limit=2)
+    queries = query_shapes("cold water immersion resistance training", limit=3)
 
     assert queries[0] == "cold water immersion resistance training"
-    assert queries[1] == "cold water immersion resistance"
+    assert queries[1] == "cold water immersion resistance training randomized placebo no effect primary endpoint"
+    assert queries[2] == "cold water immersion resistance"
 
 
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
