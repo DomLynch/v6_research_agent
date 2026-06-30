@@ -1221,6 +1221,42 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
     assert seen == ["creatine cognitive function older adults"]
 
 
+def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    trace = {
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued"},
+        ]
+    }
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "5")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{"topic": "omega 3 atrial fibrillation cardiovascular prevention", "trace": trace, "blocked_final": True}]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen == ["omega 3 atrial fibrillation cardiovascular prevention"]
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert "blocked_final" not in row
+
+
 def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: dict[str, object] = {}
 

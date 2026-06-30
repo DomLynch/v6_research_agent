@@ -70,7 +70,9 @@ def _run_pass(
 ) -> None:
     rows = _rows(board, topics)
     for row in rows:
-        if row.get("public"):
+        if row.get("public") or (
+            row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting"
+        ):
             _clear_blocker(row)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
@@ -343,6 +345,11 @@ def _blocked_stage(trace: dict[str, object]) -> str:
         ):
             return "search_cache_waiting"
     return "selector_rejected"
+
+
+def _blocked_stage_from_row(row: dict[str, object]) -> str:
+    trace = row.get("trace")
+    return _blocked_stage(trace) if isinstance(trace, dict) else ""
 
 
 def _awaiting_side_search(row: dict[str, object]) -> bool:
