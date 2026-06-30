@@ -217,14 +217,16 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
         return True
     strong_terms = topic_terms - _GENERIC_TOPIC_TERMS
     if not strong_terms:
-        strong_terms = topic_terms
-    left = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.a.text.casefold()))
-    right = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.b.text.casefold()))
-    shared = (left & right) & strong_terms
+        return True
+    shared = set(scored.pair.anchors) & strong_terms
     return len(shared) >= (2 if len(strong_terms) >= 3 else 1)
 
 
-_GENERIC_TOPIC_TERMS = frozenset({"aging", "adult", "adults", "function", "human", "humans", "mitochondrial", "older", "primary", "trial", "trials"})
+_GENERIC_TOPIC_TERMS = frozenset({
+    "adaptation", "adaptations", "aging", "adult", "adults", "exercise", "function",
+    "human", "humans", "longevity", "mitochondrial", "older", "performance", "primary",
+    "resistance", "training", "trial", "trials",
+})
 
 
 def _demo_papers(query: str) -> tuple[Paper, ...]:

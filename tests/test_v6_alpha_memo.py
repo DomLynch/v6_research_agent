@@ -158,6 +158,35 @@ def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     assert scored == ()
 
 
+def test_build_memo_rejects_modality_only_topic_fit() -> None:
+    class Client:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del query, limit
+            return SearchResult(
+                "metformin resistance training",
+                (
+                    Paper(
+                        "a",
+                        "Effect of a Concurrent Training Program with and Without Metformin Treatment",
+                        "Concurrent training with or without metformin improved metabolic markers.",
+                        "openalex",
+                        doi="10.test/a",
+                    ),
+                    Paper(
+                        "b",
+                        "Resistance training to improve type 2 diabetes",
+                        "Resistance training promotes health benefits; metformin effects warrant discussion.",
+                        "pubmed",
+                        doi="10.test/b",
+                    ),
+                ),
+                CoverageReceipt(),
+            )
+
+    with pytest.raises(NoMemoError):
+        build_memo("metformin resistance training", client=Client(), query_limit=1)
+
+
 def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
     papers = (
         Paper(
