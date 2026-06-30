@@ -218,6 +218,29 @@ def test_build_memo_rejects_compound_only_anchor_when_training_topic_missing() -
         build_memo("metformin resistance training adaptation", client=Client(), query_limit=1)
 
 
+def test_expectation_anchor_drops_generic_significance_words() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Metformin improves resistance training response",
+            "Metformin significantly improved resistance training response.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Metformin failed resistance training response",
+            "Metformin significantly failed to improve resistance training response.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "resistance", "training"})
+
+    assert scored
+    assert "significantly would travel" not in scored[0].expectation_update
+    assert "metformin would travel" in scored[0].expectation_update
+
+
 def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
     papers = (
         Paper(

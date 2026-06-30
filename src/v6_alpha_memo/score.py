@@ -52,7 +52,7 @@ _MODALITY = frozenset({
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
     "conclusion", "control", "divided", "elisa", "older", "primary", "retrospective",
-    "significant", "significantly",
+    "response", "significant", "significantly",
 })
 _CONTEXT_ANCHOR = frozenset({
     "adaptation", "adaptations", "adult", "adults", "aging", "biomarker", "biomarkers",
@@ -213,7 +213,13 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
 def _best_anchor(a: Paper, b: Paper) -> str:
     common = _tokens(a) & _tokens(b)
     for word in sorted(common, key=lambda item: (-len(item), item)):
-        if word not in _PROMISE and word not in _FAILURE:
+        if (
+            word not in _PROMISE
+            and word not in _FAILURE
+            and word not in _BAD_ANCHOR
+            and word not in _CONTEXT_ANCHOR
+            and word not in _MODALITY
+        ):
             return word
     return "the shared intervention"
 
