@@ -1040,6 +1040,7 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Return this exact Markdown skeleton" in prompt
     assert "summarize one concrete finding/result" in prompt
     assert "Never use a paper title as the finding" in prompt
+    assert "finding must follow the softer abstract language" in prompt
     assert "Keep title and alpha cautious" in prompt
     assert "one decisive future falsifier" in prompt
     assert "name the exact endpoint instead of using generic weaker/inert language" in prompt
@@ -1050,6 +1051,7 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "do not attribute the contrast to one moderator" in prompt
     assert "Mention small sample sizes" in prompt
     assert "Prefer context-dependent to age-moderated or deficiency-moderated" in prompt
+    assert "do not use a bare topic title" in prompt
     assert "Do not call interventions equivalent across species/doses" in prompt
     assert "Do not mention dose-equivalent scaling" in prompt
     assert '"finding"' in prompt
@@ -1074,7 +1076,7 @@ def test_title_prefers_specific_shared_receipt_terms() -> None:
         (),
     )
 
-    assert v6_write._title(scored).startswith("Alpha memo: nicotinamide riboside")
+    assert v6_write._title(scored) == "Alpha memo: nicotinamide riboside exercise performance context boundary"
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:

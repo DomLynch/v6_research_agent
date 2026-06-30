@@ -17,6 +17,14 @@ _TITLE_DROP = frozenset({
     "individuals", "older", "randomized", "study", "supplementation", "the",
     "trial", "with",
 })
+_SHAPE_TITLE = {
+    "mechanism_to_human_failure": "translation boundary",
+    "modality_boundary": "modality boundary",
+    "promise_reversal": "context boundary",
+    "protocol_result_mismatch": "protocol mismatch",
+    "subgroup_endpoint_split": "endpoint split",
+    "translation_boundary": "translation boundary",
+}
 
 
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
@@ -128,7 +136,10 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = " ".join(_title_terms(scored)[:5]) or "receipt pair"
+    anchor = " ".join(_title_terms(scored)[:4]) or "receipt pair"
+    shape = _SHAPE_TITLE.get(scored.shape, "evidence boundary")
+    if shape not in anchor:
+        anchor = f"{anchor} {shape}"
     return f"Alpha memo: {anchor}"
 
 
@@ -177,7 +188,8 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         "**Why this is surprising:** <short>\n"
         "**Caveats/falsifiers:**\n- <bullet>\n- <bullet>. Each receipt line must name the paper "
         "and summarize one concrete finding/result from its abstract. Never use a "
-        "paper title as the finding. Keep title and alpha cautious: use suggests/may/"
+        "paper title as the finding; if the title is stronger than the abstract, the finding must "
+        "follow the softer abstract language. Keep title and alpha cautious: use suggests/may/"
         "bounded, not proves/refutes/flips/overturns. Explicitly distinguish what "
         "Receipt 1 made plausible from what Receipt 2 updates. Caveats must name "
         "the population/dose/timescale limits and one decisive future falsifier. "
@@ -191,7 +203,9 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
         "the same pattern holds; name it as an analogous cross-context signal. If receipts "
         "differ on multiple axes such as species, dose, route, duration, baseline status, or "
         "sample size, do not attribute the contrast to one moderator; state that the moderator "
-        "hypothesis is tentative and confounded by the other axes. Mention small sample sizes "
+        "hypothesis is tentative and confounded by the other axes. Title must combine the shared "
+        "receipt anchor with a relationship noun such as boundary, split, or mismatch; do not use "
+        "a bare topic title. Mention small sample sizes "
         "when the supplied receipt gives them. Prefer context-dependent to age-moderated or "
         "deficiency-moderated unless the receipts directly isolate that moderator. "
         "Do not call interventions equivalent across species/doses unless receipts directly establish equivalence. "
