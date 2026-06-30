@@ -425,6 +425,49 @@ def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     assert result.receipt.source_count_searched == 5
 
 
+def test_fullraw_client_uses_extra_completed_sweep_cache_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    primary = tmp_path / "primary"
+    extra = tmp_path / "extra"
+    primary.mkdir()
+    extra.mkdir()
+    (extra / "cached.json").write_text(json.dumps({
+        "hits": [{
+            "id": "W1",
+            "title": "Resveratrol blunts exercise training adaptations",
+            "abstract": "A human training trial reported blunted adaptation.",
+            "source": "pubmed",
+            "year": 2014,
+        }],
+        "receipt": {
+            "sweep_query": "resveratrol exercise adaptation",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "papers_searched": 1_456_919_317,
+            "papers_total": 1_456_919_317,
+            "source_count_searched": 5,
+            "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1},
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def opener(_request: Request, _timeout: float) -> _Response:
+        raise AssertionError("remote search should not be called for extra completed cache")
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(primary))
+    monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra))
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=cast(RequestOpener, opener)).search(
+        "resveratrol exercise adaptation", limit=10
+    )
+
+    assert len(result.papers) == 1
+    assert result.receipt.shards_searched == 1525
+    assert result.receipt.source_count_searched == 5
+
+
 def test_fullraw_client_marks_requests_priority_by_default() -> None:
     payloads: list[dict[str, object]] = []
 

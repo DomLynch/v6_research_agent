@@ -324,28 +324,35 @@ def _query_variants(query: str) -> tuple[str, ...]:
 
 
 def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
-    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
-    if not cache_dir:
-        return None
     best: SearchResult | None = None
-    for path in Path(cache_dir).glob("*.json"):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(data, dict):
-            continue
-        receipt = data.get("receipt")
-        receipt = receipt if isinstance(receipt, dict) else {}
-        if query not in {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}:
-            continue
-        payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
-        if _coverage_error(payload):
-            continue
-        papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
-        if papers and (best is None or len(papers) > len(best.papers)):
-            best = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
+    for cache_dir in _sweep_cache_dirs():
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            receipt = data.get("receipt")
+            receipt = receipt if isinstance(receipt, dict) else {}
+            if query not in {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}:
+                continue
+            payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
+            if _coverage_error(payload):
+                continue
+            papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
+            if papers and (best is None or len(papers) > len(best.papers)):
+                best = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
     return best
+
+
+def _sweep_cache_dirs() -> tuple[str, ...]:
+    raw = ",".join((
+        os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", ""),
+        os.environ.get("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", ""),
+        os.environ.get("RESEARKA_FULLRAW_SWEEP_CACHE_DIR", ""),
+    ))
+    return tuple(dict.fromkeys(path.strip() for path in re.split(r"[:,]", raw) if path.strip()))
 
 
 def _search_urls(value: str) -> tuple[str, ...]:
