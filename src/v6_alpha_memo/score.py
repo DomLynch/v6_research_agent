@@ -15,6 +15,7 @@ _PROMISE = frozenset({
     "protect", "protected", "raise", "raised", "recovery", "regeneration",
     "superior", "tolerance",
 })
+_TITLE_PROMISE = _PROMISE - frozenset({"benefit", "recovery", "tolerance"})
 _FAILURE = frozenset({
     "attenuate", "attenuated", "attenuates", "blunt", "blunted", "decrease", "decreased",
     "failed", "failure", "impair", "impaired", "limited", "lower", "lowered",
@@ -252,7 +253,7 @@ def _has_finding_text(paper: Paper) -> bool:
     if len(_WORD_RE.findall(paper.abstract.casefold())) >= 6:
         return True
     title_terms = _title_terms(paper)
-    return len(title_terms) >= 6 and (_has(title_terms, _FAILURE) or _has(title_terms, _PROMISE))
+    return len(title_terms) >= 6 and (_has(title_terms, _FAILURE) or _has(title_terms, _TITLE_PROMISE))
 
 
 def _tokens(paper: Paper) -> set[str]:

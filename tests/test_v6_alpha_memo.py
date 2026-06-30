@@ -198,6 +198,27 @@ def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
     assert scored == ()
 
 
+def test_generic_recovery_title_without_abstract_is_not_a_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Cold-water recovery during heat-based training",
+            "",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Cold-water immersion blunted resistance training adaptation",
+            "Cold-water immersion blunted adaptation after resistance training.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "training", "adaptation"})
+
+    assert scored == ()
+
+
 def test_protocol_result_shape_requires_negative_update_receipt() -> None:
     papers = (
         Paper(
