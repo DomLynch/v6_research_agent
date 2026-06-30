@@ -182,13 +182,12 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
     searchable = [row for row in rows if not row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
     indexed = list(enumerate(searchable))
-    started = [item for item in indexed if _attempt_count(item[1])]
-    fresh = [item for item in indexed if not _attempt_count(item[1])]
     ranked = sorted(
-        started or fresh,
+        indexed,
         key=lambda item: (
             _awaiting_side_search(item[1]),
             -cache_progress.get(str(item[1].get("topic")), 0),
+            not _attempt_count(item[1]),
             item[0],
         ),
     )
@@ -341,9 +340,35 @@ def _topics() -> tuple[str, ...]:
     if not raw and os.environ.get("V6_TOPICS_FILE"):
         raw = Path(os.environ["V6_TOPICS_FILE"]).read_text()
     topics = tuple(line.strip() for line in re.split(r"[\n,]+", raw) if line.strip() and not line.lstrip().startswith("#"))
+    if _truthy(os.environ.get("V6_DAEMON_INCLUDE_CACHE_TOPICS", "0")):
+        topics = tuple(dict.fromkeys((*topics, *_cache_topics())))
     if not topics:
         raise SystemExit("V6_TOPICS or V6_TOPICS_FILE is required")
     return topics
+
+
+def _cache_topics() -> tuple[str, ...]:
+    limit = max(0, _int_env("V6_DAEMON_MAX_CACHE_TOPICS", 25))
+    topics: list[str] = []
+    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
+    if not cache_dir:
+        return ()
+    for path in Path(cache_dir).glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        receipt = data.get("receipt") if isinstance(data, dict) else {}
+        receipt = receipt if isinstance(receipt, dict) else {}
+        if (
+            len(data.get("hits") or []) >= 2
+            and _int(receipt.get("shards_searched")) >= 1525
+            and _int(receipt.get("shards_total")) >= 1525
+            and _int(receipt.get("sweep_failed_shards")) == 0
+            and _int(receipt.get("source_count_searched")) >= 5
+        ):
+            topics.append(str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip())
+    return tuple(dict.fromkeys(topic for topic in topics if topic))[:limit]
 
 
 def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, object]]:

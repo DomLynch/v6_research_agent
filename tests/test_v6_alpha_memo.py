@@ -1566,6 +1566,31 @@ def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.Monke
     assert seen == ["vitamin d fracture randomized trial older adults"]
 
 
+def test_daemon_cache_topics_reads_strict_completed_primary_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "done.json").write_text(json.dumps({
+        "hits": [{"title": "A"}, {"title": "B"}],
+        "receipt": {
+            "sweep_original_query": "resveratrol blunts exercise training",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    (cache_dir / "partial.json").write_text(json.dumps({
+        "hits": [{"title": "A"}, {"title": "B"}],
+        "receipt": {"sweep_original_query": "omega 3", "shards_searched": 100, "shards_total": 1525},
+    }))
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+
+    assert v6_daemon._cache_topics() == ("resveratrol blunts exercise training",)
+
+
 def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
