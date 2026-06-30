@@ -187,6 +187,35 @@ def test_build_memo_rejects_modality_only_topic_fit() -> None:
         build_memo("metformin resistance training", client=Client(), query_limit=1)
 
 
+def test_build_memo_rejects_compound_only_anchor_when_training_topic_missing() -> None:
+    class Client:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del query, limit
+            return SearchResult(
+                "metformin resistance training adaptation",
+                (
+                    Paper(
+                        "a",
+                        "Metformin protects skeletal muscle from exercise-induced injury",
+                        "Metformin with training affected skeletal muscle adaptation.",
+                        "openalex",
+                        doi="10.test/a",
+                    ),
+                    Paper(
+                        "b",
+                        "Adaptations to metformin use on fetal islets",
+                        "Metformin exposure changed fetal islet adaptation in a primate model.",
+                        "pubmed",
+                        doi="10.test/b",
+                    ),
+                ),
+                CoverageReceipt(),
+            )
+
+    with pytest.raises(NoMemoError):
+        build_memo("metformin resistance training adaptation", client=Client(), query_limit=1)
+
+
 def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
     papers = (
         Paper(
