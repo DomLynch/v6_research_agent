@@ -272,7 +272,13 @@ def _blocked_stage(trace: dict[str, object]) -> str:
     coverage = trace.get("coverage")
     if isinstance(coverage, list) and coverage:
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
-        if str(error).startswith("async_sweep_") or str(error).startswith("fullraw_incomplete"):
+        error_text = str(error)
+        if (
+            error_text.startswith("async_sweep_")
+            or error_text.startswith("fullraw_incomplete")
+            or "Connection refused" in error_text
+            or error_text.startswith(("URLError:", "TimeoutError:", "ConnectionResetError:"))
+        ):
             return "search_cache_waiting"
     return "selector_rejected"
 

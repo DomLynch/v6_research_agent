@@ -973,6 +973,12 @@ def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
     assert "traceback" not in row
 
 
+def test_daemon_classifies_transport_errors_as_waiting() -> None:
+    trace: dict[str, object] = {"coverage": [{"error": "URLError: <urlopen error [Errno 111] Connection refused>"}]}
+
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
