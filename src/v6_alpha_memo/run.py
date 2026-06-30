@@ -218,10 +218,18 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
     strong_terms = topic_terms - _GENERIC_TOPIC_TERMS
     if not strong_terms:
         return True
-    shared = set(scored.pair.anchors) & strong_terms
+    anchors = set(scored.pair.anchors)
+    shared = anchors & strong_terms
+    context_terms = topic_terms & _CONTEXT_REQUIRED_TOPIC_TERMS
+    if context_terms:
+        left = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.a.text.casefold()))
+        right = set(re.findall(r"[a-z][a-z0-9]{2,}", scored.pair.b.text.casefold()))
+    if context_terms and not ((left & right) & context_terms):
+        return False
     return len(shared) >= (2 if len(strong_terms) >= 3 else 1)
 
 
+_CONTEXT_REQUIRED_TOPIC_TERMS = frozenset({"adaptation", "adaptations", "exercise", "performance", "resistance", "training"})
 _GENERIC_TOPIC_TERMS = frozenset({
     "adaptation", "adaptations", "aging", "adult", "adults", "exercise", "function",
     "human", "humans", "longevity", "mitochondrial", "older", "performance", "primary",
