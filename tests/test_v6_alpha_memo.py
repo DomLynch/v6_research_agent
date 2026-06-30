@@ -20,7 +20,9 @@ from v6_alpha_memo import (
 )
 from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import write as v6_write
+from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
+from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
 from v6_alpha_memo.write import judge_with_minimax
 
@@ -1051,6 +1053,28 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Do not call interventions equivalent across species/doses" in prompt
     assert "Do not mention dose-equivalent scaling" in prompt
     assert '"finding"' in prompt
+
+
+def test_title_prefers_specific_shared_receipt_terms() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper("a", "The NAD+ precursor nicotinamide riboside decreases exercise performance in rats", "", "openalex"),
+            Paper(
+                "b",
+                "Acute nicotinamide riboside supplementation improves redox homeostasis and exercise performance in old individuals",
+                "",
+                "pubmed",
+            ),
+            ("nicotinamide", "exercise", "performance"),
+            (),
+        ),
+        100,
+        "promise_reversal",
+        "update",
+        (),
+    )
+
+    assert v6_write._title(scored).startswith("Alpha memo: nicotinamide riboside")
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
