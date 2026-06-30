@@ -174,11 +174,41 @@ def _attempt_count(row: dict[str, object]) -> int:
 
 def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
+    cache_progress = _cache_progress_by_topic(rows)
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
     searchable = [row for row in rows if not row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
-    started = [row for row in searchable if _attempt_count(row)]
-    fresh = [row for row in searchable if not _attempt_count(row)]
-    return [*submitted, *(started[:active_limit] or fresh[:active_limit])]
+    indexed = list(enumerate(searchable))
+    started = [item for item in indexed if _attempt_count(item[1])]
+    fresh = [item for item in indexed if not _attempt_count(item[1])]
+    ranked = sorted(started or fresh, key=lambda item: (-cache_progress.get(str(item[1].get("topic")), 0), item[0]))
+    return [*submitted, *(row for _, row in ranked[:active_limit])]
+
+
+def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
+    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
+    if not cache_dir:
+        return {}
+    topics = [(str(row.get("topic")), _schedule_terms(str(row.get("topic")))) for row in rows]
+    scores: dict[str, int] = {}
+    for path in Path(cache_dir).glob("*.json"):
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        receipt = data.get("receipt") if isinstance(data, dict) else {}
+        receipt = receipt if isinstance(receipt, dict) else {}
+        query_terms = _schedule_terms(f"{receipt.get('sweep_original_query', '')} {receipt.get('sweep_query', '')}")
+        hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
+        value = _int(receipt.get("shards_searched")) + hits * 2000 + _int(receipt.get("source_count_searched")) * 100
+        for topic, terms in topics:
+            if terms and len(terms & query_terms) >= min(2, len(terms)):
+                scores[topic] = max(scores.get(topic, 0), value)
+    return scores
+
+
+def _schedule_terms(value: str) -> set[str]:
+    drop = {"adult", "adults", "older", "trial", "randomized", "effect", "primary", "endpoint"}
+    return {word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold()) if word not in drop}
 
 
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict[str, object]:
@@ -336,6 +366,19 @@ def _truthy(value: str) -> bool:
 
 def _int_env(name: str, default: int) -> int:
     return int(os.environ.get(name, str(default)))
+
+
+def _int(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if not isinstance(value, str):
+        return 0
+    try:
+        return int(value)
+    except ValueError:
+        return 0
 
 
 if __name__ == "__main__":

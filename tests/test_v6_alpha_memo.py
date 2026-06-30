@@ -1059,6 +1059,49 @@ def test_daemon_marks_selector_rejects_final(monkeypatch: pytest.MonkeyPatch, tm
     assert row["blocked_final"] is True
 
 
+def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "vitamin.json").write_text(json.dumps({
+        "hits": [{"title": "Vitamin D fracture trial"}],
+        "receipt": {
+            "sweep_original_query": "vitamin d fracture randomized trial older adults",
+            "sweep_query": "vitamin older adults",
+            "shards_searched": 1272,
+            "source_count_searched": 4,
+        },
+    }))
+    (cache_dir / "omega.json").write_text(json.dumps({
+        "hits": [],
+        "receipt": {
+            "sweep_original_query": "omega 3 atrial fibrillation cardiovascular prevention",
+            "sweep_query": "omega atrial fibrillation",
+            "shards_searched": 200,
+            "source_count_searched": 4,
+        },
+    }))
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "omega 3 atrial fibrillation cardiovascular prevention", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {"topic": "vitamin d fracture randomized trial older adults", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention", "vitamin d fracture randomized trial older adults"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["vitamin d fracture randomized trial older adults"]
+
+
 def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: dict[str, object] = {}
 
