@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -11,6 +12,11 @@ from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import CoverageReceipt, Paper
 
 _MINIMAX_BASE_URL = "https://api.minimax.io/anthropic"
+_TITLE_DROP = frozenset({
+    "acute", "after", "and", "controlled", "double", "effects", "for", "in",
+    "individuals", "older", "randomized", "study", "supplementation", "the",
+    "trial", "with",
+})
 
 
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
@@ -122,8 +128,19 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = " ".join(scored.pair.anchors[:5]) or "receipt pair"
+    anchor = " ".join(_title_terms(scored)[:5]) or "receipt pair"
     return f"Alpha memo: {anchor}"
+
+
+def _title_terms(scored: ScoredPair) -> tuple[str, ...]:
+    a_words = _words(scored.pair.a.title)
+    b_words = set(_words(scored.pair.b.title))
+    shared = [word for word in a_words if word in b_words and word not in _TITLE_DROP]
+    return tuple(dict.fromkeys([*shared, *scored.pair.anchors]))
+
+
+def _words(value: str) -> list[str]:
+    return re.findall(r"[a-z][a-z0-9]{2,}", value.casefold().replace("+", ""))
 
 
 def _receipt_line(paper: Paper) -> str:
