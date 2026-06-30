@@ -68,7 +68,10 @@ def _run_pass(
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in rows:
-        if row.get("public") or row.get("blocked_final"):
+        if row.get("public"):
+            _clear_blocker(row)
+            continue
+        if row.get("blocked_final"):
             continue
         topic = str(row["topic"])
         try:

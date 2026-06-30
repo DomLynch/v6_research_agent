@@ -953,6 +953,26 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
     assert "traceback" not in row
 
 
+def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
+    row: dict[str, object] = {
+        "topic": "taurine aging biomarker supplementation",
+        "public": True,
+        "blocked_stage": "selector_rejected",
+        "blocked_final": True,
+        "error": "TimeoutError: stale",
+        "traceback": "old traceback",
+    }
+    board: dict[str, object] = {"rows": [row]}
+
+    v6_daemon._run_pass(tmp_path, ("taurine aging biomarker supplementation",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert row["public"] is True
+    assert "blocked_stage" not in row
+    assert "blocked_final" not in row
+    assert "error" not in row
+    assert "traceback" not in row
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
