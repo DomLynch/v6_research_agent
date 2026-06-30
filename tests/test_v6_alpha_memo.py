@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from email.message import Message
 from io import BytesIO
+from pathlib import Path
 from typing import cast
 from urllib.error import HTTPError
 from urllib.request import Request
@@ -909,6 +910,47 @@ def test_daemon_payload_uses_selected_pair_receipts() -> None:
     ]
     assert payload["agent_id"] == "agent-v6"
     assert payload["artifact_type"] == "alpha_memo"
+
+
+def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+
+    class FakePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            assert path == "/submissions"
+            assert payload["artifact_type"] == "alpha_memo"
+            return {"ok": True, "json": {"submission": {"id": "sub-1"}}}
+
+        def get(self, path: str) -> dict[str, object]:
+            assert path == "/submissions/sub-1/decision"
+            return {
+                "ok": True,
+                "json": {
+                    "status": "complete",
+                    "decision": "accept",
+                    "publication": {"id": "pub-1", "url": "https://researka.org/alpha/pub-1"},
+                },
+            }
+
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    row: dict[str, object] = {
+        "topic": "management dashboard forecast accuracy",
+        "blocked_stage": "selector_rejected",
+        "blocked_final": True,
+        "error": "TimeoutError: stale",
+        "traceback": "old traceback",
+    }
+
+    v6_daemon._run_topic(tmp_path, str(row["topic"]), "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
+
+    assert row["generated"] is True
+    assert row["submitted"] is True
+    assert row["accepted"] is True
+    assert row["public"] is True
+    assert "blocked_stage" not in row
+    assert "blocked_final" not in row
+    assert "error" not in row
+    assert "traceback" not in row
 
 
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
