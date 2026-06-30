@@ -175,7 +175,7 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
-    update = _expectation_sentence(first, second, shape)
+    update = _expectation_sentence(first, second, shape, anchors)
     return ScoredPair(
         pair=clean_pair,
         score=min(score, 100),
@@ -185,10 +185,10 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     )
 
 
-def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
+def _expectation_sentence(a: Paper, b: Paper, shape: str, anchors: tuple[str, ...]) -> str:
     if shape == "shared_anchor":
         return ""
-    anchor = _short(_best_anchor(a, b))
+    anchor = _short(_best_anchor(a, b, anchors))
     if shape == "translation_boundary":
         return (
             f"{a.title} made us expect {anchor} had biology-level promise; "
@@ -210,7 +210,10 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str) -> str:
     )
 
 
-def _best_anchor(a: Paper, b: Paper) -> str:
+def _best_anchor(a: Paper, b: Paper, anchors: tuple[str, ...] = ()) -> str:
+    for word in anchors:
+        if word not in _BAD_ANCHOR and word not in _CONTEXT_ANCHOR and word not in _MODALITY:
+            return word
     common = _tokens(a) & _tokens(b)
     for word in sorted(common, key=lambda item: (-len(item), item)):
         if (
