@@ -21,14 +21,19 @@ _FAILURE = frozenset({
     "failed", "failure", "impair", "impaired", "limited", "lower", "lowered",
     "null", "reduce", "reduced", "unchanged", "worse", "worsened",
 })
+_NEGATIVE_RESULT_WORDS = frozenset({
+    "attenuated", "blunted", "decrease", "decreased", "decreases", "failed",
+    "impair", "impaired", "lower", "lowered", "null", "reduce", "reduced",
+    "unchanged", "worse", "worsened",
+})
 _MECHANISM = frozenset({
     "animal", "cell", "cells", "in-vitro", "mechanism", "mechanistic", "mice",
     "model", "mouse", "pathway", "preclinical", "rat", "rats",
 })
 _HUMAN_OUTCOME = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
-    "human", "humans", "participants", "patient", "patients", "randomized",
-    "trial", "workers",
+    "human", "humans", "individual", "individuals", "participants", "patient",
+    "patients", "randomized", "trial", "workers",
 })
 _PROTOCOL = frozenset({"expected", "hypothesis", "intended", "planned", "protocol"})
 _RESULT = frozenset({"found", "observed", "result", "results", "showed", "shows"})
@@ -271,6 +276,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if shape == "translation_boundary":
         return (
             _has(ft, _ANIMAL | _MECHANISM)
+            and not _negative_result(first)
             and _has(ft | st, _PROMISE)
             and _is_human(second)
             and _has(st, _LIMITED_HUMAN | _BOUNDARY)
@@ -316,11 +322,10 @@ def _negative(tokens: set[str]) -> bool:
 def _negative_result(paper: Paper) -> bool:
     text = paper.text.casefold()
     phrases = (
-        "adverse effect", "attenuated", "blunted", "did not", "does not",
-        "failed", "no evidence", "no significant", "not improve",
-        "null", "unchanged", "worse", "worsened",
+        "adverse effect", "did not", "does not", "no evidence", "no significant",
+        "not improve",
     )
-    return any(phrase in text for phrase in phrases)
+    return any(phrase in text for phrase in phrases) or bool(_tokens(paper) & _NEGATIVE_RESULT_WORDS)
 
 
 def _promise_signal(paper: Paper) -> bool:

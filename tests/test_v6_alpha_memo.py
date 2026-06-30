@@ -95,6 +95,27 @@ def test_rejects_background_efficacy_as_promise_receipt() -> None:
     assert scored == ()
 
 
+def test_negative_title_does_not_become_promise_from_background_language() -> None:
+    papers = (
+        Paper(
+            "rat",
+            "The NAD+ precursor nicotinamide riboside decreases exercise performance in rats",
+            "NAD+ precursors emerged as a promising strategy, but chronic nicotinamide riboside decreased exercise performance in rats.",
+            "openalex",
+        ),
+        Paper(
+            "human",
+            "Acute nicotinamide riboside supplementation improves redox homeostasis and exercise performance in old individuals",
+            "Acute nicotinamide riboside improved redox homeostasis and exercise performance in older individuals.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"nicotinamide", "exercise", "performance"})
+
+    assert scored == ()
+
+
 def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     papers = (
         Paper(
