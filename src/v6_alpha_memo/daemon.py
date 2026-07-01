@@ -192,6 +192,7 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
         key=lambda item: (
             item[1].get("blocked_stage") == "search_cache_waiting",
             _awaiting_side_search(item[1]),
+            -_int(item[1].get("top_score")),
             -cache_progress.get(str(item[1].get("topic")), 0),
             not _attempt_count(item[1]),
             item[0],

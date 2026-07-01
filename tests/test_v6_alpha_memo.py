@@ -1760,6 +1760,28 @@ def test_daemon_prioritizes_ready_cache_topic_over_stale_waiting_row(
     assert seen == ["resveratrol blunts exercise training"]
 
 
+def test_daemon_prioritizes_previous_high_score_waiting_row(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "generic waiting", "blocked_stage": "search_cache_waiting", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {"topic": "resveratrol mimics exercise training", "blocked_stage": "search_cache_waiting", "top_score": 100, "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("generic waiting", "resveratrol mimics exercise training"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["resveratrol mimics exercise training"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
