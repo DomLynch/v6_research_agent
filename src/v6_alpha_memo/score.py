@@ -49,10 +49,6 @@ _HUMAN_OUTCOME_STUDY = frozenset({
 })
 _PROTOCOL = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned", "protocol"})
 _PROTOCOL_EXPECTATION = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned"})
-_EXPECTATION_USE_PHRASES = (
-    "commonly used", "increasingly used", "intended to", "promoted as",
-    "proposed to", "purported to", "used by", "used to support",
-)
 _RESULT = frozenset({"found", "observed", "result", "results", "showed", "shows"})
 _BOUNDARY = frozenset({
     "context", "dose", "endpoint", "endpoints", "market", "modality", "program",
@@ -208,16 +204,6 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         reasons.append("promise_to_negative_or_null")
         first, second = b, a
 
-    if shape == "shared_anchor" and _roles_fit("embedded_expectation_update", a, b, topic_terms, anchors):
-        score += 40
-        shape = "embedded_expectation_update"
-        reasons.append("receipt_embeds_expectation_update")
-    elif shape == "shared_anchor" and _roles_fit("embedded_expectation_update", b, a, topic_terms, anchors):
-        score += 40
-        shape = "embedded_expectation_update"
-        reasons.append("receipt_embeds_expectation_update")
-        first, second = b, a
-
     if _roles_fit("mechanism_to_human_failure", first, second, topic_terms, anchors):
         score += 30
         shape = "mechanism_to_human_failure"
@@ -303,11 +289,6 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str, anchors: tuple[str, ..
         return (
             f"{a.title} made {anchor} worth testing as a positive signal; "
             f"{b.title} forces the update that the same anchor can fail, reverse, or split by context."
-        )
-    if shape == "embedded_expectation_update":
-        return (
-            f"{a.title} establishes the shared {anchor} context; "
-            f"{b.title} forces the update because its receipt states the expected use and the negative or null result."
         )
     return (
         f"{a.title} made us expect {anchor} would travel cleanly as a positive signal; "
@@ -514,12 +495,6 @@ def _roles_fit(
             and _endpoint_compatible(first, second)
             and _population_compatible(first, second)
         )
-    if shape == "embedded_expectation_update":
-        return (
-            _abstract_reports_result(first)
-            and _embedded_expectation_update(second, anchors)
-            and _population_compatible(first, second)
-        )
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
@@ -588,14 +563,6 @@ def _negative_update_receipt(paper: Paper, anchors: tuple[str, ...] = ()) -> boo
     return any(
         _mentions_anchor(sentence, direct_anchors) and _observed_negative_update_sentence(sentence)
         for sentence in _sentences(abstract)
-    )
-
-
-def _embedded_expectation_update(paper: Paper, anchors: tuple[str, ...]) -> bool:
-    abstract = paper.abstract.casefold()
-    return (
-        any(phrase in abstract for phrase in _EXPECTATION_USE_PHRASES)
-        and _negative_update_receipt(paper, anchors)
     )
 
 
