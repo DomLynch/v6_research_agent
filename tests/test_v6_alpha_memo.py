@@ -833,6 +833,27 @@ def test_status_only_anchor_is_not_intervention_receipt() -> None:
     assert scored == ()
 
 
+def test_insulin_resistance_does_not_satisfy_resistance_training_topic() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Effects Of Metformin Administration With Swimming Training In Fructose Induced Insulin Resistance Rats",
+            "Results showed metformin with swimming training changed insulin sensitivity in fructose-induced insulin resistance rats.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does metformin modify the effect on glycaemic control of aerobic exercise, resistance exercise or both?",
+            "The human trial found metformin did not improve glycaemic control during resistance exercise training.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "resistance", "training"})
+
+    assert scored == ()
+
+
 def test_rejects_review_keyword_overlap_before_writing() -> None:
     papers = (
         Paper("a", "Systematic review of leadership and productivity", "productivity evidence", "openalex"),
