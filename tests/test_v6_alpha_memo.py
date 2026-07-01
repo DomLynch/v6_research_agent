@@ -2675,6 +2675,7 @@ def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.Monke
         raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
 
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "5")
     monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
     monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
     board: dict[str, object] = {
@@ -2813,6 +2814,56 @@ def test_daemon_prioritizes_usable_completed_cache_over_partial_progress(
     progress = v6_daemon._cache_progress_by_topic(rows)
 
     assert progress["metformin resistance training"] > progress["time restricted eating resistance training lean mass"]
+
+
+def test_daemon_prioritizes_exact_completed_cache_over_related_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[str] = []
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "exact.json").write_text(json.dumps({
+        "hits": [{"title": f"Exact anchor result {i}"} for i in range(5)],
+        "receipt": {
+            "sweep_original_query": "target anchor exact",
+            "sweep_query": "target anchor exact",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    (cache_dir / "related.json").write_text(json.dumps({
+        "hits": [{"title": f"Target related result {i}"} for i in range(25)],
+        "receipt": {
+            "sweep_original_query": "target anchor related cache",
+            "sweep_query": "target anchor related cache",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "5")
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "target anchor broad"},
+            {"topic": "target anchor exact"},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("target anchor broad", "target anchor exact"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["target anchor exact"]
 
 
 def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
