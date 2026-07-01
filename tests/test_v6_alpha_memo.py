@@ -1149,6 +1149,28 @@ def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
     assert result.receipt.error == "fullraw_incomplete:415/1525"
 
 
+def test_fullraw_client_reports_queue_full_when_query_not_admitted() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {
+                "status": "queued",
+                "key_queued": False,
+                "key_running": False,
+                "queued_count": 6,
+                "max_queue": 6,
+            },
+            "shard_receipt": {"authenticated": True},
+        },
+        "results": [],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "omega 3 atrial fibrillation"
+    )
+
+    assert result.receipt.error == "async_sweep_queue_full"
+
+
 def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
     class WaitingClient:
         def __init__(self) -> None:
@@ -1170,6 +1192,25 @@ def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
         "resveratrol exercise adaptation baseline subgroup high low response",
     ]
     assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
+
+
+def test_build_memo_stops_fanout_when_fullraw_queue_is_full() -> None:
+    class FullQueueClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(query, (), CoverageReceipt(error="async_sweep_queue_full"))
+
+    client = FullQueueClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("resveratrol exercise adaptation", client=client, query_limit=3)
+
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert client.queries == ["resveratrol exercise adaptation"]
+    assert [row["error"] for row in coverage] == ["async_sweep_queue_full"]
 
 
 def test_build_memo_stops_side_searches_after_elite_pair() -> None:
