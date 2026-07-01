@@ -34,6 +34,11 @@ _HUMAN_OUTCOME = frozenset({
     "human", "humans", "individual", "individuals", "participants", "patient",
     "patients", "randomized", "trial", "workers",
 })
+_HUMAN_OUTCOME_STUDY = frozenset({
+    "adult", "adults", "double-blind", "individual", "individuals", "participant",
+    "participants", "patient", "patients", "placebo-controlled", "randomized",
+    "subject", "subjects", "trial",
+})
 _PROTOCOL = frozenset({"expected", "hypothesis", "intended", "planned", "protocol"})
 _RESULT = frozenset({"found", "observed", "result", "results", "showed", "shows"})
 _BOUNDARY = frozenset({
@@ -329,10 +334,10 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if _human_topic(topic_terms) and not _is_human(second):
         return False
     if shape == "mechanism_to_human_failure":
-        return _has(ft, _MECHANISM) and _is_human(second) and _negative_result(second)
+        return _mechanism_model_receipt(first) and _is_human(second) and _negative_result(second)
     if shape == "translation_boundary":
         return (
-            _has(ft, _ANIMAL | _MECHANISM)
+            _mechanism_model_receipt(first)
             and not _negative_result(first)
             and _has(ft | st, _PROMISE)
             and _is_human(second)
@@ -402,6 +407,11 @@ def _human_topic(topic_terms: frozenset[str]) -> bool:
 def _is_human(paper: Paper) -> bool:
     tokens = _tokens(paper)
     return _has(tokens, _HUMAN_OUTCOME) and not _animal_only(paper)
+
+
+def _mechanism_model_receipt(paper: Paper) -> bool:
+    tokens = _tokens(paper)
+    return _animal_only(paper) or (_has(tokens, _MECHANISM) and not _has(tokens, _HUMAN_OUTCOME_STUDY))
 
 
 def _animal_only(paper: Paper) -> bool:
