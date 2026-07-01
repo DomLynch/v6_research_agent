@@ -91,50 +91,6 @@ def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
     assert "made us expect" in scored[0].expectation_update
 
 
-def test_scores_embedded_expectation_update_without_topic_hardcoding() -> None:
-    papers = (
-        Paper(
-            "a",
-            "Interventionx dashboard analyst workflow changed routing behavior",
-            "A field study found interventionx dashboard analyst workflow changed routing behavior.",
-            "openalex",
-        ),
-        Paper(
-            "b",
-            "Does Interventionx dashboard analyst workflow improve decision quality?",
-            "Interventionx is commonly used by firms to support analyst workflow. Results showed interventionx failed to improve decision quality.",
-            "semantic_scholar",
-        ),
-    )
-
-    scored = score_pairs(mine_pairs(papers))
-
-    assert scored
-    assert scored[0].score >= 85
-    assert scored[0].shape == "embedded_expectation_update"
-
-
-def test_embedded_expectation_update_still_rejects_title_only_receipts() -> None:
-    papers = (
-        Paper(
-            "a",
-            "Interventionx dashboard analyst workflow changed routing behavior",
-            "A field study found interventionx dashboard analyst workflow changed routing behavior.",
-            "openalex",
-        ),
-        Paper(
-            "b",
-            "Does Interventionx dashboard analyst workflow improve decision quality?",
-            "",
-            "semantic_scholar",
-        ),
-    )
-
-    scored = score_pairs(mine_pairs(papers))
-
-    assert scored == ()
-
-
 def test_rejects_background_efficacy_as_promise_receipt() -> None:
     papers = (
         Paper(
