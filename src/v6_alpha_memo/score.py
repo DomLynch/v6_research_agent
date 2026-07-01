@@ -452,8 +452,16 @@ def _negative_result(paper: Paper) -> bool:
 
 
 def _negative_update_receipt(paper: Paper) -> bool:
-    text = paper.text.casefold()
-    if any(phrase in text for phrase in _UPDATE_FAILURE_PHRASES) or bool(_tokens(paper) & _UPDATE_FAILURE_WORDS):
+    title = paper.title.casefold()
+    if _negative_update_text(title):
+        return True
+    abstract = paper.abstract.casefold()
+    return ("primary" in abstract or "endpoint" in abstract) and _negative_update_text(abstract)
+
+
+def _negative_update_text(text: str) -> bool:
+    tokens = set(_WORD_RE.findall(text))
+    if any(phrase in text for phrase in _UPDATE_FAILURE_PHRASES) or bool(tokens & _UPDATE_FAILURE_WORDS):
         return True
     return bool(
         re.search(
