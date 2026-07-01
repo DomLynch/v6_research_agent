@@ -218,7 +218,10 @@ def _stale_search_depth(row: dict[str, object]) -> bool:
         return False
     if row.get("blocked_stage") not in {"low_score", "selector_rejected"}:
         return False
-    return _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
+    return (
+        _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
+        or _int(row.get("query_limit")) < _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
+    )
 
 
 def _stale_selector_version(row: dict[str, object]) -> bool:
