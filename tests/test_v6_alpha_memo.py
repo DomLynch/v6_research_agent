@@ -2588,6 +2588,56 @@ def test_daemon_prioritizes_ready_cache_topic_over_stale_waiting_row(
     assert seen == ["resveratrol blunts exercise training"]
 
 
+def test_daemon_runs_open_row_before_waiting_cache_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[str] = []
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "creatine.json").write_text(json.dumps({
+        "hits": [],
+        "receipt": {
+            "sweep_original_query": "creatine cognitive function older adults",
+            "sweep_query": "creatine cognitive function older adults",
+            "shards_searched": 1200,
+            "source_count_searched": 5,
+        },
+    }))
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "5")
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {
+                "topic": "creatine cognitive function older adults",
+                "blocked_stage": "search_cache_waiting",
+                "query_limit": 3,
+                "per_query_limit": 10,
+                "query_shape_version": 3,
+                "selector_version": 10,
+                "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
+            },
+            {
+                "topic": "vitamin d fracture randomized trial older adults",
+                "query_shape_version": 3,
+                "selector_version": 2,
+                "trace": {"coverage": [{"error": "async_sweep_queued"}]},
+            },
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("creatine cognitive function older adults", "vitamin d fracture randomized trial older adults"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["vitamin d fracture randomized trial older adults"]
+
+
 def test_daemon_rotates_side_waiting_high_score_behind_regular_waiting_row(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
