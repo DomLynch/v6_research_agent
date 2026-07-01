@@ -2542,7 +2542,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["metformin resistance training"]
     assert "submission_id" not in row
-    assert row["selector_version"] == 5
+    assert row["selector_version"] == 6
 
 
 def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
