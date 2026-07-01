@@ -78,7 +78,7 @@ def _run_pass(
             _reset_for_revision_retry(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
             row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
-        elif row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting":
+        elif (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting") or _stale_search_depth(row):
             _clear_blocker(row)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
@@ -90,7 +90,12 @@ def _run_pass(
             _run_topic(run_dir, topic, agent_id, client, publisher, row)
         except NoMemoError as exc:
             stage = _blocked_stage(exc.trace)
-            row.update({"blocked_stage": stage, "trace": exc.trace})
+            row.update({
+                "blocked_stage": stage,
+                "trace": exc.trace,
+                "query_limit": _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT),
+                "per_query_limit": _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT),
+            })
             if stage == "search_cache_waiting":
                 waiting += 1
                 if waiting >= max_waiting:
@@ -114,17 +119,25 @@ def _run_topic(
     row: dict[str, object],
 ) -> None:
     if not row.get("generated"):
+        query_limit = _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
+        per_query_limit = _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
         run = build_memo(
             topic,
             client=client,
-            query_limit=_int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT),
-            per_query_limit=_int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT),
+            query_limit=query_limit,
+            per_query_limit=per_query_limit,
             writer=os.environ.get("V6_DAEMON_WRITER", "minimax"),
         )
         selected = run.top_pairs[0]
         min_score = int(os.environ.get("V6_DAEMON_MIN_SCORE", "85"))
         if selected.score < min_score:
-            row.update({"blocked_final": True, "blocked_stage": "low_score", "top_score": selected.score})
+            row.update({
+                "blocked_final": True,
+                "blocked_stage": "low_score",
+                "top_score": selected.score,
+                "query_limit": query_limit,
+                "per_query_limit": per_query_limit,
+            })
             return
         slug = _slug(topic)
         memo_path = run_dir / f"{slug}.md"
@@ -140,6 +153,8 @@ def _run_topic(
             "paper_count": run.paper_count,
             "pair_count": run.pair_count,
             "scored_count": run.scored_count,
+            "query_limit": query_limit,
+            "per_query_limit": per_query_limit,
         })
         _clear_blocker(row)
         response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected, row))
@@ -175,6 +190,14 @@ def _run_topic(
 def _clear_blocker(row: dict[str, object]) -> None:
     for key in ("blocked_stage", "blocked_final", "error", "traceback"):
         row.pop(key, None)
+
+
+def _stale_search_depth(row: dict[str, object]) -> bool:
+    if not row.get("blocked_final") or row.get("submitted") or row.get("public"):
+        return False
+    if row.get("blocked_stage") not in {"low_score", "selector_rejected"}:
+        return False
+    return _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
 
 
 def _attempt_count(row: dict[str, object]) -> int:

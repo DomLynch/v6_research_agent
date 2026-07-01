@@ -1999,6 +1999,38 @@ def test_daemon_query_limits_remain_env_overridable(monkeypatch: pytest.MonkeyPa
     assert seen["per_query_limit"] == 12
 
 
+def test_daemon_reopens_stale_final_row_when_search_depth_increases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen.update(kwargs)
+        raise NoMemoError({"coverage": [{"error": ""}]})
+
+    monkeypatch.setenv("V6_DAEMON_PER_QUERY_LIMIT", "25")
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "metformin resistance training",
+            "blocked_stage": "low_score",
+            "blocked_final": True,
+            "top_score": 60,
+            "per_query_limit": 10,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("metformin resistance training",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen["topic"] == "metformin resistance training"
+    assert seen["per_query_limit"] == 25
+    assert row["blocked_stage"] == "selector_rejected"
+    assert row["per_query_limit"] == 25
+
+
 def test_domain_classifier_does_not_match_ai_inside_training() -> None:
     assert v6_daemon._domain("resveratrol mimics exercise training") == "longevity_research"
     assert v6_daemon._domain("retrieval augmented generation benchmark") == "ai_research"
