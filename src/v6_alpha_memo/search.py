@@ -209,8 +209,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     seed = " ".join(seed.split())
     words = seed.split()
     compact = " ".join(words[:4])
-    head_len = 2 if len(words) > 1 and (words[1].isdigit() or len(words[1]) <= 2) else 1
-    alpha_seed = " ".join((*words[:head_len], "null", "failed", "primary", "endpoint", *words[head_len:]))
+    alpha_seed = f"{seed} null failed primary endpoint"
     templates = (
         "{seed} mechanism model human failed translation",
         alpha_seed,
