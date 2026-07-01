@@ -1972,6 +1972,42 @@ def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.Mo
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
+def test_daemon_reopens_legacy_clean_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del topic, kwargs
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    row: dict[str, object] = {
+        "topic": "resveratrol blunts exercise training",
+        "generated": True,
+        "submitted": True,
+        "submission_id": "sub-old",
+        "revision_retry_count": 1,
+        "blocked_final": True,
+        "decision_response": {
+            "json": {
+                "decision": "revise",
+                "resubmission": {"allowed": True},
+                "gate_failures": [],
+                "required_revisions": [],
+                "major_issues": [],
+                "rubric_scores": {"source_grounding": 5},
+                "claim_support_verdict": "supported",
+                "overclaim_verdict": "none",
+            }
+        },
+    }
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol blunts exercise training",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert row["revision_retry_count"] == 2
+    assert row["revision_of_object_id"] == "sub-old"
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert row["blocked_stage"] == "search_cache_waiting"
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:

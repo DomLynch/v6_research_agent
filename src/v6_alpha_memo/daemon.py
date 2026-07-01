@@ -74,7 +74,7 @@ def _run_pass(
     for row in rows:
         if row.get("public"):
             _clear_blocker(row)
-        elif row.get("blocked_final") and _row_clean_revision(row) and _int(row.get("revision_retry_count")) < 1:
+        elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
             _reset_for_revision_retry(row)
         elif row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting":
             _clear_blocker(row)
@@ -420,6 +420,10 @@ def _row_clean_revision(row: dict[str, object]) -> bool:
     response = row.get("decision_response")
     data = response.get("json") if isinstance(response, dict) else None
     return _clean_revision(data) if isinstance(data, dict) else False
+
+
+def _needs_revision_retry(row: dict[str, object]) -> bool:
+    return _int(row.get("revision_retry_count")) < 1 or not row.get("revision_of_object_id")
 
 
 def _reset_for_revision_retry(row: dict[str, object]) -> None:
