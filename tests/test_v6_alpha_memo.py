@@ -3516,6 +3516,40 @@ def test_daemon_prioritizes_near_complete_cached_topic(monkeypatch: pytest.Monke
     assert seen == ["vitamin d fracture randomized trial older adults"]
 
 
+def test_daemon_prioritizes_shard_completion_over_hit_count(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "many-hits.json").write_text(json.dumps({
+        "hits": [{"title": f"Many hit result {i}"} for i in range(25)],
+        "receipt": {
+            "sweep_original_query": "many hits topic",
+            "sweep_query": "many hits topic",
+            "shards_searched": 900,
+            "source_count_searched": 5,
+        },
+    }))
+    (cache_dir / "near-complete.json").write_text(json.dumps({
+        "hits": [{"title": f"Near complete result {i}"} for i in range(10)],
+        "receipt": {
+            "sweep_original_query": "near complete topic",
+            "sweep_query": "near complete topic",
+            "shards_searched": 1319,
+            "source_count_searched": 5,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+
+    rows: list[dict[str, object]] = [
+        {"topic": "many hits topic", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+        {"topic": "near complete topic", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+    ]
+
+    selected = v6_daemon._candidate_rows(rows, ("many hits topic", "near complete topic"))
+
+    assert selected == [rows[1]]
+
+
 def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -420,17 +420,19 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
             query_terms = _schedule_terms(" ".join(query_values))
             hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
             usable = _usable_completed_cache(receipt, hits)
+            shards = _int(receipt.get("shards_searched"))
+            sources = _int(receipt.get("source_count_searched"))
             value = (
-                _int(receipt.get("shards_searched"))
-                + hits * 2000
-                + _int(receipt.get("source_count_searched")) * 100
-                + (1_000_000 if usable else 0)
+                shards * 1000
+                + sources * 100_000
+                + min(hits, 50) * 10
+                + (10_000_000 if usable else 0)
             )
             for topic, terms, ordered_terms in topics:
                 exact = _schedule_key(topic) in query_values
                 related = usable and bool(ordered_terms) and ordered_terms[0] in query_terms
                 if terms and (exact or related) and len(terms & query_terms) >= min(2, len(terms)):
-                    scores[topic] = max(scores.get(topic, 0), value + (1_000_000 if exact and usable else 0))
+                    scores[topic] = max(scores.get(topic, 0), value + (10_000_000 if exact and usable else 0))
     return scores
 
 
