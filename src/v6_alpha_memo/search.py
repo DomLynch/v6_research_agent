@@ -207,7 +207,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} baseline subgroup high low response",
         "{seed} endpoint split randomized trial placebo",
         "{seed} intervention opposite endpoint boundary condition",
-        "{seed} field experiment intervention null effect",
+        "{seed} trial experiment results no effect",
         "{seed} benchmark improvement replication failure",
         "{seed} same intervention different modality adaptation",
     )
