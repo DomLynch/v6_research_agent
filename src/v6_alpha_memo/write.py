@@ -63,6 +63,7 @@ def render_with_minimax(
     *,
     receipt: CoverageReceipt | None = None,
     judge: bool = True,
+    revision_notes: tuple[str, ...] = (),
 ) -> str:
     if judge:
         judged = judge_with_minimax(top_pairs)
@@ -78,7 +79,7 @@ def render_with_minimax(
         "temperature": 0.2,
         "system": "Pick the strongest receipt pair and write only the required concise memo. Use only supplied receipts.",
         "thinking": {"type": "disabled"},
-        "messages": [{"role": "user", "content": [{"type": "text", "text": _prompt(top_pairs[:5])}]}],
+        "messages": [{"role": "user", "content": [{"type": "text", "text": _prompt(top_pairs[:5], revision_notes)}]}],
     }
     base_url = os.environ.get("V6_MINIMAX_BASE_URL", _MINIMAX_BASE_URL).rstrip("/")
     request = Request(
@@ -164,7 +165,7 @@ def _receipt_line(paper: Paper) -> str:
     return " | ".join(bits)
 
 
-def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
+def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ()) -> str:
     rows = []
     for idx, scored in enumerate(pairs, start=1):
         a, b = scored.pair.a, scored.pair.b
@@ -179,8 +180,16 @@ def _prompt(pairs: tuple[ScoredPair, ...]) -> str:
                 "receipt_2": _paper_json(b),
             }
         )
+    note_text = ""
+    if revision_notes:
+        note_text = (
+            "Reviewer revision notes to satisfy without adding unsupported claims: "
+            + json.dumps(tuple(revision_notes[:5]), ensure_ascii=False)
+            + "\n"
+        )
     return (
-        "Return this exact Markdown skeleton, with each label on its own line:\n"
+        note_text
+        + "Return this exact Markdown skeleton, with each label on its own line:\n"
         "# Alpha memo: <receipt-owned title>\n"
         "**One-sentence alpha:** <one sentence>\n"
         "**Receipt 1:** <paper plus finding>\n"

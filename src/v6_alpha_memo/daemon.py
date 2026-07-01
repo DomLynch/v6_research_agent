@@ -75,6 +75,7 @@ def _run_pass(
         if row.get("public"):
             _clear_blocker(row)
         elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
+            _store_revision_notes(row)
             _reset_for_revision_retry(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
             row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
@@ -127,6 +128,7 @@ def _run_topic(
             query_limit=query_limit,
             per_query_limit=per_query_limit,
             writer=os.environ.get("V6_DAEMON_WRITER", "minimax"),
+            revision_notes=_row_revision_notes(row),
         )
         selected = run.top_pairs[0]
         min_score = int(os.environ.get("V6_DAEMON_MIN_SCORE", "85"))
@@ -173,7 +175,8 @@ def _run_topic(
         if data.get("status") == "complete":
             publication = data.get("publication")
             publication = publication if isinstance(publication, dict) else {}
-            if _clean_revision(data) and _int(row.get("revision_retry_count")) < 1:
+            if _clean_revision(data) and _needs_revision_retry(row):
+                row["revision_notes"] = _revision_notes(data)
                 _reset_for_revision_retry(row)
                 return
             row.update({
@@ -448,7 +451,7 @@ def _row_clean_revision(row: dict[str, object]) -> bool:
 
 
 def _needs_revision_retry(row: dict[str, object]) -> bool:
-    return _int(row.get("revision_retry_count")) < 1 or not row.get("revision_of_object_id")
+    return _int(row.get("revision_retry_count")) < _int_env("V6_DAEMON_MAX_REVISION_RETRIES", 2) or not row.get("revision_of_object_id")
 
 
 def _reset_for_revision_retry(row: dict[str, object]) -> None:
@@ -461,6 +464,29 @@ def _reset_for_revision_retry(row: dict[str, object]) -> None:
     ):
         row.pop(key, None)
     _clear_blocker(row)
+
+
+def _store_revision_notes(row: dict[str, object]) -> None:
+    response = row.get("decision_response")
+    data = response.get("json") if isinstance(response, dict) else None
+    if isinstance(data, dict):
+        row["revision_notes"] = _revision_notes(data)
+
+
+def _row_revision_notes(row: dict[str, object]) -> tuple[str, ...]:
+    raw = row.get("revision_notes")
+    if not isinstance(raw, list | tuple):
+        return ()
+    return tuple(str(note).strip() for note in raw if str(note).strip())
+
+
+def _revision_notes(data: dict[str, object]) -> tuple[str, ...]:
+    notes: list[str] = []
+    for key in ("required_revisions", "major_issues", "minor_issues"):
+        raw = data.get(key)
+        if isinstance(raw, list):
+            notes.extend(str(item).strip() for item in raw if str(item).strip())
+    return tuple(dict.fromkeys(notes))
 
 
 def _load_board(run_dir: Path, topics: tuple[str, ...], agent_id: str) -> dict[str, object]:

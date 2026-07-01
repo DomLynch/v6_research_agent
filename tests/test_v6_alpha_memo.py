@@ -2052,6 +2052,7 @@ def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> No
                     "rubric_scores": {"source_grounding": 5, "claim_evidence_alignment": 5},
                     "claim_support_verdict": "supported",
                     "overclaim_verdict": "none",
+                    "minor_issues": ["Name the exact endpoint in the alpha sentence."],
                     "resubmission": {"allowed": True},
                 },
             }
@@ -2062,9 +2063,17 @@ def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> No
 
     assert row["revision_retry_count"] == 1
     assert row["revision_of_object_id"] == "sub-1"
+    assert row["revision_notes"] == ("Name the exact endpoint in the alpha sentence.",)
     assert "generated" not in row
     assert "submitted" not in row
     assert "blocked_final" not in row
+
+
+def test_minimax_prompt_includes_revision_notes() -> None:
+    prompt = v6_write._prompt((), ("Sharpen the endpoint wording.",))
+
+    assert "Reviewer revision notes" in prompt
+    assert "Sharpen the endpoint wording." in prompt
 
 
 def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

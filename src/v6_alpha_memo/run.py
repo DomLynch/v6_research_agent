@@ -59,6 +59,7 @@ def build_memo(
     query_limit: int = 8,
     per_query_limit: int = 20,
     writer: str = "template",
+    revision_notes: tuple[str, ...] = (),
 ) -> V6Run:
     collected: list[SearchResult] = []
     topic_terms = _topic_terms(topic)
@@ -101,7 +102,7 @@ def build_memo(
                     scored_count=0,
                 )
             )
-        memo = render_with_minimax(scored, receipt=receipt, judge=False)
+        memo = render_with_minimax(scored, receipt=receipt, judge=False, revision_notes=revision_notes)
     else:
         memo = render_memo(scored[0], receipt=receipt)
     return V6Run(
