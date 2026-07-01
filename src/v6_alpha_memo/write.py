@@ -98,6 +98,8 @@ def render_with_minimax(
     if not _valid_memo(text):
         return render_memo(top_pairs[0], receipt=receipt)
     text = _normalize_title(text, top_pairs[0])
+    if not _uses_selected_receipts(text, top_pairs[0]):
+        return render_memo(top_pairs[0], receipt=receipt)
     return text + ("\n" if text else "")
 
 
@@ -163,6 +165,15 @@ def _receipt_line(paper: Paper) -> str:
         bits.append(paper.doi)
     bits.append(f"finding: {_finding(paper)}")
     return " | ".join(bits)
+
+
+def _uses_selected_receipts(memo: str, scored: ScoredPair) -> bool:
+    text = _compact(memo)
+    return _compact(scored.pair.a.title) in text and _compact(scored.pair.b.title) in text
+
+
+def _compact(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
 def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ()) -> str:
