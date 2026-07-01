@@ -11,7 +11,7 @@ import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from v6_alpha_memo.run import NoMemoError, build_memo
@@ -177,6 +177,24 @@ def _run_topic(
                 "per_query_limit": per_query_limit,
                 "selector_version": _SELECTOR_VERSION,
                 "query_shape_version": _QUERY_SHAPE_VERSION,
+            })
+            return
+        unresolved_dois = _unresolved_dois(selected)
+        if unresolved_dois:
+            row.update({
+                "blocked_final": True,
+                "blocked_stage": "source_doi_unresolved",
+                "unresolved_dois": unresolved_dois,
+                "top_score": selected.score,
+                "top_shape": selected.shape,
+                "paper_count": run.paper_count,
+                "pair_count": run.pair_count,
+                "scored_count": run.scored_count,
+                "query_limit": query_limit,
+                "per_query_limit": per_query_limit,
+                "selector_version": _SELECTOR_VERSION,
+                "query_shape_version": _QUERY_SHAPE_VERSION,
+                "writer_version": _WRITER_VERSION,
             })
             return
         slug = _slug(topic)
@@ -484,6 +502,24 @@ def _source(paper: Paper) -> dict[str, object]:
         "excerpt": (paper.abstract or paper.title)[:900],
         "evidence_type": "primary",
     }
+
+
+def _unresolved_dois(selected: ScoredPair) -> tuple[str, ...]:
+    if not _truthy(os.environ.get("V6_DAEMON_VALIDATE_DOI", "1")):
+        return ()
+    dois = tuple(dict.fromkeys(doi for doi in (selected.pair.a.doi, selected.pair.b.doi) if doi))
+    return tuple(doi for doi in dois if not _doi_resolves(doi))
+
+
+def _doi_resolves(doi: str) -> bool:
+    request = Request(f"https://doi.org/{doi}", method="HEAD", headers={"User-Agent": "v6-alpha-memo/0.1"})
+    try:
+        with urlopen(request, timeout=float(os.environ.get("V6_DAEMON_DOI_TIMEOUT", "8"))):
+            return True
+    except HTTPError as exc:
+        return exc.code not in {400, 404, 410}
+    except (OSError, TimeoutError, URLError):
+        return True
 
 
 def _open_json(request: Request, timeout: float) -> dict[str, object]:
