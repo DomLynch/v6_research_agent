@@ -2065,7 +2065,7 @@ def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None
     assert result.receipt.error == "async_sweep_queued"
 
 
-def test_build_memo_continues_past_waitable_fullraw_shape() -> None:
+def test_build_memo_can_continue_past_waitable_fullraw_shape_with_override(monkeypatch: pytest.MonkeyPatch) -> None:
     class WaitingThenHitClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -2096,6 +2096,7 @@ def test_build_memo_continues_past_waitable_fullraw_shape() -> None:
             )
 
     client = WaitingThenHitClient()
+    monkeypatch.setenv("V6_MAX_EMPTY_WAITABLE_QUERIES", "2")
     run = build_memo("tool x", client=client, query_limit=3)
 
     coverage = cast(list[dict[str, object]], run.trace["coverage"])
@@ -2134,6 +2135,26 @@ def test_build_memo_caps_empty_waitable_fanout() -> None:
             return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
 
     client = WaitingClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("creatine cognitive function older adults", client=client, query_limit=8)
+
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert len(client.queries) == 1
+    assert [row["error"] for row in coverage] == ["async_sweep_queued"]
+
+
+def test_build_memo_empty_waitable_fanout_has_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    class WaitingClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
+
+    client = WaitingClient()
+    monkeypatch.setenv("V6_MAX_EMPTY_WAITABLE_QUERIES", "2")
     with pytest.raises(NoMemoError) as exc:
         build_memo("creatine cognitive function older adults", client=client, query_limit=8)
 

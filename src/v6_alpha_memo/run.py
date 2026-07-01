@@ -66,6 +66,7 @@ def build_memo(
     topic_terms = _topic_terms(topic)
     waitable_empty = 0
     min_stop_queries = max(1, _int_env("V6_MIN_QUERY_SHAPES_BEFORE_STOP", 2))
+    max_empty_waitable = max(1, _int_env("V6_MAX_EMPTY_WAITABLE_QUERIES", 1))
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
@@ -77,7 +78,7 @@ def build_memo(
         if result.receipt.error != "async_sweep_stopped_no_hits" and _waitable_search_error(result.receipt.error):
             if not result.papers:
                 waitable_empty += 1
-            if waitable_empty >= 2:
+            if waitable_empty >= max_empty_waitable:
                 break
             continue
         if (
