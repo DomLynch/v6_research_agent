@@ -407,9 +407,22 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             and _has(st, _LIMITED_HUMAN | _BOUNDARY)
         )
     if shape == "subgroup_endpoint_split":
-        return _is_human(first) and _is_human(second) and _promise_signal(first) and _negative_update_receipt(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+        return (
+            _is_human(first)
+            and _is_human(second)
+            and _promise_signal(first)
+            and _negative_update_receipt(second)
+            and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+            and _population_compatible(first, second)
+        )
     if shape == "modality_boundary":
-        return _promise_signal(first) and _negative_update_receipt(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
+        return (
+            _promise_signal(first)
+            and _negative_update_receipt(second)
+            and _has(st, _ADAPTATION)
+            and _has(ft | st, _MODALITY)
+            and _population_compatible(first, second)
+        )
     if shape == "protocol_result_mismatch":
         return (
             _protocol_expectation_signal(first)
