@@ -1147,6 +1147,29 @@ def test_score_rejects_title_only_receipts() -> None:
     assert score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "training"}) == ()
 
 
+def test_score_rejects_supplementary_data_sheet_as_core_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Nicotinamide riboside improves exercise performance in older humans",
+            "Acute nicotinamide riboside improved redox homeostasis and physical performance in older individuals.",
+            "pubmed",
+            2019,
+            "10.test/a",
+        ),
+        Paper(
+            "b",
+            "Data_Sheet_1_Elevated Nampt in skeletal muscle improves exercise performance",
+            "Supplementary material for a transgenic training study reporting exercise performance outcomes.",
+            "semantic_scholar",
+            2018,
+            "10.3389/fphys.2018.00704.s001",
+        ),
+    )
+
+    assert score_pairs(mine_pairs(papers), topic_terms={"nicotinamide", "exercise", "performance"}) == ()
+
+
 def test_minimax_prompt_requires_receipt_findings() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
     prompt = v6_write._prompt(run.top_pairs[:1])
