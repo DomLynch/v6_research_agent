@@ -2066,6 +2066,49 @@ def test_daemon_cache_progress_ignores_partial_related_cache(
     assert "platform strategy network" not in progress
 
 
+def test_daemon_prioritizes_usable_completed_cache_over_partial_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "partial.json").write_text(json.dumps({
+        "hits": [{"title": f"Time restricted result {i}"} for i in range(25)],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time resistance mass",
+            "sweep_result_limit": 25,
+            "shards_searched": 900,
+            "shards_total": 1525,
+            "source_count_searched": 4,
+            "partial_shard_search": True,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    (cache_dir / "complete.json").write_text(json.dumps({
+        "hits": [{"title": f"Metformin resistance training result {i}"} for i in range(25)],
+        "receipt": {
+            "sweep_original_query": "metformin resistance training",
+            "sweep_query": "metformin resistance training",
+            "sweep_result_limit": 25,
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "25")
+
+    rows = [
+        {"topic": "time restricted eating resistance training lean mass"},
+        {"topic": "metformin resistance training"},
+    ]
+    progress = v6_daemon._cache_progress_by_topic(rows)
+
+    assert progress["metformin resistance training"] > progress["time restricted eating resistance training lean mass"]
+
+
 def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()

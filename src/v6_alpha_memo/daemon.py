@@ -265,7 +265,10 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
     cache_dirs = _cache_dirs()
     if not cache_dirs:
         return {}
-    topics = [(str(row.get("topic")), _schedule_terms(str(row.get("topic")))) for row in rows]
+    topics = [
+        (str(row.get("topic")), _schedule_terms(str(row.get("topic"))), _schedule_ordered_terms(str(row.get("topic"))))
+        for row in rows
+    ]
     scores: dict[str, int] = {}
     for cache_dir in cache_dirs:
         for path in Path(cache_dir).glob("*.json"):
@@ -281,10 +284,17 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
             )
             query_terms = _schedule_terms(" ".join(query_values))
             hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
-            value = _int(receipt.get("shards_searched")) + hits * 2000 + _int(receipt.get("source_count_searched")) * 100
-            for topic, terms in topics:
+            usable = _usable_completed_cache(receipt, hits)
+            value = (
+                _int(receipt.get("shards_searched"))
+                + hits * 2000
+                + _int(receipt.get("source_count_searched")) * 100
+                + (1_000_000 if usable else 0)
+            )
+            for topic, terms, ordered_terms in topics:
                 exact = _schedule_key(topic) in query_values
-                if terms and (exact or _usable_completed_cache(receipt, hits)) and len(terms & query_terms) >= min(2, len(terms)):
+                related = usable and bool(ordered_terms) and ordered_terms[0] in query_terms
+                if terms and (exact or related) and len(terms & query_terms) >= min(2, len(terms)):
                     scores[topic] = max(scores.get(topic, 0), value)
     return scores
 
@@ -333,7 +343,7 @@ def _cache_key_terms(value: str) -> str:
 
 
 def _schedule_key(value: str) -> str:
-    return " ".join(_schedule_terms(value))
+    return " ".join(_schedule_ordered_terms(value))
 
 
 def _usable_completed_cache(receipt: dict[str, object], hits: int) -> bool:
@@ -348,8 +358,13 @@ def _usable_completed_cache(receipt: dict[str, object], hits: int) -> bool:
 
 
 def _schedule_terms(value: str) -> set[str]:
+    return set(_schedule_ordered_terms(value))
+
+
+def _schedule_ordered_terms(value: str) -> tuple[str, ...]:
     drop = {"adult", "adults", "older", "trial", "randomized", "effect", "primary", "endpoint"}
-    return {word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold()) if word not in drop}
+    terms = (word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold()) if word not in drop)
+    return tuple(dict.fromkeys(terms))
 
 
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: dict[str, object]) -> dict[str, object]:
