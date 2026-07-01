@@ -2540,14 +2540,14 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
                 ),
                 Paper(
                     "c",
-                    "Dashboard accuracy tool improves human decisions in a benchmark",
-                    "The dashboard accuracy tool improved human decision performance and accuracy in a benchmark.",
+                    "Dashboard forecast accuracy tool improves human decisions in a benchmark",
+                    "The dashboard forecast accuracy tool improved human decision performance and accuracy in a benchmark.",
                     "openalex",
                 ),
                 Paper(
                     "d",
-                    "Dashboard accuracy tool failed in a randomized human trial",
-                    "The dashboard accuracy tool had null effects and reduced decision quality in a randomized human trial.",
+                    "Dashboard forecast accuracy tool failed in a randomized human trial",
+                    "The dashboard forecast accuracy tool had null effects and reduced decision quality in a randomized human trial.",
                     "semantic_scholar",
                 ),
             )
