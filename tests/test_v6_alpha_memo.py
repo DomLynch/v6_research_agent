@@ -518,6 +518,29 @@ def test_scores_translation_boundary_without_reversal() -> None:
     assert "bounded by population or endpoint" in scored[0].expectation_update
 
 
+def test_human_trial_cell_language_is_not_mechanism_translation() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx enhances resistance training insulin secretion in adults",
+            "A randomized double-blind placebo-controlled trial in adults assessed beta-cell dysfunction "
+            "and insulin secretion during resistance training.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does interventionx modify glycaemic control of resistance exercise in adults?",
+            "The human trial results showed no significant resistance-training signal for HbA1c glycaemic control.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert not any(item.score >= 85 for item in scored)
+    assert not any(item.shape == "mechanism_to_human_failure" for item in scored)
+
+
 def test_scores_subgroup_endpoint_split_without_manual_topic_fix() -> None:
     papers = (
         Paper(
