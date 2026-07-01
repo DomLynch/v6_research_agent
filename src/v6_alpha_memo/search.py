@@ -361,7 +361,8 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
                 continue
             receipt = data.get("receipt")
             receipt = receipt if isinstance(receipt, dict) else {}
-            if query not in {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}:
+            match_kind = _cache_match_kind(query, receipt)
+            if not match_kind:
                 continue
             cached_limit = _int(receipt.get("sweep_result_limit"))
             min_cached_limit = min(limit, int(os.environ.get("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "10")))
@@ -371,9 +372,31 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             if _coverage_error(payload):
                 continue
             papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
-            if papers and (best is None or len(papers) > len(best.papers)):
-                best = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
+            result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
+            if papers and (match_kind == "exact" or _result_matches_query(result, query)) and (
+                best is None or len(papers) > len(best.papers)
+            ):
+                best = result
     return best
+
+
+def _cache_match_kind(query: str, receipt: dict[object, object]) -> str:
+    cached_queries = {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}
+    if query in cached_queries:
+        return "exact"
+    request_terms = _cache_match_terms(query)
+    cache_terms = _cache_match_terms(" ".join(cached_queries))
+    if len(request_terms) < 2:
+        return ""
+    needed = 2 if len(request_terms) <= 4 else 3
+    return "related" if len(request_terms & cache_terms) >= needed else ""
+
+
+def _cache_match_terms(value: str) -> set[str]:
+    return {
+        word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold().replace("-", " "))
+        if word not in _QUERY_DROP
+    }
 
 
 def _sweep_cache_dirs() -> tuple[str, ...]:
