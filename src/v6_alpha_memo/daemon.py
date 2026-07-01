@@ -250,7 +250,7 @@ def _run_topic(
 
 
 def _clear_blocker(row: dict[str, object]) -> None:
-    for key in ("blocked_stage", "blocked_final", "error", "traceback"):
+    for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois"):
         row.pop(key, None)
     _clear_wait_progress(row)
 

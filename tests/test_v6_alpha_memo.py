@@ -2599,6 +2599,7 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
         "blocked_final": True,
         "error": "TimeoutError: stale",
         "traceback": "old traceback",
+        "unresolved_dois": ("10.bad/stale",),
     }
 
     v6_daemon._run_topic(tmp_path, str(row["topic"]), "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
@@ -2611,6 +2612,7 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
     assert "blocked_final" not in row
     assert "error" not in row
     assert "traceback" not in row
+    assert "unresolved_dois" not in row
 
 
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
