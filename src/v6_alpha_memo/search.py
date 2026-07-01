@@ -623,13 +623,14 @@ def _pubmed_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> 
         return None
     if not _has_receipt_abstract(Paper(paper.paper_id, paper.title, abstract, paper.source)):
         return None
+    abstract_doi = _doi(abstract)
     return Paper(
         paper_id=paper.paper_id,
         title=paper.title,
         abstract=abstract,
         source=paper.source,
         year=paper.year,
-        doi=paper.doi or _doi(abstract),
+        doi=abstract_doi or paper.doi,
         url=paper.url or f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
         venue=paper.venue,
     )

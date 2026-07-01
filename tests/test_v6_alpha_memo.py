@@ -1453,6 +1453,7 @@ def test_fullraw_client_falls_back_to_pubmed_title_when_doi_lookup_misses(
         assert "efetch.fcgi" in request.full_url
         return _TextResponse(
             "OBJECTIVE: To test prescription omega-3 fatty acids for recurrent atrial fibrillation. "
+            "doi: 10.1001/jama.2010.1735. "
             "RESULTS: No significant reduction in recurrent atrial fibrillation was observed."
         )
 
@@ -1465,6 +1466,7 @@ def test_fullraw_client_falls_back_to_pubmed_title_when_doi_lookup_misses(
 
     assert len(searches) == 2
     assert result.papers[0].abstract.startswith("OBJECTIVE")
+    assert result.papers[0].doi == "10.1001/jama.2010.1735"
 
 
 def test_fullraw_client_backfill_limit_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:

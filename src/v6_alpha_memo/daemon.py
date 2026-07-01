@@ -24,7 +24,7 @@ _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 30
 _QUERY_SHAPE_VERSION = 9
-_WRITER_VERSION = 7
+_WRITER_VERSION = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -576,7 +576,7 @@ def _source(paper: Paper) -> dict[str, object]:
         "url": paper.url or (f"https://doi.org/{paper.doi}" if paper.doi else ""),
         "doi": paper.doi,
         "year": paper.year,
-        "excerpt": (paper.abstract or paper.title)[:900],
+        "excerpt": (paper.abstract or paper.title)[:1800],
         "evidence_type": "primary",
     }
 
