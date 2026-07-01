@@ -870,6 +870,47 @@ def test_fullraw_client_ignores_loose_related_cache_without_paper_support(
     assert result.receipt.error == "async_sweep_queued"
 
 
+def test_fullraw_client_does_not_cross_primary_anchor_for_related_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "cached.json").write_text(json.dumps({
+        "hits": [{
+            "id": "W1",
+            "title": "Resveratrol exercise training model",
+            "abstract": "Resveratrol changed exercise training response in a model.",
+            "source": "openalex",
+        }],
+        "receipt": {
+            "sweep_original_query": "resveratrol exercise training model",
+            "sweep_query": "resveratrol exercise training",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1},
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    payloads: list[dict[str, object]] = []
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        payloads.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        return _Response({"meta": {"async_sweep": {"status": "queued"}}, "results": []})
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=opener).search(
+        "caffeine exercise training adaptation mechanism model human failed translation",
+        limit=10,
+    )
+
+    assert payloads[0]["query"] == "caffeine exercise training adaptation mechanism model human failed translation"
+    assert result.receipt.error == "async_sweep_queued"
+
+
 def test_fullraw_client_does_not_reuse_shallow_cache_for_deeper_request(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

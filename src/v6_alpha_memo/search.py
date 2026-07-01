@@ -384,19 +384,25 @@ def _cache_match_kind(query: str, receipt: dict[object, object]) -> str:
     cached_queries = {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}
     if query in cached_queries:
         return "exact"
-    request_terms = _cache_match_terms(query)
+    request_ordered = _cache_match_ordered_terms(query)
+    request_terms = set(request_ordered)
     cache_terms = _cache_match_terms(" ".join(cached_queries))
-    if len(request_terms) < 2:
+    if len(request_terms) < 2 or request_ordered[0] not in cache_terms:
         return ""
     needed = 2 if len(request_terms) <= 4 else 3
     return "related" if len(request_terms & cache_terms) >= needed else ""
 
 
-def _cache_match_terms(value: str) -> set[str]:
-    return {
+def _cache_match_ordered_terms(value: str) -> tuple[str, ...]:
+    terms = (
         word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold().replace("-", " "))
         if word not in _QUERY_DROP
-    }
+    )
+    return tuple(dict.fromkeys(terms))
+
+
+def _cache_match_terms(value: str) -> set[str]:
+    return set(_cache_match_ordered_terms(value))
 
 
 def _sweep_cache_dirs() -> tuple[str, ...]:
