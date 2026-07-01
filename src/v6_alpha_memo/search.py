@@ -248,6 +248,19 @@ def _coverage_error(data: object) -> str:
     shard = shard if isinstance(shard, dict) else {}
     status = _async_status(data)
     if status and status != "hit":
+        sweep = meta.get("async_sweep")
+        queued_count = _int(sweep.get("queued_count")) if isinstance(sweep, dict) else 0
+        max_queue = _int(sweep.get("max_queue")) if isinstance(sweep, dict) else 0
+        max_queue_value = max_queue or 0
+        if (
+            status == "queued"
+            and isinstance(sweep, dict)
+            and not sweep.get("key_queued")
+            and not sweep.get("key_running")
+            and bool(max_queue_value)
+            and (queued_count or 0) >= max_queue_value
+        ):
+            return "async_sweep_queue_full"
         return f"async_sweep_{status or 'missing'}"
     shards = _int(shard.get("shards_searched")) or 0
     total = _int(shard.get("shards_total")) or 0
@@ -267,6 +280,7 @@ def _coverage_error(data: object) -> str:
 def _waitable_coverage_error(error: str) -> bool:
     return (
         error in {"async_sweep_busy", "async_sweep_queued", "async_sweep_running", "async_sweep_started"}
+        or error == "async_sweep_queue_full"
         or error.startswith("fullraw_incomplete:")
         or error in {"fullraw_partial", "fullraw_low_source_count:0"}
         or error == "async_sweep_stopped_no_hits"

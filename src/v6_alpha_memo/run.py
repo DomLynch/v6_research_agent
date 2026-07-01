@@ -69,6 +69,8 @@ def build_memo(
         preview = score_pairs(mine_pairs(merge_results(tuple(collected))), topic_terms=topic_terms)
         if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85:
             break
+        if result.receipt.error == "async_sweep_queue_full":
+            break
         if (
             result.receipt.error
             and result.receipt.error != "async_sweep_stopped_no_hits"
