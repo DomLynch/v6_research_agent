@@ -1070,6 +1070,27 @@ def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
 
 
+def test_build_memo_stops_side_searches_after_elite_pair() -> None:
+    class EliteFirstClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            papers = (
+                Paper("a", "Tool X improves benchmark accuracy in a mechanistic model", "The model showed tool x enhanced accuracy and improved performance.", "openalex"),
+                Paper("b", "Tool X failed to improve human analyst decisions in a randomized field trial", "Human analysts using tool x had null results and reduced decision quality.", "semantic_scholar"),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
+
+    client = EliteFirstClient()
+    run = build_memo("tool x", client=client, query_limit=3)
+
+    assert len(client.queries) == 1
+    assert run.top_pairs[0].score >= 85
+
+
 def test_build_memo_continues_after_no_hit_sweep_stop() -> None:
     class NoHitThenHitClient:
         def __init__(self) -> None:

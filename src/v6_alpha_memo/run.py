@@ -61,9 +61,13 @@ def build_memo(
     writer: str = "template",
 ) -> V6Run:
     collected: list[SearchResult] = []
+    topic_terms = _topic_terms(topic)
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
+        preview = score_pairs(mine_pairs(merge_results(tuple(collected))), topic_terms=topic_terms)
+        if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85:
+            break
         if (
             result.receipt.error
             and result.receipt.error != "async_sweep_stopped_no_hits"
@@ -73,7 +77,6 @@ def build_memo(
     results = tuple(collected)
     papers = merge_results(results)
     pairs = mine_pairs(papers)
-    topic_terms = _topic_terms(topic)
     scored = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
     if not scored:
         raise NoMemoError(

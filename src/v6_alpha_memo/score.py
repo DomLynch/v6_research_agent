@@ -244,6 +244,8 @@ def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str
 def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str:
     if _supplement_receipt(a) or _supplement_receipt(b):
         return "reject:supplement_receipt"
+    if _weak_stat_receipt(a) or _weak_stat_receipt(b):
+        return "reject:weak_statistical_signal"
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
     if not _has_finding_text(a) or not _has_finding_text(b):
@@ -263,6 +265,11 @@ def _nonprimary(paper: Paper) -> bool:
 def _supplement_receipt(paper: Paper) -> bool:
     text = paper.text.casefold().replace("-", "_")
     return bool(re.search(r"\.s\d+$", paper.doi)) or "data_sheet" in text or "supplementary" in text
+
+
+def _weak_stat_receipt(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return "tendency" in text or "trend toward" in text or "not statistically confirmed" in text
 
 
 def _title_terms(paper: Paper) -> set[str]:
