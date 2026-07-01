@@ -2042,6 +2042,30 @@ def test_daemon_cache_progress_reads_extra_cache_dir(
     assert progress["resveratrol blunts exercise training"] > 0
 
 
+def test_daemon_cache_progress_ignores_partial_related_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    extra_dir = tmp_path / "extra"
+    extra_dir.mkdir()
+    (extra_dir / "partial-related.json").write_text(json.dumps({
+        "hits": [{"title": f"Platform network result {i}"} for i in range(90)],
+        "receipt": {
+            "sweep_original_query": "platform strategy network performance",
+            "sweep_query": "platform network performance",
+            "shards_searched": 1398,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "partial_shard_search": True,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra_dir))
+
+    progress = v6_daemon._cache_progress_by_topic([{"topic": "platform strategy network"}])
+
+    assert "platform strategy network" not in progress
+
+
 def test_daemon_promotes_duplicate_cache_progress(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()

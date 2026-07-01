@@ -275,11 +275,16 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
                 continue
             receipt = data.get("receipt") if isinstance(data, dict) else {}
             receipt = receipt if isinstance(receipt, dict) else {}
-            query_terms = _schedule_terms(f"{receipt.get('sweep_original_query', '')} {receipt.get('sweep_query', '')}")
+            query_values = (
+                _schedule_key(str(receipt.get("sweep_original_query") or "")),
+                _schedule_key(str(receipt.get("sweep_query") or "")),
+            )
+            query_terms = _schedule_terms(" ".join(query_values))
             hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
             value = _int(receipt.get("shards_searched")) + hits * 2000 + _int(receipt.get("source_count_searched")) * 100
             for topic, terms in topics:
-                if terms and len(terms & query_terms) >= min(2, len(terms)):
+                exact = _schedule_key(topic) in query_values
+                if terms and (exact or _usable_completed_cache(receipt, hits)) and len(terms & query_terms) >= min(2, len(terms)):
                     scores[topic] = max(scores.get(topic, 0), value)
     return scores
 
@@ -325,6 +330,21 @@ def _promote_duplicate_cache_progress() -> None:
 
 def _cache_key_terms(value: str) -> str:
     return " ".join(sorted(_schedule_terms(value)))
+
+
+def _schedule_key(value: str) -> str:
+    return " ".join(_schedule_terms(value))
+
+
+def _usable_completed_cache(receipt: dict[str, object], hits: int) -> bool:
+    return (
+        hits >= _int_env("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", 10)
+        and _int(receipt.get("shards_searched")) >= 1525
+        and _int(receipt.get("shards_total")) >= 1525
+        and not receipt.get("partial_shard_search")
+        and _int(receipt.get("sweep_failed_shards")) == 0
+        and _int(receipt.get("source_count_searched")) >= 5
+    )
 
 
 def _schedule_terms(value: str) -> set[str]:
