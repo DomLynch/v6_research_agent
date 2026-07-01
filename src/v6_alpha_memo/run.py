@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from dataclasses import dataclass
 from typing import Protocol
@@ -64,11 +65,12 @@ def build_memo(
     collected: list[SearchResult] = []
     topic_terms = _topic_terms(topic)
     waitable_empty = 0
+    min_stop_queries = max(1, _int_env("V6_MIN_QUERY_SHAPES_BEFORE_STOP", 2))
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
         preview = score_pairs(mine_pairs(merge_results(tuple(collected))), topic_terms=topic_terms)
-        if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85:
+        if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85 and len(collected) >= min_stop_queries:
             break
         if result.receipt.error == "async_sweep_queue_full":
             break
@@ -225,6 +227,13 @@ def _best_receipt(results: tuple[SearchResult, ...]) -> CoverageReceipt:
     if not results:
         return CoverageReceipt()
     return max(results, key=lambda result: result.receipt.papers_searched).receipt
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
 
 
 def _topic_terms(topic: str) -> set[str]:

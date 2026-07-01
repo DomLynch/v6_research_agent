@@ -2035,7 +2035,7 @@ def test_build_memo_caps_empty_waitable_fanout() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queued", "async_sweep_queued"]
 
 
-def test_build_memo_stops_side_searches_after_elite_pair() -> None:
+def test_build_memo_stops_side_searches_after_second_elite_query_shape() -> None:
     class EliteFirstClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -2052,7 +2052,7 @@ def test_build_memo_stops_side_searches_after_elite_pair() -> None:
     client = EliteFirstClient()
     run = build_memo("tool x", client=client, query_limit=3)
 
-    assert len(client.queries) == 1
+    assert len(client.queries) == 2
     assert run.top_pairs[0].score >= 85
 
 
