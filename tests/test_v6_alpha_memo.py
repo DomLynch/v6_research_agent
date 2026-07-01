@@ -2452,7 +2452,6 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
 
     run = build_memo("dashboard forecast accuracy", client=MultiPairClient(), query_limit=1, writer="minimax")
 
-    assert len(run.top_pairs) == 1
     assert run.top_pairs[0].pair.a.paper_id == "c"
     assert run.top_pairs[0].pair.b.paper_id == "d"
     assert run.memo.splitlines()[0] == f"# {v6_write._title(run.top_pairs[0])}"

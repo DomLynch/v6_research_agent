@@ -103,9 +103,9 @@ def build_memo(
         deterministic = scored
         judged = judge_with_minimax(scored)
         if judged and judged[0].score >= 85:
-            scored = judged
+            scored = (*judged, *(item for item in deterministic if item not in judged))
         elif deterministic[0].score >= 85:
-            scored = (deterministic[0],)
+            scored = deterministic
         elif judged:
             scored = judged
         else:
