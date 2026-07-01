@@ -1096,31 +1096,21 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> Non
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
 
 
-def test_fullraw_client_tries_compact_variant_when_sweep_is_busy() -> None:
+def test_fullraw_client_preserves_busy_exact_query_before_compact_variant() -> None:
     calls: list[str] = []
-    hit_payload: dict[str, object] = {
-        "meta": _strict_meta({"openalex": 1}),
-        "results": [{
-            "id": "W1",
-            "title": "Metformin blunted exercise adaptation",
-            "abstract": "Metformin reduced exercise adaptation in humans.",
-            "source": "openalex",
-        }],
-    }
 
     def opener(request: Request, timeout: float) -> _Response:
         del timeout
         calls.append(json.loads(cast(bytes, request.data or b"{}").decode())["query"])
-        if len(calls) == 1:
-            return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
-        return _Response(hit_payload)
+        return _Response({"meta": {"async_sweep": {"status": "busy"}}, "results": []})
 
     result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search(
         "metformin exercise adaptation expected improved null outcome randomized trial"
     )
 
-    assert calls[:2] == ["metformin exercise adaptation expected improved null outcome randomized trial", "metformin exercise"]
-    assert result.papers[0].title == "Metformin blunted exercise adaptation"
+    assert calls == ["metformin exercise adaptation expected improved null outcome randomized trial"]
+    assert result.query == "metformin exercise adaptation expected improved null outcome randomized trial"
+    assert result.receipt.error == "async_sweep_busy"
 
 
 def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
@@ -1169,6 +1159,26 @@ def test_fullraw_client_reports_queue_full_when_query_not_admitted() -> None:
     )
 
     assert result.receipt.error == "async_sweep_queue_full"
+
+
+def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None:
+    payloads: list[dict[str, object]] = []
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        payloads.append(json.loads(cast(bytes, request.data or b"{}").decode()))
+        return _Response({"meta": {"async_sweep": {"status": "queued"}}, "results": []})
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=opener).search(
+        "resveratrol exercise adaptation mechanism model human failed translation",
+        limit=5,
+    )
+
+    assert [payload["query"] for payload in payloads] == [
+        "resveratrol exercise adaptation mechanism model human failed translation"
+    ]
+    assert result.query == "resveratrol exercise adaptation mechanism model human failed translation"
+    assert result.receipt.error == "async_sweep_queued"
 
 
 def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:

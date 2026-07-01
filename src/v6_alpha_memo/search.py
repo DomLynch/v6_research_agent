@@ -121,7 +121,7 @@ class FullrawSearchClient:
                     )
                     continue
                 last = result
-                if result.receipt.error and not _waitable_coverage_error(result.receipt.error):
+                if result.receipt.error:
                     return result
                 if result.papers and _result_matches_query(result, variant):
                     return result
