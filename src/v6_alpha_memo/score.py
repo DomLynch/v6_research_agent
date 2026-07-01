@@ -203,11 +203,11 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         first, second = b, a
 
     if shape == "shared_anchor" and _roles_fit("context_boundary", a, b, topic_terms, anchors):
-        score += 35
+        score += 40
         shape = "context_boundary"
         reasons.append("same_intervention_context_boundary")
     elif shape == "shared_anchor" and _roles_fit("context_boundary", b, a, topic_terms, anchors):
-        score += 35
+        score += 40
         shape = "context_boundary"
         reasons.append("same_intervention_context_boundary")
         first, second = b, a
