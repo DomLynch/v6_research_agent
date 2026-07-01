@@ -1410,6 +1410,54 @@ def test_fullraw_completed_cache_prefers_richer_same_size_result(
     assert result.papers[0].abstract.startswith("Cold water immersion blunted")
 
 
+def test_fullraw_completed_cache_aggregates_matching_strict_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    receipt = {
+        "sweep_original_query": "resveratrol exercise adaptation",
+        "sweep_query": "resveratrol exercise adaptation",
+        "sweep_result_limit": 2,
+        "shards_searched": 1525,
+        "shards_total": 1525,
+        "source_count_searched": 5,
+        "partial_shard_search": False,
+        "sweep_failed_shards": 0,
+    }
+    (cache_dir / "promise.json").write_text(json.dumps({
+        "receipt": receipt,
+        "hits": [{
+            "title": "Resveratrol improves exercise adaptation in a mouse model",
+            "abstract": "Resveratrol improved exercise adaptation in a mechanistic mouse model.",
+            "source": "openalex",
+            "doi": "10.test/promise",
+        }],
+    }))
+    (cache_dir / "update.json").write_text(json.dumps({
+        "receipt": receipt,
+        "hits": [{
+            "title": "Resveratrol failed to improve exercise adaptation in a human trial",
+            "abstract": "A human trial found resveratrol failed to improve exercise adaptation.",
+            "source": "pubmed",
+            "doi": "10.test/update",
+        }],
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "1")
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del request, timeout
+        raise AssertionError("completed cache should avoid HTTP")
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search(
+        "resveratrol exercise adaptation",
+        limit=2,
+    )
+
+    assert {paper.doi for paper in result.papers} == {"10.test/promise", "10.test/update"}
+
+
 def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None:
     payloads: list[dict[str, object]] = []
 

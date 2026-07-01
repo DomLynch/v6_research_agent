@@ -350,7 +350,7 @@ def _query_variants(query: str) -> tuple[str, ...]:
 
 
 def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
-    best: SearchResult | None = None
+    candidates: list[SearchResult] = []
     for cache_dir in _sweep_cache_dirs():
         for path in Path(cache_dir).glob("*.json"):
             try:
@@ -373,11 +373,13 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
                 continue
             papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
             result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
-            if papers and (match_kind == "exact" or _result_matches_query(result, query)) and (
-                best is None or _result_rank(result) > _result_rank(best)
-            ):
-                best = result
-    return best
+            if papers and (match_kind == "exact" or _result_matches_query(result, query)):
+                candidates.append(result)
+    if not candidates:
+        return None
+    ranked = tuple(sorted(candidates, key=_result_rank, reverse=True))
+    papers = merge_results(ranked)[:limit]
+    return SearchResult(query=query, papers=papers, receipt=ranked[0].receipt)
 
 
 def _result_rank(result: SearchResult) -> tuple[int, int]:
