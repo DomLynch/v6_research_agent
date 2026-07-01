@@ -2534,6 +2534,9 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
             "blocked_final": True,
             "decision": "revise",
             "selector_version": 1,
+            "top_score": 85,
+            "top_shape": "protocol_result_mismatch",
+            "trace": {"top_pairs": [{"score": 85}]},
         }]
     }
 
@@ -2542,6 +2545,8 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["metformin resistance training"]
     assert "submission_id" not in row
+    assert "top_score" not in row
+    assert row["trace"] == {"coverage": [{"error": ""}]}
     assert row["selector_version"] == 6
 
 

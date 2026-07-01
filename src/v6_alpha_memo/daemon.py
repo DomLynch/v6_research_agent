@@ -538,6 +538,7 @@ def _reset_for_selector_retry(row: dict[str, object]) -> None:
         "generated", "submitted", "accepted", "public", "submission_id", "decision",
         "publication", "submit_response", "decision_response", "memo_file", "trace_file",
         "revision_of_object_id", "revision_retry_count", "revision_notes",
+        "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
     ):
         row.pop(key, None)
     _clear_blocker(row)
