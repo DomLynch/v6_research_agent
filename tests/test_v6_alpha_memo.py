@@ -2232,11 +2232,11 @@ def test_daemon_prioritizes_usable_completed_cache_over_partial_progress(
         },
     }))
     (cache_dir / "complete.json").write_text(json.dumps({
-        "hits": [{"title": f"Metformin resistance training result {i}"} for i in range(25)],
+        "hits": [{"title": f"Metformin resistance training result {i}"} for i in range(10)],
         "receipt": {
             "sweep_original_query": "metformin resistance training",
             "sweep_query": "metformin resistance training",
-            "sweep_result_limit": 25,
+            "sweep_result_limit": 10,
             "shards_searched": 1525,
             "shards_total": 1525,
             "source_count_searched": 5,
@@ -2245,7 +2245,7 @@ def test_daemon_prioritizes_usable_completed_cache_over_partial_progress(
         },
     }))
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
-    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "25")
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "5")
 
     rows: list[dict[str, object]] = [
         {"topic": "time restricted eating resistance training lean mass"},
