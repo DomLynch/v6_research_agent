@@ -12,11 +12,11 @@ _WORD_RE = re.compile(r"[a-z][a-z0-9]{2,}")
 _STOP = frozenset({
     "about", "after", "again", "against", "among", "and", "are", "based",
     "between", "both", "but", "case", "cases", "data", "effect", "effects",
-    "evidence", "for", "from", "finding", "findings", "has", "have", "human",
+    "evidence", "for", "found", "from", "finding", "findings", "has", "have", "human",
     "humans", "impact", "into", "method", "methods", "model", "models", "not",
     "outcome", "outcomes", "paper", "patients", "power", "review", "response",
-    "responses", "result", "results", "study", "studies", "system", "systems",
-    "the", "this", "through", "trial", "trials", "using", "with", "within",
+    "reduce", "reduces", "responses", "result", "results", "study", "studies", "system", "systems",
+    "the", "this", "through", "time", "trial", "trials", "using", "with", "within",
 })
 _BAD_SHARED = _STOP | {"association", "analysis", "clinical", "different", "mechanism"}
 

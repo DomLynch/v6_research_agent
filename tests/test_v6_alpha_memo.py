@@ -869,6 +869,26 @@ def test_generic_older_adult_primary_care_overlap_does_not_publish() -> None:
     assert scored == ()
 
 
+def test_time_word_alone_is_not_a_real_anchor() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Time management intervention reduces academic procrastination in students",
+            "A student study found that time management training improved academic scheduling.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Time restricted feeding reduces hepatic steatosis in mice",
+            "A mouse feeding study found time restricted feeding changed liver steatosis outcomes.",
+            "pubmed",
+        ),
+    )
+
+    assert mine_pairs(papers) == ()
+    assert score_pairs(mine_pairs(papers), topic_terms={"time", "restricted"}) == ()
+
+
 def test_anchors_drop_generic_connector_words() -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
 

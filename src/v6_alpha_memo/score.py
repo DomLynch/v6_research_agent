@@ -65,7 +65,7 @@ _MODALITY = frozenset({
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
     "conclusion", "control", "divided", "elisa", "older", "primary", "retrospective",
-    "response", "significant", "significantly",
+    "found", "reduce", "reduces", "response", "significant", "significantly", "time",
 })
 _CONTEXT_ANCHOR = frozenset({
     "adaptation", "adaptations", "adult", "adults", "aging", "biomarker", "biomarkers",
