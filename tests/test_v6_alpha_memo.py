@@ -793,10 +793,10 @@ def test_fullraw_client_does_not_reuse_shallow_cache_for_deeper_request(
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     (cache_dir / "cached.json").write_text(json.dumps({
-        "hits": [{"id": f"W{i}", "title": f"Omega title only {i}", "source": "openalex"} for i in range(10)],
+        "hits": [{"id": f"W{i}", "title": f"Omega title only {i}", "source": "openalex"} for i in range(4)],
         "receipt": {
             "sweep_query": "omega atrial fibrillation",
-            "sweep_result_limit": 10,
+            "sweep_result_limit": 4,
             "shards_searched": 1525,
             "shards_total": 1525,
             "source_count_searched": 5,
@@ -827,6 +827,42 @@ def test_fullraw_client_does_not_reuse_shallow_cache_for_deeper_request(
 
     assert payloads[0]["limit"] == 20
     assert result.papers[0].paper_id == "W20"
+
+
+def test_fullraw_client_reuses_completed_cache_floor_for_deeper_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "cached.json").write_text(json.dumps({
+        "hits": [{
+            "id": f"W{i}",
+            "title": f"Omega-3 atrial fibrillation trial {i}",
+            "abstract": "A randomized atrial fibrillation trial reported endpoint evidence.",
+            "source": "openalex",
+        } for i in range(10)],
+        "receipt": {
+            "sweep_query": "omega atrial fibrillation",
+            "sweep_result_limit": 10,
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1},
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def opener(_request: Request, _timeout: float) -> _Response:
+        raise AssertionError("strict completed cache should be reused")
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=cast(RequestOpener, opener)).search(
+        "omega atrial fibrillation", limit=25
+    )
+
+    assert len(result.papers) == 10
+    assert result.receipt.shards_searched == 1525
 
 
 def test_fullraw_client_marks_requests_priority_by_default() -> None:
