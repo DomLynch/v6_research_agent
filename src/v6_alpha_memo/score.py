@@ -416,7 +416,12 @@ def _nonprimary(paper: Paper) -> bool:
 
 def _supplement_receipt(paper: Paper) -> bool:
     text = paper.text.casefold().replace("-", "_")
-    return bool(re.search(r"\.s\d+$", paper.doi)) or "data_sheet" in text or "supplementary" in text
+    doi = paper.doi.casefold()
+    return (
+        bool(re.search(r"(?:[._/-]s\d+|suppl(?:ement)?)[._/-]?p?\d*", doi))
+        or "data_sheet" in text
+        or "supplementary" in text
+    )
 
 
 def _weak_stat_receipt(paper: Paper) -> bool:
@@ -604,8 +609,6 @@ def _negative_update_receipt(paper: Paper, anchors: tuple[str, ...] = ()) -> boo
     if _negative_update_text(title) and _abstract_reports_result(paper) and _mentions_anchor(title, direct_anchors):
         return True
     abstract = paper.abstract.casefold()
-    if _mentions_anchor(title, direct_anchors) and any(_observed_negative_update_sentence(sentence) for sentence in _sentences(abstract)):
-        return True
     return any(
         _mentions_anchor(sentence, direct_anchors) and _observed_negative_update_sentence(sentence)
         for sentence in _sentences(abstract)

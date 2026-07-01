@@ -179,6 +179,61 @@ def test_negative_title_does_not_become_promise_from_background_language() -> No
     assert scored == ()
 
 
+def test_rejects_human_update_receipt_that_only_states_background_and_methods() -> None:
+    papers = (
+        Paper(
+            "rat",
+            "The Impact of Resveratrol Supplementation on Inflammation Induced by Acute Exercise in Rats",
+            "Results showed resveratrol reduced IL-6 after acute exercise in rats.",
+            "openalex",
+            doi="10.22037/ijpr.2019.1100684",
+        ),
+        Paper(
+            "runner",
+            "Effects of 14 days of prophylactic resveratrol supplementation in trained endurance runners",
+            (
+                "Background Resveratrol possesses antioxidative properties which have shown to reduce "
+                "oxidative damage from reactive oxygen species. Resveratrol also has the ability to "
+                "attenuate inflammation via inhibiting TNF-a, IL-1b, IL-6, and blocking NF-kB activation. "
+                "Resveratrol supplementation may have the potential to mitigate damages associated with "
+                "intense exercise. The purpose of this study is to evaluate effects on TNF-a, IL-1b, "
+                "and IL-6. Methods eight trained runners consumed placebo or trans-resveratrol for 14 days. "
+                "Results showed a significant main effect for time for IL-6. No significant observations "
+                "for time or between groups for TNF-a and IL-1b were observed."
+            ),
+            "pubmed",
+            doi="10.1186/1550-2783-8-s1-p15",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise"})
+
+    assert scored == ()
+
+
+def test_rejects_supplement_abstract_doi_as_primary_alpha_receipt() -> None:
+    papers = (
+        Paper(
+            "rat",
+            "Resveratrol reduced exercise inflammation in rats",
+            "Results showed resveratrol reduced IL-6 after acute exercise in rats.",
+            "openalex",
+            doi="10.22037/ijpr.2019.1100684",
+        ),
+        Paper(
+            "supplement",
+            "Effects of resveratrol supplementation in trained endurance runners",
+            "Results showed no significant observations between groups for inflammatory markers.",
+            "pubmed",
+            doi="10.1186/1550-2783-8-s1-p15",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise"})
+
+    assert scored == ()
+
+
 def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     papers = (
         Paper(
