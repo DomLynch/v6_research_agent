@@ -72,9 +72,11 @@ def _run_pass(
     _promote_duplicate_cache_progress()
     rows = _rows(board, topics)
     for row in rows:
-        if row.get("public") or (
-            row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting"
-        ):
+        if row.get("public"):
+            _clear_blocker(row)
+        elif row.get("blocked_final") and _row_clean_revision(row) and _int(row.get("revision_retry_count")) < 1:
+            _reset_for_revision_retry(row)
+        elif row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting":
             _clear_blocker(row)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
@@ -404,6 +406,12 @@ def _clean_revision(data: dict[str, object]) -> bool:
         and data.get("overclaim_verdict") == "none"
         and all(isinstance(score, int | float) and score >= 4 for score in values)
     )
+
+
+def _row_clean_revision(row: dict[str, object]) -> bool:
+    response = row.get("decision_response")
+    data = response.get("json") if isinstance(response, dict) else None
+    return _clean_revision(data) if isinstance(data, dict) else False
 
 
 def _reset_for_revision_retry(row: dict[str, object]) -> None:
