@@ -505,6 +505,10 @@ def _roles_fit(
 def _role_matches_topic(a: Paper, b: Paper, topic_terms: frozenset[str]) -> bool:
     if not topic_terms:
         return True
+    if {"resistance", "training"} <= topic_terms and not (
+        _resistance_training_context(a) and _resistance_training_context(b)
+    ):
+        return False
     left = _loose_tokens(a) & topic_terms
     right = _loose_tokens(b) & topic_terms
     if not left or not right:
@@ -517,6 +521,10 @@ def _role_matches_topic(a: Paper, b: Paper, topic_terms: frozenset[str]) -> bool
 def _loose_tokens(paper: Paper) -> set[str]:
     tokens = set(re.findall(r"[a-z][a-z0-9]{2,}", paper.text.casefold()))
     return tokens | {word[:-1] for word in tokens if word.endswith("s") and len(word) > 4}
+
+
+def _resistance_training_context(paper: Paper) -> bool:
+    return bool(re.search(r"\b(?:progressive\s+resistance|resistance\s+(?:exercise|training)|strength\s+training)\b", paper.text.casefold()))
 
 
 def _has(tokens: set[str], needles: frozenset[str]) -> bool:
