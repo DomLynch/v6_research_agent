@@ -1478,23 +1478,43 @@ def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None
     assert result.receipt.error == "async_sweep_queued"
 
 
-def test_build_memo_waits_on_current_shape_when_fullraw_is_queued() -> None:
-    class WaitingClient:
+def test_build_memo_continues_past_waitable_fullraw_shape() -> None:
+    class WaitingThenHitClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
 
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
             del limit
             self.queries.append(query)
-            return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
+            if len(self.queries) == 1:
+                return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
+            papers = (
+                Paper(
+                    "a",
+                    "Tool X improves benchmark accuracy in a mechanistic model",
+                    "The model showed tool x enhanced accuracy and improved performance.",
+                    "openalex",
+                ),
+                Paper(
+                    "b",
+                    "Tool X failed to improve human analyst decisions in a randomized field trial",
+                    "Human analysts using tool x had null results and reduced decision quality.",
+                    "semantic_scholar",
+                ),
+            )
+            return SearchResult(
+                query,
+                papers,
+                CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5),
+            )
 
-    client = WaitingClient()
-    with pytest.raises(NoMemoError) as exc:
-        build_memo("resveratrol exercise adaptation", client=client, query_limit=3)
+    client = WaitingThenHitClient()
+    run = build_memo("tool x", client=client, query_limit=3)
 
-    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
-    assert client.queries == ["resveratrol exercise adaptation"]
-    assert [row["error"] for row in coverage] == ["async_sweep_queued"]
+    coverage = cast(list[dict[str, object]], run.trace["coverage"])
+    assert len(client.queries) == 2
+    assert coverage[0]["error"] == "async_sweep_queued"
+    assert run.top_pairs[0].score >= 85
 
 
 def test_build_memo_stops_fanout_when_fullraw_queue_is_full() -> None:

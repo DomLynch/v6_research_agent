@@ -72,7 +72,7 @@ def build_memo(
         if result.receipt.error == "async_sweep_queue_full":
             break
         if result.receipt.error != "async_sweep_stopped_no_hits" and _waitable_search_error(result.receipt.error):
-            break
+            continue
         if (
             result.receipt.error
             and result.receipt.error != "async_sweep_stopped_no_hits"
