@@ -1790,7 +1790,28 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Do not call receipts matched unless" in prompt
     assert "Do not call interventions equivalent across species/doses" in prompt
     assert "Do not mention dose-equivalent scaling" in prompt
+    assert "After Caveats/falsifiers, stop" in prompt
     assert '"finding"' in prompt
+
+
+def test_minimax_memo_rejects_extra_paragraph_after_caveats() -> None:
+    text = """# Alpha memo: resveratrol exercise training translation boundary
+
+**One-sentence alpha:** x
+
+**Receipt 1:** y
+
+**Receipt 2:** z
+
+**Why this is surprising:** q
+
+**Caveats/falsifiers:**
+- w
+
+Unrelated extra evidence paragraph.
+"""
+
+    assert not v6_write._valid_memo(text)
 
 
 def test_title_prefers_specific_shared_receipt_terms() -> None:
