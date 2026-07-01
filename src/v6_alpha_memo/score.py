@@ -459,6 +459,14 @@ def _sentence_reports_result(sentence: str) -> bool:
     )
 
 
+def _quantified_result(paper: Paper) -> bool:
+    return any(
+        _sentence_reports_result(sentence)
+        and re.search(r"\b(?:p\s*[<=>]|n\s*=|\d+(?:\.\d+)?\s*(?:%|percent|fold))", sentence)
+        for sentence in _sentences(paper.abstract.casefold())
+    )
+
+
 def _tokens(paper: Paper) -> set[str]:
     return set(_WORD_RE.findall(paper.text.casefold()))
 
@@ -516,6 +524,8 @@ def _roles_fit(
             and _is_human(second)
             and _positive_result(first)
             and _negative_update_receipt(second, anchors)
+            and _quantified_result(first)
+            and _quantified_result(second)
             and _context_boundary_diff(first, second)
             and _endpoint_not_drift(first, second)
             and _population_compatible(first, second)

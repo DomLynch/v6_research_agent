@@ -294,7 +294,7 @@ def _paper_json(paper: Paper) -> dict[str, object]:
 
 
 def _finding(paper: Paper) -> str:
-    return " ".join(paper.abstract.split())[:260]
+    return " ".join(paper.abstract.split())[:700]
 
 
 def _valid_memo(text: str) -> bool:
