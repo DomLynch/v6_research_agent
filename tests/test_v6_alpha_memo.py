@@ -1807,6 +1807,8 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "do not replace it with generic tissue, biology, or performance wording" in prompt
     assert "Do not invent or complete numeric values from truncated snippets" in prompt
     assert "heterogeneous cross-context signal" in prompt
+    assert "do not frame it as a direct overturning" in prompt
+    assert "no clinical, dosing, or supplementation recommendation follows" in prompt
     assert "If receipt years differ" in prompt
     assert "mechanistic context, clinical update, or direct replication" in prompt
     assert "Mention small sample sizes" in prompt
@@ -1896,7 +1898,7 @@ def test_mechanism_to_human_title_uses_cross_context_signal() -> None:
         (),
     )
 
-    assert v6_write._title(scored) == "Alpha memo: resveratrol exercise cross-context signal"
+    assert v6_write._title(scored) == "Alpha memo: resveratrol exercise cross-context evidence signal"
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
