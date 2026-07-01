@@ -1700,6 +1700,43 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
     assert seen == ["creatine cognitive function older adults"]
 
 
+def test_daemon_prioritizes_ready_cache_topic_over_stale_waiting_row(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[str] = []
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "ready.json").write_text(json.dumps({
+        "hits": [{"title": "A"}, {"title": "B"}],
+        "receipt": {
+            "sweep_original_query": "resveratrol blunts exercise training",
+            "sweep_query": "resveratrol exercise training",
+            "shards_searched": 1525,
+            "source_count_searched": 5,
+        },
+    }))
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_MAX_WAITING", "5")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "protein timing distribution muscle synthesis", "blocked_stage": "search_cache_waiting", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {"topic": "resveratrol blunts exercise training"},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("protein timing distribution muscle synthesis", "resveratrol blunts exercise training"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["resveratrol blunts exercise training"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
