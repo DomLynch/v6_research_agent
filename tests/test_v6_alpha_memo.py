@@ -1275,6 +1275,66 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.papers[0].doi == "10.test/metformin"
 
 
+def test_fullraw_client_stops_empty_irrelevant_partial_sweep() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "running"},
+            "shard_receipt": {
+                "shards_searched": 650,
+                "shards_total": 1525,
+                "source_count_searched": 4,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1},
+                "partial_shard_search": True,
+                "sweep_failed_shards": 0,
+            },
+        },
+        "results": [{
+            "title": "Response time to passed and failed problems in the retardate",
+            "abstract": "A historical response-time study unrelated to supplementation or fractures.",
+            "source": "pubmed",
+        }],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "vitamin d fracture randomized trial older adults",
+        limit=3,
+    )
+
+    assert result.receipt.error == "async_sweep_stopped_no_hits"
+    assert result.receipt.shards_searched == 650
+    assert result.papers == ()
+
+
+def test_fullraw_client_keeps_relevant_partial_sweep_waitable() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "running"},
+            "shard_receipt": {
+                "shards_searched": 650,
+                "shards_total": 1525,
+                "source_count_searched": 4,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1},
+                "partial_shard_search": True,
+                "sweep_failed_shards": 0,
+            },
+        },
+        "results": [{
+            "title": "Vitamin D fracture randomized trial in older adults",
+            "abstract": "A randomized trial tested vitamin D for fracture prevention in older adults.",
+            "source": "pubmed",
+        }],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "vitamin d fracture randomized trial older adults",
+        limit=3,
+    )
+
+    assert result.receipt.error == "async_sweep_running"
+    assert result.receipt.shards_searched == 650
+    assert result.papers == ()
+
+
 def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.MonkeyPatch) -> None:
     def opener(request: Request, timeout: float) -> _Response:
         del timeout
