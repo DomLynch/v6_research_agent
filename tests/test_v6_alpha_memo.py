@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from email.message import Message
 from io import BytesIO
 from pathlib import Path
@@ -3050,6 +3051,33 @@ def test_daemon_migrates_legacy_submit_backoff_to_timed_cooldown(
     assert seen == []
     assert row["blocked_stage"] == "submit_backoff"
     assert isinstance(row["submit_retry_after"], int)
+
+
+def test_submit_backoff_is_exponential_and_lane_wide(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", "60")
+    row: dict[str, object] = {}
+    before = int(time.time())
+
+    v6_daemon._mark_submit_backoff(row)
+    first_count = row.get("submit_backoff_count")
+    first_retry = row.get("submit_retry_after")
+    assert isinstance(first_count, int)
+    assert isinstance(first_retry, int)
+    assert first_count == 1
+    assert before + 60 <= first_retry <= int(time.time()) + 61
+
+    v6_daemon._mark_submit_backoff(row)
+    second_count = row.get("submit_backoff_count")
+    second_retry = row.get("submit_retry_after")
+    assert isinstance(second_count, int)
+    assert isinstance(second_retry, int)
+    assert second_count == 2
+    assert before + 120 <= second_retry <= int(time.time()) + 121
+
+    due: dict[str, object] = {"topic": "omega", "blocked_stage": "submit_backoff", "submit_retry_after": 0}
+    active: dict[str, object] = {"topic": "resveratrol", "blocked_stage": "submit_backoff", "submit_retry_after": int(time.time()) + 120}
+
+    assert v6_daemon._candidate_rows([due, active], ("omega", "resveratrol")) == []
 
 
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
