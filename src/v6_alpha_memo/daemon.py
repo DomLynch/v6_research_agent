@@ -102,7 +102,12 @@ def _run_pass(
                 "pair_count": trace.get("pair_count"),
                 "scored_count": trace.get("scored_count"),
             })
-        elif row.get("blocked_stage") == "selector_rejected" and not row.get("generated") and not row.get("submitted"):
+        elif (
+            row.get("blocked_stage") == "selector_rejected"
+            and not row.get("generated")
+            and not row.get("submitted")
+            and _int(row.get("selector_version")) < _SELECTOR_VERSION
+        ):
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
     waiting = 0

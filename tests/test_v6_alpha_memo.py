@@ -3133,6 +3133,30 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
     assert row["scored_count"] == 0
 
 
+def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None:
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "time restricted eating resistance training lean mass",
+            "blocked_stage": "selector_rejected",
+            "blocked_final": True,
+            "selector_version": 14,
+            "query_shape_version": 4,
+            "query_limit": 3,
+            "per_query_limit": 10,
+            "paper_count": 26,
+            "pair_count": 80,
+            "scored_count": 0,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("time restricted eating resistance training lean mass",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert row["paper_count"] == 26
+    assert row["pair_count"] == 80
+    assert row["scored_count"] == 0
+
+
 def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
