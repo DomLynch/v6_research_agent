@@ -110,6 +110,12 @@ class FullrawSearchClient:
         for variant in _query_variants(query):
             cached = _completed_cached_result(variant, limit=limit)
             if cached is not None:
+                if _truthy(os.environ.get("V6_FULLRAW_ABSTRACT_BACKFILL", "0")):
+                    return SearchResult(
+                        query=cached.query,
+                        papers=_backfill_missing_abstracts(cached.papers, self._opener, timeout=min(self.timeout, 10.0)),
+                        receipt=cached.receipt,
+                    )
                 return cached
             for search_url in self.search_urls:
                 try:

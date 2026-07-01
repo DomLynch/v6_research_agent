@@ -948,6 +948,47 @@ def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     assert result.receipt.source_count_searched == 5
 
 
+def test_fullraw_client_backfills_completed_cache_title_only_hit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "cached.json").write_text(json.dumps({
+        "hits": [{
+            "title": "GlyNAC Supplementation Improves Glutathione Deficiency",
+            "abstract": "",
+            "source": "semantic_scholar",
+            "doi": "10.1093/jn/nxab309",
+        }],
+        "receipt": {
+            "sweep_original_query": "glynac glutathione",
+            "sweep_query": "glynac glutathione",
+            "sweep_result_limit": 10,
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1},
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        assert "api.semanticscholar.org" in request.full_url
+        return _Response({"abstract": "GlyNAC corrected glutathione deficiency in older adults."})
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
+
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=cast(RequestOpener, opener),
+    ).search("glynac glutathione", limit=10)
+
+    assert result.papers[0].abstract.startswith("GlyNAC corrected")
+
+
 def test_fullraw_client_filters_noisy_exact_completed_cache(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
