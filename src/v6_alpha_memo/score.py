@@ -32,12 +32,12 @@ _MECHANISM = frozenset({
 _HUMAN_OUTCOME = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
     "human", "humans", "individual", "individuals", "participants", "patient",
-    "patients", "randomized", "trial", "workers",
+    "patients", "men", "randomized", "trial", "women", "workers",
 })
 _HUMAN_OUTCOME_STUDY = frozenset({
     "adult", "adults", "double-blind", "individual", "individuals", "participant",
     "participants", "patient", "patients", "placebo-controlled", "randomized",
-    "subject", "subjects", "trial",
+    "subject", "subjects", "men", "trial", "women",
 })
 _PROTOCOL = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned", "protocol"})
 _PROTOCOL_EXPECTATION = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned"})
@@ -195,6 +195,14 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     if shape != "shared_anchor" and any(anchor not in _CONTEXT_ANCHOR for anchor in anchors):
         score += 5
         reasons.append("direct_title_anchor")
+    if (
+        shape == "mechanism_to_human_failure"
+        and len(anchors) >= 2
+        and a.source.casefold() != b.source.casefold()
+        and any(anchor not in _CONTEXT_ANCHOR for anchor in anchors)
+    ):
+        score += 10
+        reasons.append("direct_mechanism_to_human_anchor")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
