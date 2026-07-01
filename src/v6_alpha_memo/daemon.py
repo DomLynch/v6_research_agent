@@ -83,13 +83,13 @@ def _run_pass(
             _reset_for_query_shape_retry(row)
         elif _stale_selector_version(row):
             _reset_for_selector_retry(row)
+        elif (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting") or _stale_search_depth(row):
+            _clear_blocker(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
             row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
         elif row.get("blocked_stage") == "selector_rejected" and not row.get("generated") and not row.get("submitted"):
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
-        elif (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting") or _stale_search_depth(row):
-            _clear_blocker(row)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in _candidate_rows(rows):

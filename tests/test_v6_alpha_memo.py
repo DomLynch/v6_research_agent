@@ -2700,6 +2700,7 @@ def test_daemon_reopens_stale_final_row_when_query_breadth_increases(
             "blocked_final": True,
             "query_limit": 2,
             "per_query_limit": 25,
+            "query_shape_version": 3,
         }]
     }
 
