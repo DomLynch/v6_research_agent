@@ -303,6 +303,11 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str, anchors: tuple[str, ..
             f"{a.title} made us expect {anchor} would help recovery or performance; "
             f"{b.title} forces the update that the same intervention may be bounded by training modality or adaptation endpoint."
         )
+    if shape == "context_boundary":
+        return (
+            f"{a.title} made us expect {anchor} could work in one clinical context; "
+            f"{b.title} forces the update that the same intervention may fail or null out in another context."
+        )
     if shape == "protocol_result_mismatch":
         return (
             f"{a.title} made {anchor} worth testing as a positive signal; "
