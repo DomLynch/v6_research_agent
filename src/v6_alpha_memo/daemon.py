@@ -365,7 +365,8 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
     active_topics = set(topics)
     cache_progress = _cache_progress_by_topic(rows)
-    submit_backoff_active = _submit_backoff_deadline(rows) > int(time.time())
+    active_rows = [row for row in rows if str(row.get("topic")) in active_topics]
+    submit_backoff_active = _submit_backoff_deadline(active_rows) > int(time.time())
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
     searchable = [
         row for row in rows

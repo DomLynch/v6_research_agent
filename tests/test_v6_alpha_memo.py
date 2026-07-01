@@ -3083,6 +3083,17 @@ def test_submit_backoff_is_exponential_and_lane_wide(monkeypatch: pytest.MonkeyP
     assert v6_daemon._candidate_rows([due, active], ("omega", "resveratrol")) == []
 
 
+def test_inactive_submit_backoff_does_not_block_active_retry() -> None:
+    due: dict[str, object] = {"topic": "omega", "blocked_stage": "submit_backoff", "submit_retry_after": 0}
+    inactive: dict[str, object] = {
+        "topic": "resveratrol",
+        "blocked_stage": "submit_backoff",
+        "submit_retry_after": int(time.time()) + 120,
+    }
+
+    assert v6_daemon._candidate_rows([due, inactive], ("omega",)) == [due]
+
+
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pair = CandidatePair(
         a=Paper(
