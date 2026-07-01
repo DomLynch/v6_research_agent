@@ -61,9 +61,10 @@ _CONTEXT_ANCHOR = frozenset({
     "trial", "trials",
 })
 _NONPRIMARY_PHRASES = (
-    "case report", "commentary", "dispatch", "editorial", "in brief", "meta-analysis",
+    "case report", "commentary", "dispatch", "editorial", "in brief",
+    "it was with great interest that we read", "letter to the editor", "meta-analysis",
     "news and views", "news & views", "perspective", "potential of applying",
-    "research highlight", "systematic review", "too much of a good thing",
+    "research highlight", "response to", "systematic review", "too much of a good thing",
     "topic of interest", "viewpoint",
 )
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})

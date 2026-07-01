@@ -1191,6 +1191,29 @@ def test_score_rejects_supplementary_data_sheet_as_core_receipt() -> None:
     assert score_pairs(mine_pairs(papers), topic_terms={"nicotinamide", "exercise", "performance"}) == ()
 
 
+def test_score_rejects_letter_style_receipt_as_core_update() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol blunts the positive effects of exercise training on cardiovascular health in aged men",
+            "The trial tested whether resveratrol supplementation enhances training-induced improvements in aged men.",
+            "openalex",
+            2013,
+            "10.1113/jphysiol.2013.258061",
+        ),
+        Paper(
+            "b",
+            "Recent data do not provide evidence that resveratrol causes adverse effects on exercise training in humans",
+            "It was with great interest that we read the article by Gliemann et al. and comment on the same exercise dataset.",
+            "pubmed",
+            2013,
+            "10.1113/jphysiol.2013.262956",
+        ),
+    )
+
+    assert score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"}) == ()
+
+
 def test_minimax_prompt_requires_receipt_findings() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
     prompt = v6_write._prompt(run.top_pairs[:1])
