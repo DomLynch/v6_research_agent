@@ -63,6 +63,7 @@ def build_memo(
 ) -> V6Run:
     collected: list[SearchResult] = []
     topic_terms = _topic_terms(topic)
+    waitable_empty = 0
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
@@ -72,6 +73,10 @@ def build_memo(
         if result.receipt.error == "async_sweep_queue_full":
             break
         if result.receipt.error != "async_sweep_stopped_no_hits" and _waitable_search_error(result.receipt.error):
+            if not result.papers:
+                waitable_empty += 1
+            if waitable_empty >= 2:
+                break
             continue
         if (
             result.receipt.error

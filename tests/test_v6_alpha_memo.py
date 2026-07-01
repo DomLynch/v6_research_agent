@@ -1684,6 +1684,25 @@ def test_build_memo_stops_fanout_when_fullraw_queue_is_full() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queue_full"]
 
 
+def test_build_memo_caps_empty_waitable_fanout() -> None:
+    class WaitingClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(query, (), CoverageReceipt(error="async_sweep_queued"))
+
+    client = WaitingClient()
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("creatine cognitive function older adults", client=client, query_limit=8)
+
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert len(client.queries) == 2
+    assert [row["error"] for row in coverage] == ["async_sweep_queued", "async_sweep_queued"]
+
+
 def test_build_memo_stops_side_searches_after_elite_pair() -> None:
     class EliteFirstClient:
         def __init__(self) -> None:
