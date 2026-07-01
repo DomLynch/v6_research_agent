@@ -465,6 +465,58 @@ def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
     assert scored == ()
 
 
+def test_scores_same_intervention_context_boundary_from_observed_clinical_results() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Omega-3 polyunsaturated fatty acids in atrial fibrillation prevention after coronary bypass surgery",
+            (
+                "Results. Omega-3 therapy before coronary bypass surgery reduces atrial "
+                "fibrillation risk and hospital discharge time in patients."
+            ),
+            "openalex",
+            2007,
+        ),
+        Paper(
+            "b",
+            "Efficacy and Safety of Prescription Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation",
+            (
+                "Results. There was no difference between treatment groups for recurrence "
+                "of symptomatic atrial fibrillation in randomized trial participants."
+            ),
+            "pubmed",
+            2011,
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"omega", "atrial", "fibrillation", "prevention"})
+
+    assert scored
+    assert scored[0].score >= 85
+    assert scored[0].shape == "context_boundary"
+
+
+def test_no_difference_result_still_requires_title_owned_anchor() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Omega-3 coronary bypass surgery",
+            "Results. Omega-3 reduces atrial fibrillation risk after coronary bypass surgery.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "General recurrent arrhythmia trial",
+            "Results. There was no difference between treatment groups for recurrence.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"omega", "atrial", "fibrillation", "prevention"})
+
+    assert scored == ()
+
+
 def test_generic_recovery_title_without_abstract_is_not_a_receipt() -> None:
     papers = (
         Paper(

@@ -88,8 +88,8 @@ _DESIGN_ONLY_PHRASES = (
 )
 _ABSTRACT_RESULT_PHRASES = (
     "demonstrated", "did not", "failed to", "found that", "no significant",
-    "observed", "reported", "resulted in", "results showed", "showed that",
-    "significantly", "was associated", "were associated", "we found",
+    "no difference", "observed", "reported", "resulted in", "results showed",
+    "showed that", "significantly", "was associated", "were associated", "we found",
 )
 _RESULT_SENTENCE_MARKERS = frozenset({
     "demonstrated", "failed", "found", "observed", "reported", "resulted",
@@ -110,9 +110,9 @@ _SPECULATIVE_UPDATE_CONTEXT = frozenset({
 })
 _UPDATE_FAILURE_WORDS = frozenset({"attenuated", "blunted", "failed", "null", "unchanged"})
 _UPDATE_FAILURE_PHRASES = (
-    "did not", "does not", "failed to", "failure to", "no evidence",
-    "no significant", "not improve", "not improved", "impaired adaptation",
-    "impaired adaptations", "impaired performance", "impaired strength",
+    "did not", "does not", "failed to", "failure to", "no difference",
+    "no evidence", "no significant", "not improve", "not improved",
+    "impaired adaptation", "impaired adaptations", "impaired performance", "impaired strength",
 )
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
@@ -593,6 +593,8 @@ def _negative_update_receipt(paper: Paper, anchors: tuple[str, ...] = ()) -> boo
     if _negative_update_text(title) and _abstract_reports_result(paper) and _mentions_anchor(title, direct_anchors):
         return True
     abstract = paper.abstract.casefold()
+    if _mentions_anchor(title, direct_anchors) and any(_observed_negative_update_sentence(sentence) for sentence in _sentences(abstract)):
+        return True
     return any(
         _mentions_anchor(sentence, direct_anchors) and _observed_negative_update_sentence(sentence)
         for sentence in _sentences(abstract)
@@ -647,7 +649,7 @@ def _positive_result(paper: Paper) -> bool:
     tokens = _tokens(paper)
     return bool(tokens & (_PROMISE | _POSITIVE_RESULT_WORDS)) or bool(
         re.search(
-            r"\b(?:decreas(?:e|ed|es)|lower(?:ed)?|reduc(?:e|ed)|reduction)\b"
+            r"\b(?:decreas(?:e|ed|es|ing)|lower(?:ed|s|ing)?|reduc(?:e|ed|es|ing)|reduction)\b"
             r".{0,70}\b(?:" + "|".join(_BENEFIT_REDUCTION_TARGETS) + r")\b",
             text,
         )
