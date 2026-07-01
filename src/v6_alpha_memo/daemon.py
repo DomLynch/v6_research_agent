@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import time
 import traceback
 from dataclasses import dataclass
@@ -73,7 +72,6 @@ def _run_pass(
     publisher: Publisher,
     board: dict[str, object],
 ) -> None:
-    _promote_duplicate_cache_progress()
     rows = _rows(board, topics)
     for row in rows:
         if row.get("public"):
@@ -375,7 +373,6 @@ def _attempt_count(row: dict[str, object]) -> int:
 def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> list[dict[str, object]]:
     active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
     active_topics = set(topics)
-    cache_progress = _cache_progress_by_topic(rows)
     active_rows = [row for row in rows if str(row.get("topic")) in active_topics]
     submit_backoff_active = _submit_backoff_deadline(active_rows) > int(time.time())
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
@@ -394,128 +391,12 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
         key=lambda item: (
             item[1].get("blocked_stage") == "search_cache_waiting",
             _stale_waiting_row(item[1]),
-            item[1].get("blocked_stage") == "search_cache_waiting"
-            and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
-            _awaiting_side_search(item[1])
-            and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
             -_int(item[1].get("top_score")),
-            -cache_progress.get(str(item[1].get("topic")), 0),
             not _attempt_count(item[1]),
             item[0],
         ),
     )
     return [*submitted, *(row for _, row in ranked[:active_limit])]
-
-
-def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
-    cache_dirs = _cache_dirs()
-    if not cache_dirs:
-        return {}
-    topics = [
-        (str(row.get("topic")), _schedule_terms(str(row.get("topic"))), _schedule_ordered_terms(str(row.get("topic"))))
-        for row in rows
-    ]
-    primary_cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
-    primary_scores: dict[str, int] = {}
-    extra_scores: dict[str, int] = {}
-    for cache_dir in cache_dirs:
-        scores = primary_scores if cache_dir == primary_cache_dir else extra_scores
-        for path in Path(cache_dir).glob("*.json"):
-            try:
-                data = json.loads(path.read_text())
-            except (OSError, json.JSONDecodeError):
-                continue
-            receipt = data.get("receipt") if isinstance(data, dict) else {}
-            receipt = receipt if isinstance(receipt, dict) else {}
-            query_values = (
-                _schedule_key(str(receipt.get("sweep_original_query") or "")),
-                _schedule_key(str(receipt.get("sweep_query") or "")),
-            )
-            query_terms = _schedule_terms(" ".join(query_values))
-            hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
-            usable = _usable_completed_cache(receipt, hits)
-            shards = _int(receipt.get("shards_searched"))
-            sources = _int(receipt.get("source_count_searched"))
-            value = (
-                shards * 1000
-                + sources * 100_000
-                + min(hits, 50) * 10
-                + (10_000_000 if usable else 0)
-            )
-            for topic, terms, ordered_terms in topics:
-                exact = _schedule_key(topic) in query_values
-                related = usable and bool(ordered_terms) and ordered_terms[0] in query_terms
-                if terms and (exact or related) and len(terms & query_terms) >= min(2, len(terms)):
-                    scores[topic] = max(scores.get(topic, 0), value + (10_000_000 if exact and usable else 0))
-    return {**extra_scores, **primary_scores}
-
-
-def _promote_duplicate_cache_progress() -> None:
-    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
-    if not cache_dir:
-        return
-    groups: dict[tuple[str, str, int, int, str], list[tuple[tuple[int, int, int], Path]]] = {}
-    for path in Path(cache_dir).glob("*.json"):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        receipt = data.get("receipt") if isinstance(data, dict) else {}
-        receipt = receipt if isinstance(receipt, dict) else {}
-        key = (
-            _cache_key_terms(str(receipt.get("sweep_original_query") or "")),
-            _cache_key_terms(str(receipt.get("sweep_query") or "")),
-            _int(receipt.get("sweep_result_limit")),
-            _int(receipt.get("sweep_shard_limit")),
-            str(receipt.get("sweep_strategy") or ""),
-        )
-        if not key[0] and not key[1]:
-            continue
-        hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
-        score = (1 if hits else 0, _int(receipt.get("shards_searched")), _int(receipt.get("source_count_searched")))
-        groups.setdefault(key, []).append((score, path))
-    for entries in groups.values():
-        if len(entries) < 2:
-            continue
-        best_score, best_path = max(entries, key=lambda item: item[0])
-        for score, path in entries:
-            if path == best_path or score >= best_score:
-                continue
-            tmp_path = path.with_suffix(path.suffix + ".tmp")
-            try:
-                shutil.copy2(best_path, tmp_path)
-                os.replace(tmp_path, path)
-            except OSError:
-                tmp_path.unlink(missing_ok=True)
-
-
-def _cache_key_terms(value: str) -> str:
-    return " ".join(sorted(_schedule_terms(value)))
-
-
-def _schedule_key(value: str) -> str:
-    return " ".join(_schedule_ordered_terms(value))
-
-
-def _usable_completed_cache(receipt: dict[str, object], hits: int) -> bool:
-    return (
-        hits >= _int_env("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", 10)
-        and _int(receipt.get("shards_searched")) >= 1525
-        and _int(receipt.get("shards_total")) >= 1525
-        and not receipt.get("partial_shard_search")
-        and _int(receipt.get("sweep_failed_shards")) == 0
-        and _int(receipt.get("source_count_searched")) >= 5
-    )
-
-
-def _schedule_terms(value: str) -> set[str]:
-    return set(_schedule_ordered_terms(value))
-
-
-def _schedule_ordered_terms(value: str) -> tuple[str, ...]:
-    drop = {"adult", "adults", "older", "trial", "randomized", "effect", "primary", "endpoint"}
-    terms = (word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold()) if word not in drop)
-    return tuple(dict.fromkeys(terms))
 
 
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: dict[str, object]) -> dict[str, object]:
@@ -836,16 +717,6 @@ def _blocked_stage(trace: dict[str, object]) -> str:
 def _blocked_stage_from_row(row: dict[str, object]) -> str:
     trace = row.get("trace")
     return _blocked_stage(trace) if isinstance(trace, dict) else ""
-
-
-def _awaiting_side_search(row: dict[str, object]) -> bool:
-    trace = row.get("trace")
-    coverage = trace.get("coverage") if isinstance(trace, dict) else None
-    return bool(
-        isinstance(coverage, list)
-        and any(_strict_coverage(item) for item in coverage)
-        and any(_waitable_coverage(item) for item in coverage)
-    )
 
 
 def _stale_waiting_row(row: dict[str, object]) -> bool:
