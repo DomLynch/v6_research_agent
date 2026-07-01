@@ -1550,6 +1550,27 @@ def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
+def test_daemon_rejects_completed_strict_search_with_zero_scored_pairs() -> None:
+    trace: dict[str, object] = {
+        "paper_count": 9,
+        "pair_count": 36,
+        "scored_count": 0,
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
+        ],
+    }
+
+    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
+
+
 def test_daemon_final_rejects_after_strict_receipt_without_waitable_search() -> None:
     trace: dict[str, object] = {
         "coverage": [
