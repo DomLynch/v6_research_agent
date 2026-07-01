@@ -21,7 +21,7 @@ from v6_alpha_memo.search import FullrawSearchClient, Paper
 _DEFAULT_QUERY_LIMIT = 3
 _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
-_SELECTOR_VERSION = 12
+_SELECTOR_VERSION = 13
 _QUERY_SHAPE_VERSION = 4
 _WRITER_VERSION = 4
 
@@ -82,11 +82,11 @@ def _run_pass(
             _reset_for_revision_retry(row)
         elif _stale_query_shape_version(row):
             _reset_for_query_shape_retry(row)
-        elif _stale_selector_version(row):
-            _reset_for_selector_retry(row)
         elif _stale_writer_version(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
+        elif _stale_selector_version(row):
+            _reset_for_selector_retry(row)
         elif (
             _stale_waiting_search_config(row)
             or (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting")
@@ -581,7 +581,7 @@ def _reset_for_revision_retry(row: dict[str, object]) -> None:
     for key in (
         "generated", "submitted", "accepted", "public", "submission_id", "decision",
         "publication", "submit_response", "decision_response", "memo_file", "trace_file",
-        "writer_version",
+        "writer_version", "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
     ):
         row.pop(key, None)
     _clear_blocker(row)
