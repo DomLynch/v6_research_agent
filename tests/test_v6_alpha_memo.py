@@ -367,6 +367,27 @@ def test_protocol_result_shape_rejects_unrelated_endpoint_families() -> None:
     assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
 
 
+def test_protocol_result_shape_rejects_animal_to_human_protocol_mismatch() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx training protocol in insulin resistant rats",
+            "In insulin resistant rats, the protocol expected interventionx to improve glucose metabolism.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does interventionx modify glycaemic control of resistance exercise in adults?",
+            "The human trial results showed no significant resistance-training signal for HbA1c glycaemic control.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(

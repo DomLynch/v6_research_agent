@@ -318,6 +318,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             and _has(st, _RESULT | _FAILURE)
             and _negative_result(second)
             and _endpoint_compatible(first, second)
+            and _population_compatible(first, second)
         )
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
@@ -387,6 +388,10 @@ def _endpoint_compatible(a: Paper, b: Paper) -> bool:
 def _endpoint_families(paper: Paper) -> set[str]:
     tokens = _tokens(paper)
     return {family for family, words in _ENDPOINT_FAMILIES.items() if tokens & words}
+
+
+def _population_compatible(a: Paper, b: Paper) -> bool:
+    return not ((_animal_only(a) and _is_human(b)) or (_animal_only(b) and _is_human(a)))
 
 
 def _short(text: str) -> str:
