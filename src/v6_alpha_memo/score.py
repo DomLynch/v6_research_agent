@@ -271,10 +271,7 @@ def _title_terms(paper: Paper) -> set[str]:
 
 
 def _has_finding_text(paper: Paper) -> bool:
-    if len(_WORD_RE.findall(paper.abstract.casefold())) >= 6:
-        return True
-    title_terms = _title_terms(paper)
-    return len(title_terms) >= 6 and (_has(title_terms, _FAILURE) or _has(title_terms, _TITLE_PROMISE))
+    return len(_WORD_RE.findall(paper.abstract.casefold())) >= 6
 
 
 def _tokens(paper: Paper) -> set[str]:
