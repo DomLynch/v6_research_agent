@@ -2073,6 +2073,36 @@ def test_daemon_reopens_stale_final_row_when_search_depth_increases(
     assert row["per_query_limit"] == 25
 
 
+def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": ""}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "metformin resistance training",
+            "generated": True,
+            "submitted": True,
+            "submission_id": "old-sub",
+            "blocked_final": True,
+            "decision": "revise",
+            "selector_version": 1,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("metformin resistance training",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen == ["metformin resistance training"]
+    assert "submission_id" not in row
+    assert row["selector_version"] == 2
+
+
 def test_domain_classifier_does_not_match_ai_inside_training() -> None:
     assert v6_daemon._domain("resveratrol mimics exercise training") == "longevity_research"
     assert v6_daemon._domain("retrieval augmented generation benchmark") == "ai_research"
