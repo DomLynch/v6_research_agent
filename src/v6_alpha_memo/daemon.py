@@ -154,6 +154,9 @@ def _run_topic(
         if data.get("status") == "complete":
             publication = data.get("publication")
             publication = publication if isinstance(publication, dict) else {}
+            if _clean_revision(data) and _int(row.get("revision_retry_count")) < 1:
+                _reset_for_revision_retry(row)
+                return
             row.update({
                 "decision": data.get("decision"),
                 "accepted": data.get("decision") == "accept",
@@ -388,6 +391,31 @@ def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, o
     return typed
 
 
+def _clean_revision(data: dict[str, object]) -> bool:
+    scores = data.get("rubric_scores")
+    values = scores.values() if isinstance(scores, dict) else ()
+    return (
+        data.get("decision") == "revise"
+        and bool(data.get("resubmission"))
+        and not data.get("gate_failures")
+        and not data.get("required_revisions")
+        and not data.get("major_issues")
+        and data.get("claim_support_verdict") == "supported"
+        and data.get("overclaim_verdict") == "none"
+        and all(isinstance(score, int | float) and score >= 4 for score in values)
+    )
+
+
+def _reset_for_revision_retry(row: dict[str, object]) -> None:
+    row["revision_retry_count"] = _int(row.get("revision_retry_count")) + 1
+    for key in (
+        "generated", "submitted", "accepted", "public", "submission_id", "decision",
+        "publication", "submit_response", "decision_response", "memo_file", "trace_file",
+    ):
+        row.pop(key, None)
+    _clear_blocker(row)
+
+
 def _load_board(run_dir: Path, topics: tuple[str, ...], agent_id: str) -> dict[str, object]:
     path = run_dir / "scoreboard.json"
     if path.exists():
@@ -469,10 +497,10 @@ def _strict_coverage(value: object) -> bool:
 
 
 def _domain(topic: str) -> str:
-    t = topic.casefold()
-    if any(word in t for word in ("ai", "llm", "retrieval", "rag", "model")):
+    terms = set(re.findall(r"[a-z][a-z0-9]*", topic.casefold()))
+    if terms & {"ai", "llm", "retrieval", "rag", "model", "models"}:
         return "ai_research"
-    if any(word in t for word in ("business", "firm", "management", "marketing", "finance", "employee")):
+    if terms & {"business", "firm", "firms", "management", "marketing", "finance", "employee", "employees"}:
         return "management_research"
     return "longevity_research"
 
