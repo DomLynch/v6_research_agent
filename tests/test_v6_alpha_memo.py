@@ -869,6 +869,38 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.papers[0].doi == "10.test/metformin"
 
 
+def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.MonkeyPatch) -> None:
+    def opener(request: Request, timeout: float) -> _Response:
+        del timeout
+        if request.full_url == "http://fullraw/search":
+            return _Response({
+                "meta": _strict_meta({"semantic_scholar": 1}),
+                "results": [{
+                    "title": "GlyNAC Supplementation Improves Glutathione Deficiency",
+                    "abstract": "",
+                    "source": "semantic_scholar",
+                    "doi": "10.1093/jn/nxab309",
+                }],
+            })
+        assert "api.semanticscholar.org" in request.full_url
+        return _Response({
+            "abstract": "GlyNAC improved glutathione deficiency and oxidative stress in older adults.",
+            "year": 2021,
+            "venue": "Journal of Nutrition",
+            "externalIds": {"DOI": "10.1093/jn/nxab309"},
+        })
+
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
+
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=cast(RequestOpener, opener),
+    ).search("glynac glutathione", limit=3)
+
+    assert result.papers[0].abstract.startswith("GlyNAC improved glutathione deficiency")
+    assert result.papers[0].venue == "Journal of Nutrition"
+
+
 def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
