@@ -3018,6 +3018,7 @@ def test_daemon_retries_submit_backoff_after_retry_time(
         "topic": "resveratrol exercise adaptation",
         "blocked_stage": "submit_backoff",
         "submit_retry_after": 0,
+        "submit_backoff_count": 1,
     }
 
     v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
@@ -3043,6 +3044,7 @@ def test_daemon_migrates_legacy_submit_backoff_to_timed_cooldown(
     row: dict[str, object] = {
         "topic": "resveratrol exercise adaptation",
         "blocked_stage": "submit_backoff",
+        "submit_retry_after": 0,
         "last_submit_response": {"ok": False, "status": 429},
     }
 
@@ -3051,6 +3053,7 @@ def test_daemon_migrates_legacy_submit_backoff_to_timed_cooldown(
     assert seen == []
     assert row["blocked_stage"] == "submit_backoff"
     assert isinstance(row["submit_retry_after"], int)
+    assert row["submit_backoff_count"] == 1
 
 
 def test_submit_backoff_is_exponential_and_lane_wide(monkeypatch: pytest.MonkeyPatch) -> None:
