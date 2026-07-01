@@ -226,7 +226,8 @@ def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ())
         "deficiency-moderated unless the receipts directly isolate that moderator. "
         "Do not call interventions equivalent across species/doses unless receipts directly establish equivalence. "
         "Do not mention dose-equivalent scaling unless the supplied receipts quantify it. "
-        "No broad framing beyond receipts.\n"
+        "No broad framing beyond receipts. After Caveats/falsifiers, stop; every "
+        "non-empty line after that label must be a bullet beginning with '- '.\n"
         + json.dumps(rows, ensure_ascii=False)
     )
 
@@ -292,7 +293,10 @@ def _valid_memo(text: str) -> bool:
         "**Why this is surprising:**",
         "**Caveats/falsifiers:**",
     )
-    return all(any(line.startswith(marker) for line in lines) for marker in markers)
+    if not all(any(line.startswith(marker) for line in lines) for marker in markers):
+        return False
+    caveat_at = next(idx for idx, line in enumerate(lines) if line.startswith("**Caveats/falsifiers:**"))
+    return all(line.startswith("- ") for line in lines[caveat_at + 1 :])
 
 
 def _normalize_title(text: str, scored: ScoredPair) -> str:
