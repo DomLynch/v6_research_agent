@@ -100,6 +100,43 @@ def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
     assert "made us expect" in scored[0].expectation_update
 
 
+def test_context_boundary_requires_quantified_result_evidence() -> None:
+    weak = (
+        Paper(
+            "cabg",
+            "Omega-3 polyunsaturated fatty acids in atrial fibrillation prevention after coronary bypass surgery",
+            "Aim. To estimate efficacy before and after CABG. Results. Omacor therapy reduces atrial fibrillation risk.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "forward",
+            "Omega-3 fatty acids for prevention of recurrent symptomatic atrial fibrillation",
+            "Objectives. The trial tested recurrent symptomatic atrial fibrillation. Background. Earlier results were heterogeneous.",
+            "openalex",
+        ),
+    )
+    strong = (
+        Paper(
+            "surgical",
+            "Interventionx reduces postoperative symptom incidence after bypass surgery",
+            "Results showed interventionx reduced postoperative symptom incidence by 30% in surgical patients.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "recurrent",
+            "Interventionx did not reduce recurrent symptomatic symptom incidence",
+            "Results showed interventionx did not reduce recurrent symptomatic symptom incidence in patients (p=0.80).",
+            "openalex",
+        ),
+    )
+
+    assert score_pairs(mine_pairs(weak), topic_terms={"omega", "atrial", "fibrillation"}) == ()
+    scored = score_pairs(mine_pairs(strong), topic_terms={"interventionx", "symptom", "incidence"})
+
+    assert scored
+    assert scored[0].shape == "context_boundary"
+
+
 def test_rejects_background_efficacy_as_promise_receipt() -> None:
     papers = (
         Paper(
@@ -480,7 +517,7 @@ def test_scores_same_intervention_context_boundary_from_observed_clinical_result
             "Omega-3 polyunsaturated fatty acids in atrial fibrillation prevention after coronary bypass surgery",
             (
                 "Results. Omega-3 therapy before coronary bypass surgery reduces atrial "
-                "fibrillation risk and hospital discharge time in patients."
+                "fibrillation risk by 30% and hospital discharge time in patients."
             ),
             "openalex",
             2007,
@@ -490,7 +527,7 @@ def test_scores_same_intervention_context_boundary_from_observed_clinical_result
             "Efficacy and Safety of Prescription Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation",
             (
                 "Results. There was no difference between treatment groups for recurrence "
-                "of symptomatic atrial fibrillation in randomized trial participants."
+                "of symptomatic atrial fibrillation in randomized trial participants (p=0.75)."
             ),
             "pubmed",
             2011,

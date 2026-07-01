@@ -460,9 +460,10 @@ def _sentence_reports_result(sentence: str) -> bool:
 
 
 def _quantified_result(paper: Paper) -> bool:
+    quant = r"\b(?:p\s*[<=>]|n\s*=|\d+(?:\.\d+)?\s*(?:%|percent|fold))"
+    direction = r"\b(?:did not|no difference|improv(?:e|ed|es|ing)|increas(?:e|ed|es|ing)|reduc(?:e|ed|es|ing))\b"
     return any(
-        _sentence_reports_result(sentence)
-        and re.search(r"\b(?:p\s*[<=>]|n\s*=|\d+(?:\.\d+)?\s*(?:%|percent|fold))", sentence)
+        re.search(quant, sentence) and (_sentence_reports_result(sentence) or re.search(direction, sentence))
         for sentence in _sentences(paper.abstract.casefold())
     )
 
