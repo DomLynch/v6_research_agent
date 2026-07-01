@@ -2499,6 +2499,7 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
             }
 
     monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: True)
     row: dict[str, object] = {
         "topic": "management dashboard forecast accuracy",
         "blocked_stage": "selector_rejected",
@@ -2517,6 +2518,51 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
     assert "blocked_final" not in row
     assert "error" not in row
     assert "traceback" not in row
+
+
+def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pair = CandidatePair(
+        a=Paper(
+            "a",
+            "Interventionx improves measured endpoint",
+            "Results showed interventionx improved endpoint.",
+            "openalex",
+            doi="10.bad/missing",
+        ),
+        b=Paper(
+            "b",
+            "Interventionx failed primary endpoint",
+            "Results showed interventionx failed the primary endpoint.",
+            "pubmed",
+        ),
+        anchors=("interventionx",),
+    )
+    selected = ScoredPair(
+        pair,
+        95,
+        "promise_reversal",
+        "A made us expect; B forced an update.",
+        ("shared_anchor:interventionx",),
+    )
+    run = v6_run.V6Run("memo", (selected,), (), paper_count=2, pair_count=1, scored_count=1)
+
+    class FakePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError("invalid DOI candidate should not be submitted")
+
+        def get(self, path: str) -> dict[str, object]:
+            raise AssertionError("no submission should be polled")
+
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: False)
+    row: dict[str, object] = {"topic": "interventionx endpoint"}
+
+    v6_daemon._run_topic(tmp_path, "interventionx endpoint", "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "source_doi_unresolved"
+    assert row["blocked_final"] is True
+    assert row["unresolved_dois"] == ("10.bad/missing",)
+    assert "submitted" not in row
 
 
 def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
@@ -2646,7 +2692,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "trace": trace,
             "query_limit": 3,
             "per_query_limit": 10,
-            "selector_version": 17,
+            "selector_version": 18,
             "query_shape_version": 7,
         }]
     }
@@ -3133,7 +3179,7 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "query_limit": 3,
                 "per_query_limit": 10,
                 "query_shape_version": 7,
-                "selector_version": 17,
+                "selector_version": 18,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
@@ -3415,7 +3461,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 17
+    assert row["selector_version"] == 18
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -3448,7 +3494,7 @@ def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None
             "topic": "time restricted eating resistance training lean mass",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 17,
+            "selector_version": 18,
             "query_shape_version": 7,
             "query_limit": 3,
             "per_query_limit": 10,
@@ -3537,7 +3583,7 @@ def test_daemon_reopens_waiting_rows_from_old_search_config(
     assert seen["topic"] == "vitamin d fracture randomized trial older adults"
     assert seen["query_limit"] == 8
     assert seen["per_query_limit"] == 25
-    assert row["selector_version"] == 17
+    assert row["selector_version"] == 18
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
