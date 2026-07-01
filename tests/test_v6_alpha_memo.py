@@ -19,6 +19,7 @@ from v6_alpha_memo import (
     score_pairs,
 )
 from v6_alpha_memo import daemon as v6_daemon
+from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
@@ -1696,6 +1697,52 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
     assert run.top_pairs[0].pair.b.paper_id == "b"
     assert run.memo.splitlines()[0] == f"# {v6_write._title(run.top_pairs[0])}"
     assert calls == 2
+
+
+def test_build_memo_does_not_let_minimax_downgrade_a_grade_pair(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MultiScoreClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Tool X improves benchmark accuracy in a mechanistic model",
+                    "The model showed tool x enhanced accuracy and improved performance.",
+                    "openalex",
+                ),
+                Paper(
+                    "b",
+                    "Tool X failed to improve human analyst decisions in a randomized field trial",
+                    "Human analysts using tool x had null results and reduced decision quality.",
+                    "semantic_scholar",
+                ),
+                Paper(
+                    "c",
+                    "Tool X in mice increases length of life and corrects mitochondrial dysfunction",
+                    "A mouse model showed tool x improved glutathione and mitochondrial function.",
+                    "openalex",
+                ),
+                Paper(
+                    "d",
+                    "Tool X improves biomarker deficiency in aging HIV patients in an open-label clinical trial",
+                    "The human patient trial improved biomarker endpoints in a bounded disease population.",
+                    "pubmed",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
+
+    def fake_judge(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, ...]:
+        assert top_pairs[0].score >= 85
+        assert top_pairs[-1].score < 85
+        return (top_pairs[-1],)
+
+    monkeypatch.delenv("V6_MINIMAX_API_KEY", raising=False)
+    monkeypatch.setattr(v6_run, "judge_with_minimax", fake_judge)
+
+    run = build_memo("tool x", client=MultiScoreClient(), query_limit=1, writer="minimax")
+
+    assert run.top_pairs[0].score >= 85
+    assert run.top_pairs[0].pair.a.paper_id != "c"
 
 
 def test_daemon_payload_uses_selected_pair_receipts() -> None:

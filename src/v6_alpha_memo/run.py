@@ -106,6 +106,10 @@ def build_memo(
                     scored_count=0,
                 )
             )
+        if scored[0].score < 85:
+            deterministic = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
+            if deterministic and deterministic[0].score >= 85:
+                scored = (deterministic[0],)
         memo = render_with_minimax(scored, receipt=receipt, judge=False, revision_notes=revision_notes)
     else:
         memo = render_memo(scored[0], receipt=receipt)
