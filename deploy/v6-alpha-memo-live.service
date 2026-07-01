@@ -1,7 +1,7 @@
 [Unit]
 Description=V6 Alpha Memo live publisher independent lane
-Wants=researka-fullraw-search.service
-After=network-online.target researka-fullraw-search.service
+Wants=v6-fullraw-search.service
+After=network-online.target v6-fullraw-search.service
 
 [Service]
 Type=simple
@@ -27,7 +27,7 @@ Environment=V6_FULLRAW_QUEUE_IF_MISSING=1
 Environment=V6_FULLRAW_SWEEP_WAIT_SECONDS=0
 Environment=V6_FULLRAW_SWEEP_CACHE_DIR=/var/lib/v6-research-agent/fullraw-sweep-cache
 Environment=V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS=/var/lib/v5-memo/fullraw-sweep-cache
-ExecStart=/bin/bash -lc 'set -a; source /etc/researka-fullraw.env; set +a; export V6_FULLRAW_SEARCH_URL="${V6_FULLRAW_SEARCH_URL:-http://127.0.0.1:9903/search}"; export V6_FULLRAW_TOKEN="${RESEARKA_FULLRAW_TOKEN:-${RESEARKA_FULLRAW_INDEX_TOKEN:-}}"; exec /opt/v6-research-agent/.venv/bin/python -m v6_alpha_memo.daemon'
+ExecStart=/bin/bash -lc 'set -a; source /etc/researka-fullraw.env; set +a; export V6_FULLRAW_SEARCH_URL="${V6_FULLRAW_SEARCH_URL:-http://127.0.0.1:9917/search}"; export V6_FULLRAW_TOKEN="${RESEARKA_FULLRAW_TOKEN:-${RESEARKA_FULLRAW_INDEX_TOKEN:-}}"; exec /opt/v6-research-agent/.venv/bin/python -m v6_alpha_memo.daemon'
 Restart=always
 RestartSec=30
 

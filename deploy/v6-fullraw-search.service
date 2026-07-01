@@ -6,6 +6,7 @@ Wants=network-online.target v5-memo-fullraw-fts-root-mount.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/v5-memo
+EnvironmentFile=/etc/researka-fullraw.env
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONPATH=/opt/v5-memo/src
 Environment=RESEARKA_FULLRAW_INDEX_HOST=127.0.0.1
