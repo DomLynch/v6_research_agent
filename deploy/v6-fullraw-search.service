@@ -6,7 +6,6 @@ Wants=network-online.target v5-memo-fullraw-fts-root-mount.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/v5-memo
-EnvironmentFile=/etc/researka-fullraw.env
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONPATH=/opt/v5-memo/src
 Environment=RESEARKA_FULLRAW_INDEX_HOST=127.0.0.1
@@ -35,7 +34,7 @@ Environment=RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20
 Environment=RESEARKA_FULLRAW_SEARCH_ISOLATED=1
 Environment=V5_MEMO_FULL_RAW_INDEX_HOST=127.0.0.1
 Environment=V5_MEMO_FULL_RAW_INDEX_PORT=9918
-ExecStart=/usr/bin/python3 -m v5_memo.fullraw_index serve
+ExecStart=/bin/bash -lc 'set -a; source /etc/researka-fullraw.env; set +a; export RESEARKA_FULLRAW_INDEX_PORT=9918 V5_MEMO_FULL_RAW_INDEX_PORT=9918 RESEARKA_FULLRAW_SEARCH_URL=http://127.0.0.1:9918/search V5_MEMO_FULL_RAW_CORPUS_SEARCH_URL=http://127.0.0.1:9918/search RESEARKA_FULLRAW_SWEEP_CACHE_DIR=/var/lib/v6-research-agent/fullraw-sweep-cache; exec /usr/bin/python3 -m v5_memo.fullraw_index serve'
 Restart=always
 RestartSec=10
 TimeoutStopSec=120
