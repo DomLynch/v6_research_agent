@@ -1781,6 +1781,8 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "do not attribute the contrast to one moderator" in prompt
     assert "Name exact tissue, organ, anatomy, assay, or outcome domain" in prompt
     assert "do not replace it with generic tissue, biology, or performance wording" in prompt
+    assert "Do not invent or complete numeric values from truncated snippets" in prompt
+    assert "heterogeneous cross-context signal" in prompt
     assert "If receipt years differ" in prompt
     assert "mechanistic context, clinical update, or direct replication" in prompt
     assert "Mention small sample sizes" in prompt
@@ -1854,6 +1856,23 @@ def test_title_hides_internal_protocol_mismatch_label() -> None:
 
     assert title == "Alpha memo: resveratrol exercise context boundary"
     assert "protocol mismatch" not in title
+
+
+def test_mechanism_to_human_title_uses_cross_context_signal() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper("a", "Resveratrol protects intestine during exercise in mice", "", "openalex"),
+            Paper("b", "Resveratrol blunts exercise training adaptations in men", "", "pubmed"),
+            ("resveratrol", "exercise"),
+            (),
+        ),
+        100,
+        "mechanism_to_human_failure",
+        "update",
+        (),
+    )
+
+    assert v6_write._title(scored) == "Alpha memo: resveratrol exercise cross-context signal"
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3286,6 +3305,7 @@ def test_daemon_rebuilds_old_writer_reject_with_revision_notes(
         "generated": True,
         "submitted": True,
         "submission_id": "sub-bad",
+        "revision_retry_count": 4,
         "blocked_final": True,
         "decision": "reject",
         "selector_version": 11,
@@ -3310,7 +3330,7 @@ def test_daemon_rebuilds_old_writer_reject_with_revision_notes(
     )
 
     assert seen["revision_notes"] == ("Remove unsupported trailing evidence.", "Unsupported trailing evidence.")
-    assert row["revision_retry_count"] == 1
+    assert row["revision_retry_count"] == 5
     assert row["revision_of_object_id"] == "sub-bad"
     assert "generated" not in row
     assert "submitted" not in row

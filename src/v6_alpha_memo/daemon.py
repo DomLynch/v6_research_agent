@@ -23,7 +23,7 @@ _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 11
 _QUERY_SHAPE_VERSION = 4
-_WRITER_VERSION = 2
+_WRITER_VERSION = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,7 +84,7 @@ def _run_pass(
             _reset_for_query_shape_retry(row)
         elif _stale_selector_version(row):
             _reset_for_selector_retry(row)
-        elif _stale_writer_version(row) and _needs_revision_retry(row):
+        elif _stale_writer_version(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
         elif (

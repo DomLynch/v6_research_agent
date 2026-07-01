@@ -18,7 +18,7 @@ _TITLE_DROP = frozenset({
     "trial", "with",
 })
 _SHAPE_TITLE = {
-    "mechanism_to_human_failure": "translation boundary",
+    "mechanism_to_human_failure": "cross-context signal",
     "modality_boundary": "modality boundary",
     "promise_reversal": "context boundary",
     "protocol_result_mismatch": "context boundary",
@@ -213,7 +213,11 @@ def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ())
         "the same pattern holds; name it as an analogous cross-context signal. If receipts "
         "differ on multiple axes such as species, dose, route, duration, baseline status, or "
         "sample size, do not attribute the contrast to one moderator; state that the moderator "
-        "hypothesis is tentative and confounded by the other axes. Name exact tissue, organ, "
+        "hypothesis is tentative and confounded by the other axes. Do not use boundary or split "
+        "language when the receipts differ on multiple axes and do not isolate a moderator; call "
+        "it a heterogeneous cross-context signal. Do not invent or complete numeric values from "
+        "truncated snippets; omit unverified numbers if the supplied title/abstract does not "
+        "contain the full number and endpoint. Name exact tissue, organ, "
         "anatomy, assay, or outcome domain when a receipt supplies it; do not replace it with "
         "generic tissue, biology, or performance wording. If receipt years differ, caveats must "
         "state whether the later paper is mechanistic context, clinical update, or direct replication. "
