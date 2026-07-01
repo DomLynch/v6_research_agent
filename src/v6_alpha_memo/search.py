@@ -275,10 +275,18 @@ def _waitable_coverage_error(error: str) -> bool:
 
 def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
     seen: set[str] = set()
+    key_index: dict[str, int] = {}
     title_index: dict[str, int] = {}
     papers: list[Paper] = []
     for result in results:
         for paper in result.papers:
+            if paper.key in key_index:
+                idx = key_index[paper.key]
+                if _paper_rank(paper) > _paper_rank(papers[idx]):
+                    title_index.pop(_norm_title(papers[idx].title), None)
+                    papers[idx] = paper
+                    title_index[_norm_title(paper.title)] = idx
+                continue
             if paper.key not in seen:
                 title_key = _norm_title(paper.title)
                 if title_key in title_index:
@@ -287,8 +295,10 @@ def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
                         seen.discard(papers[idx].key)
                         papers[idx] = paper
                         seen.add(paper.key)
+                        key_index[paper.key] = idx
                     continue
                 seen.add(paper.key)
+                key_index[paper.key] = len(papers)
                 title_index[title_key] = len(papers)
                 papers.append(paper)
     return tuple(papers)
@@ -297,6 +307,8 @@ def merge_results(results: tuple[SearchResult, ...]) -> tuple[Paper, ...]:
 def _paper_rank(paper: Paper) -> int:
     text = f"{paper.title} {paper.abstract} {paper.source} {paper.venue} {paper.doi}".casefold()
     score = int(bool(paper.doi)) + int(bool(paper.year)) * 2
+    if len(re.findall(r"[a-z][a-z0-9]{2,}", paper.abstract.casefold())) >= 6:
+        score += 4
     if any(marker in text for marker in ("10.1101/", "arxiv", "biorxiv", "medrxiv", "preprint")):
         score -= 5
     if any(marker in text for marker in ("commentary", "editorial", "in brief", "research highlight")):

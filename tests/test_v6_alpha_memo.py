@@ -601,6 +601,30 @@ def test_merge_results_prefers_published_duplicate_over_preprint() -> None:
     assert merged[0].paper_id == "published"
 
 
+def test_merge_results_prefers_duplicate_with_abstract() -> None:
+    title = "GlyNAC supplementation improves glutathione deficiency in older adults"
+    result = SearchResult(
+        "glynac",
+        (
+            Paper("blank", title, "", "semantic_scholar", 2021, "10.1002/ctm2.372"),
+            Paper(
+                "abstract",
+                title,
+                "GlyNAC supplementation lowered oxidative stress and corrected glutathione deficiency in older adults.",
+                "openalex",
+                2021,
+                "10.1002/ctm2.372",
+            ),
+        ),
+        CoverageReceipt(hits=2),
+    )
+
+    merged = merge_results((result,))
+
+    assert len(merged) == 1
+    assert merged[0].paper_id == "abstract"
+
+
 def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     payload: dict[str, object] = {
         "meta": _strict_meta({"openalex": 100, "pubmed": 10}),
