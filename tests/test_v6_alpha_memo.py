@@ -1305,7 +1305,7 @@ def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None
     assert result.receipt.error == "async_sweep_queued"
 
 
-def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
+def test_build_memo_waits_on_current_shape_when_fullraw_is_queued() -> None:
     class WaitingClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -1320,12 +1320,8 @@ def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
         build_memo("resveratrol exercise adaptation", client=client, query_limit=3)
 
     coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
-    assert client.queries == [
-        "resveratrol exercise adaptation",
-        "resveratrol exercise adaptation mechanism model human failed translation",
-        "resveratrol null failed primary endpoint exercise adaptation",
-    ]
-    assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
+    assert client.queries == ["resveratrol exercise adaptation"]
+    assert [row["error"] for row in coverage] == ["async_sweep_queued"]
 
 
 def test_build_memo_stops_fanout_when_fullraw_queue_is_full() -> None:
