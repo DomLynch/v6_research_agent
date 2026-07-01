@@ -342,6 +342,30 @@ def test_scores_direct_mechanism_to_human_failure_at_publish_threshold() -> None
     assert "direct_mechanism_to_human_anchor" in scored[0].reasons
 
 
+def test_cross_species_endpoint_drift_stays_below_publish_threshold() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol attenuated high intensity exercise training-induced inflammation and ferroptosis in intestine of mice",
+            "A mouse swimming study found resveratrol attenuated intestinal inflammatory factors and permeability markers.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Resveratrol blunts the positive effects of exercise training on cardiovascular health in aged men",
+            "In aged men, resveratrol blunted cardiovascular training adaptations after exercise training.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
+
+    assert scored
+    assert scored[0].shape == "mechanism_to_human_failure"
+    assert scored[0].score < 85
+    assert "penalty:cross_species_endpoint_drift" in scored[0].reasons
+
+
 def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
     papers = (
         Paper(

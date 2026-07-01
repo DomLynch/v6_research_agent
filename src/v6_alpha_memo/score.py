@@ -203,6 +203,9 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     ):
         score += 10
         reasons.append("direct_mechanism_to_human_anchor")
+    if shape == "mechanism_to_human_failure" and _animal_only(first) and _is_human(second) and not _endpoint_compatible(first, second):
+        score -= 15
+        reasons.append("penalty:cross_species_endpoint_drift")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
