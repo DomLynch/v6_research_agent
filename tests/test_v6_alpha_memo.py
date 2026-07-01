@@ -1246,6 +1246,76 @@ def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.Mo
     assert result.papers[0].venue == "Journal of Nutrition"
 
 
+def test_fullraw_client_backfills_missing_abstract_from_pubmed_title(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def opener(request: Request, timeout: float) -> _Response | _TextResponse:
+        del timeout
+        if request.full_url == "http://fullraw/search":
+            return _Response({
+                "meta": _strict_meta({"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1}),
+                "results": [{
+                    "title": "Efficacy and Safety of Prescription Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation",
+                    "abstract": "",
+                    "source": "openalex",
+                    "year": 2011,
+                }],
+            })
+        if "esearch.fcgi" in request.full_url:
+            return _Response({"esearchresult": {"idlist": ["21078810"]}})
+        assert "efetch.fcgi" in request.full_url
+        return _TextResponse(
+            "CONTEXT: Small trials suggested omega-3 fatty acids may provide a safe option. "
+            "OBJECTIVE: To test prescription omega-3 fatty acids for recurrent symptomatic atrial fibrillation. "
+            "RESULTS: The randomized trial found no significant reduction in recurrent atrial fibrillation."
+        )
+
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
+
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=cast(RequestOpener, opener),
+    ).search("omega 3 atrial fibrillation", limit=3)
+
+    assert result.papers[0].abstract.startswith("CONTEXT: Small trials")
+    assert result.papers[0].url == "https://pubmed.ncbi.nlm.nih.gov/21078810/"
+
+
+def test_fullraw_client_backfill_limit_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def opener(request: Request, timeout: float) -> _Response | _TextResponse:
+        del timeout
+        if request.full_url == "http://fullraw/search":
+            return _Response({
+                "meta": _strict_meta({"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1}),
+                "results": [
+                    {"title": "Omega-3 fatty acids recurrent atrial fibrillation trial", "abstract": "", "source": "openalex"},
+                    {"title": "Fish oil postoperative atrial fibrillation trial", "abstract": "", "source": "openalex"},
+                ],
+            })
+        calls.append(request.full_url)
+        if "esearch.fcgi" in request.full_url:
+            return _Response({"esearchresult": {"idlist": ["21078810"]}})
+        return _TextResponse(
+            "OBJECTIVE: To test omega-3 fatty acids for recurrent atrial fibrillation. "
+            "RESULTS: No significant reduction in atrial fibrillation recurrence was observed."
+        )
+
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL_LIMIT", "1")
+
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=cast(RequestOpener, opener),
+    ).search("omega 3 atrial fibrillation", limit=3)
+
+    assert len(calls) == 2
+    assert "efetch.fcgi" in calls[1]
+    assert result.papers[0].abstract.startswith("OBJECTIVE")
+    assert result.papers[1].abstract == ""
+
+
 def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -4357,6 +4427,20 @@ class _Response:
 
     def read(self) -> bytes:
         return json.dumps(self.payload).encode()
+
+
+class _TextResponse:
+    def __init__(self, payload: str) -> None:
+        self.payload = payload
+
+    def __enter__(self) -> _TextResponse:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.payload.encode()
 
 
 def _fake_opener(payload: dict[str, object]) -> RequestOpener:
