@@ -317,13 +317,28 @@ def _stale_writer_version(row: dict[str, object]) -> bool:
 
 
 def _stale_query_shape_version(row: dict[str, object]) -> bool:
-    return bool(not row.get("submitted") and not row.get("public") and _int(row.get("query_shape_version")) < _QUERY_SHAPE_VERSION)
+    return bool(
+        not row.get("public")
+        and _int(row.get("query_shape_version")) < _QUERY_SHAPE_VERSION
+        and (
+            not row.get("submitted")
+            or row.get("blocked_final")
+            or row.get("decision") in {"reject", "revise"}
+            or row.get("accepted") is False
+        )
+    )
 
 
 def _reset_for_query_shape_retry(row: dict[str, object]) -> None:
+    if row.get("submission_id") and row.get("submitted"):
+        _store_revision_notes(row)
+        row["revision_of_object_id"] = row["submission_id"]
+        row["revision_retry_count"] = _int(row.get("revision_retry_count")) + 1
     for key in (
+        "generated", "submitted", "accepted", "public", "submission_id", "decision",
+        "publication", "submit_response", "decision_response", "memo_file", "trace_file",
         "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
-        "query_limit", "per_query_limit", "selector_version",
+        "query_limit", "per_query_limit", "selector_version", "writer_version",
     ):
         row.pop(key, None)
     row["query_shape_version"] = _QUERY_SHAPE_VERSION

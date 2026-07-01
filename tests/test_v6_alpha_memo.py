@@ -3850,6 +3850,48 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
+def test_daemon_reopens_failed_submission_from_old_query_shape_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen["revision_notes"] = kwargs.get("revision_notes")
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "resveratrol blunts exercise training",
+        "generated": True,
+        "submitted": True,
+        "submission_id": "sub-old",
+        "decision": "reject",
+        "accepted": False,
+        "blocked_final": True,
+        "query_shape_version": 7,
+        "decision_response": {
+            "json": {
+                "decision": "reject",
+                "major_issues": ["Receipt pair does not support the claim."],
+            }
+        },
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol blunts exercise training",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert seen["topic"] == "resveratrol blunts exercise training"
+    assert seen["revision_notes"] == ("Receipt pair does not support the claim.",)
+    assert row["revision_of_object_id"] == "sub-old"
+    assert row["revision_retry_count"] == 1
+    assert "submitted" not in row
+    assert "submission_id" not in row
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert row["query_shape_version"] == v6_daemon._QUERY_SHAPE_VERSION
+
+
 def test_daemon_reopens_waiting_rows_from_old_search_config(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
