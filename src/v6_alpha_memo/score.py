@@ -25,6 +25,14 @@ _NEGATIVE_RESULT_WORDS = frozenset({
     "impair", "impaired", "lower", "lowered", "null", "reduce", "reduced",
     "unchanged", "worse", "worsened",
 })
+_HARD_NEGATIVE_RESULT_WORDS = _NEGATIVE_RESULT_WORDS - {
+    "decrease", "decreased", "decreases", "lower", "lowered", "reduce", "reduced",
+}
+_ADVERSE_REDUCTION_TARGETS = (
+    "accuracy", "adaptation", "adaptations", "conversion", "fitness", "function",
+    "growth", "hypertrophy", "learning", "performance", "productivity", "quality",
+    "sales", "strength", "vo2", "vo2peak",
+)
 _MECHANISM = frozenset({
     "animal", "cell", "cells", "in-vitro", "mechanism", "mechanistic", "mice",
     "model", "mouse", "pathway", "preclinical", "rat", "rats",
@@ -426,7 +434,15 @@ def _negative_result(paper: Paper) -> bool:
         "adverse effect", "did not", "does not", "no evidence", "no significant",
         "not improve",
     )
-    return any(phrase in text for phrase in phrases) or bool(_tokens(paper) & _NEGATIVE_RESULT_WORDS)
+    if any(phrase in text for phrase in phrases) or bool(_tokens(paper) & _HARD_NEGATIVE_RESULT_WORDS):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:decreas(?:e|ed|es)|lower(?:ed)?|reduc(?:e|ed))\b"
+            r".{0,50}\b(?:" + "|".join(_ADVERSE_REDUCTION_TARGETS) + r")\b",
+            text,
+        )
+    )
 
 
 def _promise_signal(paper: Paper) -> bool:

@@ -457,6 +457,52 @@ def test_protocol_result_shape_requires_negative_update_receipt() -> None:
     assert not any(item.shape == "protocol_result_mismatch" for item in scored)
 
 
+def test_beneficial_biomarker_reduction_is_not_negative_update_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx protocol expected improved inflammation and insulin resistance",
+            "The protocol expected interventionx to improve inflammation and insulin resistance in older adults.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Interventionx clinical trial decreased inflammation and lowered insulin resistance",
+            "Results showed interventionx decreased inflammation and lowered insulin resistance in older adults.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "inflammation", "insulin", "resistance"})
+
+    assert not any(item.shape == "protocol_result_mismatch" for item in scored)
+
+
+def test_same_direction_pilot_extension_does_not_publish_as_alpha() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Improving glutathione mitochondria inflammation and cognitive decline: a pilot clinical trial of interventionx",
+            "Based on prior translational studies where interventionx improved glutathione deficiency, "
+            "oxidative stress, mitochondrial dysfunction and glucose tolerance, we conducted a 36-week "
+            "pilot human clinical trial. Interventionx reversed these defects and improved cognition.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "b",
+            "Interventionx supplementation improves glutathione deficiency oxidative stress inflammation and cognition",
+            "Interventionx supplementation was well tolerated and lowered oxidative stress, corrected "
+            "glutathione deficiency and mitochondrial dysfunction, decreased inflammation and insulin "
+            "resistance, and improved strength, gait-speed, cognition, and body composition.",
+            "openalex",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "glutathione", "aging"})
+
+    assert scored == ()
+
+
 def test_design_only_abstract_does_not_make_directional_title_elite() -> None:
     papers = (
         Paper(
