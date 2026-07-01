@@ -325,6 +325,28 @@ def test_explicit_result_title_without_abstract_is_not_enough_for_receipt() -> N
     assert scored == ()
 
 
+def test_negative_title_with_background_only_abstract_is_not_update_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol improves exercise adaptation in aged mice",
+            "A mouse mechanism study found resveratrol improved exercise adaptation and endurance.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Resveratrol blunted inflammatory markers after eccentric exercise in trained runners",
+            "Background resveratrol is a polyphenol. The study was designed to determine whether "
+            "resveratrol changes inflammatory markers after eccentric exercise in trained runners.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "adaptation"})
+
+    assert scored == ()
+
+
 def test_scores_direct_mechanism_to_human_failure_at_publish_threshold() -> None:
     papers = (
         Paper(

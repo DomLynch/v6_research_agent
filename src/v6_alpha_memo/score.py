@@ -173,54 +173,54 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     shape = "shared_anchor"
     first, second = a, b
 
-    if _roles_fit("subgroup_endpoint_split", a, b, topic_terms):
+    if _roles_fit("subgroup_endpoint_split", a, b, topic_terms, anchors):
         score += 40
         shape = "subgroup_endpoint_split"
         reasons.append("primary_endpoint_or_subgroup_split")
-    elif _roles_fit("subgroup_endpoint_split", b, a, topic_terms):
+    elif _roles_fit("subgroup_endpoint_split", b, a, topic_terms, anchors):
         score += 40
         shape = "subgroup_endpoint_split"
         reasons.append("primary_endpoint_or_subgroup_split")
         first, second = b, a
 
-    if shape == "shared_anchor" and _roles_fit("modality_boundary", a, b, topic_terms):
+    if shape == "shared_anchor" and _roles_fit("modality_boundary", a, b, topic_terms, anchors):
         score += 40
         shape = "modality_boundary"
         reasons.append("same_intervention_modality_boundary")
-    elif shape == "shared_anchor" and _roles_fit("modality_boundary", b, a, topic_terms):
+    elif shape == "shared_anchor" and _roles_fit("modality_boundary", b, a, topic_terms, anchors):
         score += 40
         shape = "modality_boundary"
         reasons.append("same_intervention_modality_boundary")
         first, second = b, a
 
-    if shape == "shared_anchor" and _promise_signal(a) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms):
+    if shape == "shared_anchor" and _promise_signal(a) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms, anchors):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
-    elif shape == "shared_anchor" and _promise_signal(b) and _negative_result(a) and _roles_fit("promise_reversal", b, a, topic_terms):
+    elif shape == "shared_anchor" and _promise_signal(b) and _negative_result(a) and _roles_fit("promise_reversal", b, a, topic_terms, anchors):
         score += 40
         shape = "promise_reversal"
         reasons.append("promise_to_negative_or_null")
         first, second = b, a
 
-    if _roles_fit("mechanism_to_human_failure", first, second, topic_terms):
+    if _roles_fit("mechanism_to_human_failure", first, second, topic_terms, anchors):
         score += 30
         shape = "mechanism_to_human_failure"
         reasons.append("mechanism_or_animal_to_human_failure")
-    if shape == "shared_anchor" and _roles_fit("translation_boundary", a, b, topic_terms):
+    if shape == "shared_anchor" and _roles_fit("translation_boundary", a, b, topic_terms, anchors):
         score += 35
         shape = "translation_boundary"
         reasons.append("animal_or_mechanism_to_bounded_human_evidence")
-    elif shape == "shared_anchor" and _roles_fit("translation_boundary", b, a, topic_terms):
+    elif shape == "shared_anchor" and _roles_fit("translation_boundary", b, a, topic_terms, anchors):
         score += 35
         shape = "translation_boundary"
         reasons.append("animal_or_mechanism_to_bounded_human_evidence")
         first, second = b, a
-    if _has(at, _PROTOCOL) and _has(bt, _RESULT | _FAILURE) and _roles_fit("protocol_result_mismatch", a, b, topic_terms):
+    if _has(at, _PROTOCOL) and _has(bt, _RESULT | _FAILURE) and _roles_fit("protocol_result_mismatch", a, b, topic_terms, anchors):
         score += 20
         shape = "protocol_result_mismatch"
         reasons.append("protocol_result_mismatch")
-    elif _has(bt, _PROTOCOL) and _has(at, _RESULT | _FAILURE) and _roles_fit("protocol_result_mismatch", b, a, topic_terms):
+    elif _has(bt, _PROTOCOL) and _has(at, _RESULT | _FAILURE) and _roles_fit("protocol_result_mismatch", b, a, topic_terms, anchors):
         score += 20
         shape = "protocol_result_mismatch"
         reasons.append("protocol_result_mismatch")
@@ -411,14 +411,20 @@ def _tokens(paper: Paper) -> set[str]:
     return set(_WORD_RE.findall(paper.text.casefold()))
 
 
-def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[str]) -> bool:
+def _roles_fit(
+    shape: str,
+    first: Paper,
+    second: Paper,
+    topic_terms: frozenset[str],
+    anchors: tuple[str, ...],
+) -> bool:
     ft, st = _tokens(first), _tokens(second)
     if not _role_matches_topic(first, second, topic_terms):
         return False
     if _human_topic(topic_terms) and not _is_human(second):
         return False
     if shape == "mechanism_to_human_failure":
-        return _mechanism_model_receipt(first) and _is_human(second) and _negative_update_receipt(second)
+        return _mechanism_model_receipt(first) and _is_human(second) and _negative_update_receipt(second, anchors)
     if shape == "translation_boundary":
         return (
             _mechanism_model_receipt(first)
@@ -432,14 +438,14 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             _is_human(first)
             and _is_human(second)
             and _promise_signal(first)
-            and _negative_update_receipt(second)
+            and _negative_update_receipt(second, anchors)
             and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
             and _population_compatible(first, second)
         )
     if shape == "modality_boundary":
         return (
             _promise_signal(first)
-            and _negative_update_receipt(second)
+            and _negative_update_receipt(second, anchors)
             and _has(st, _ADAPTATION)
             and _has(ft | st, _MODALITY)
             and _population_compatible(first, second)
@@ -448,14 +454,14 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
         return (
             _protocol_expectation_signal(first)
             and _has(st, _RESULT | _FAILURE)
-            and _negative_update_receipt(second)
+            and _negative_update_receipt(second, anchors)
             and _endpoint_compatible(first, second)
             and _population_compatible(first, second)
         )
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
-        return _promise_signal(first) and _negative_update_receipt(second)
+        return _promise_signal(first) and _negative_update_receipt(second, anchors)
     return False
 
 
@@ -501,12 +507,25 @@ def _negative_result(paper: Paper) -> bool:
     )
 
 
-def _negative_update_receipt(paper: Paper) -> bool:
+def _negative_update_receipt(paper: Paper, anchors: tuple[str, ...] = ()) -> bool:
+    direct_anchors = tuple(
+        anchor for anchor in anchors if anchor not in _BAD_ANCHOR and anchor not in _CONTEXT_ANCHOR and anchor not in _MODALITY
+    )
     title = paper.title.casefold()
-    if _negative_update_text(title):
+    if _negative_update_text(title) and _abstract_reports_result(paper) and _mentions_anchor(title, direct_anchors):
         return True
     abstract = paper.abstract.casefold()
-    return any(_observed_negative_update_sentence(sentence) for sentence in _sentences(abstract))
+    return any(
+        _mentions_anchor(sentence, direct_anchors) and _observed_negative_update_sentence(sentence)
+        for sentence in _sentences(abstract)
+    )
+
+
+def _mentions_anchor(text: str, anchors: tuple[str, ...]) -> bool:
+    if not anchors:
+        return True
+    tokens = set(_WORD_RE.findall(text.casefold()))
+    return bool(tokens & set(anchors))
 
 
 def _sentences(text: str) -> tuple[str, ...]:
