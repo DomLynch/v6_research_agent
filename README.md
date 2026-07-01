@@ -16,4 +16,4 @@ export V6_MINIMAX_API_KEY="..."
 ```
 
 Live VPS deployment uses `deploy/v6-alpha-memo-live.service` with the
-isolated `deploy/v6-fullraw-search.service` lane on port `9917`.
+isolated `deploy/v6-fullraw-search.service` lane on port `9918`.
