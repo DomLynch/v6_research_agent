@@ -769,6 +769,28 @@ def test_scores_same_intervention_training_modality_boundary() -> None:
     assert "Potential of Applying" not in scored[0].pair.b.title
 
 
+def test_modality_boundary_requires_anchor_specific_update_sentence() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Daily cold-water recovery improved training-load tolerance during heat-based training",
+            "Daily cold-water recovery improved training-load tolerance during heat-based training.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "b",
+            "Cold-water immersion after training sessions and sprint-interval adaptations",
+            "Effects of regular use of cold-water immersion were investigated in trained men. "
+            "Sprint-interval training showed no significant adaptation endpoint change.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"cold", "water", "immersion", "training"})
+
+    assert not any(item.shape == "modality_boundary" for item in scored)
+
+
 def test_rejects_review_keyword_overlap_before_writing() -> None:
     papers = (
         Paper("a", "Systematic review of leadership and productivity", "productivity evidence", "openalex"),
@@ -2892,7 +2914,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "trace": trace,
             "query_limit": 3,
             "per_query_limit": 10,
-            "selector_version": 23,
+            "selector_version": v6_daemon._SELECTOR_VERSION,
             "query_shape_version": 7,
         }]
     }
@@ -3379,7 +3401,7 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "query_limit": 3,
                 "per_query_limit": 10,
                 "query_shape_version": 7,
-                "selector_version": 23,
+                "selector_version": v6_daemon._SELECTOR_VERSION,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
@@ -3661,7 +3683,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 23
+    assert row["selector_version"] == v6_daemon._SELECTOR_VERSION
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -3694,7 +3716,7 @@ def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None
             "topic": "time restricted eating resistance training lean mass",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 23,
+            "selector_version": v6_daemon._SELECTOR_VERSION,
             "query_shape_version": 7,
             "query_limit": 3,
             "per_query_limit": 10,
@@ -3783,7 +3805,7 @@ def test_daemon_reopens_waiting_rows_from_old_search_config(
     assert seen["topic"] == "vitamin d fracture randomized trial older adults"
     assert seen["query_limit"] == 8
     assert seen["per_query_limit"] == 25
-    assert row["selector_version"] == 23
+    assert row["selector_version"] == v6_daemon._SELECTOR_VERSION
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
