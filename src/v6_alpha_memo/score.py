@@ -166,7 +166,7 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     reasons: list[str] = [f"shared_anchor:{anchor}" for anchor in anchors[:3]]
     if not anchors:
         return ScoredPair(clean_pair, 0, "shared_anchor", "", ("reject:no_real_anchor",))
-    hygiene_reject = _receipt_hygiene_reject(a, b, anchors)
+    hygiene_reject = _receipt_hygiene_reject(a, b, anchors, topic_terms)
     if hygiene_reject:
         return ScoredPair(clean_pair, 0, "shared_anchor", "", (*reasons, hygiene_reject))
     score = 20 + min(len(anchors), 4) * 5
@@ -327,13 +327,20 @@ def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str
     return tuple(dict.fromkeys(kept))[:6]
 
 
-def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str:
+def _receipt_hygiene_reject(
+    a: Paper,
+    b: Paper,
+    anchors: tuple[str, ...],
+    topic_terms: frozenset[str],
+) -> str:
     if _supplement_receipt(a) or _supplement_receipt(b):
         return "reject:supplement_receipt"
     if _weak_stat_receipt(a) or _weak_stat_receipt(b):
         return "reject:weak_statistical_signal"
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
+    if _comparator_only_anchor(a, anchors, topic_terms) or _comparator_only_anchor(b, anchors, topic_terms):
+        return "reject:comparator_only_anchor"
     if not _has_finding_text(a) or not _has_finding_text(b):
         return "reject:title_only_receipt"
     if _design_only_directional_receipt(a) or _design_only_directional_receipt(b):
@@ -343,6 +350,20 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
         return "reject:name_or_context_only_anchor"
     return ""
+
+
+def _comparator_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: frozenset[str]) -> bool:
+    title = paper.title.casefold()
+    for anchor in anchors:
+        if anchor in _CONTEXT_ANCHOR or (topic_terms and anchor not in topic_terms):
+            continue
+        pattern = rf"\b(?:compared with|compared to|versus|vs\.?)\b[^.:\n]{{0,90}}\b{re.escape(anchor)}\b"
+        if re.search(pattern, title) and not re.search(
+            rf"\b{re.escape(anchor)}\b[^.:\n]{{0,90}}\b(?:compared with|compared to|versus|vs\.?)\b",
+            title,
+        ):
+            return True
+    return False
 
 
 def _nonprimary(paper: Paper) -> bool:
