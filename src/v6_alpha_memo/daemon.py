@@ -81,6 +81,9 @@ def _run_pass(
         elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
+        elif _waitable_submit_failure(row):
+            _reset_for_submit_retry(row)
+            row["blocked_stage"] = "submit_backoff"
         elif _stale_query_shape_version(row):
             _reset_for_query_shape_retry(row)
         elif _stale_writer_version(row):
@@ -227,6 +230,9 @@ def _run_topic(
             submission = cast(dict[str, object], response.get("json", {})).get("submission")
             submission = submission if isinstance(submission, dict) else {}
             row.update({"submitted": True, "submission_id": submission.get("id")})
+        elif _waitable_submit_response(response):
+            _reset_for_submit_retry(row)
+            row["blocked_stage"] = "submit_backoff"
         else:
             row.update({"blocked_stage": "submit_failed", "blocked_final": True})
 
@@ -653,6 +659,31 @@ def _row_clean_revision(row: dict[str, object]) -> bool:
 
 def _needs_revision_retry(row: dict[str, object]) -> bool:
     return _int(row.get("revision_retry_count")) < _int_env("V6_DAEMON_MAX_REVISION_RETRIES", 2) or not row.get("revision_of_object_id")
+
+
+def _waitable_submit_failure(row: dict[str, object]) -> bool:
+    return bool(row.get("blocked_stage") == "submit_failed" and _waitable_submit_response(row.get("submit_response")))
+
+
+def _waitable_submit_response(response: object) -> bool:
+    if not isinstance(response, dict):
+        return False
+    status = _int(response.get("status"))
+    body = str(response.get("body") or "").casefold()
+    return status in {408, 425, 429, 500, 502, 503, 504} or "backoff" in body or "timeout" in body
+
+
+def _reset_for_submit_retry(row: dict[str, object]) -> None:
+    if row.get("submit_response"):
+        row["last_submit_response"] = row.get("submit_response")
+    for key in (
+        "generated", "submitted", "accepted", "public", "submission_id", "decision",
+        "publication", "submit_response", "decision_response", "memo_file", "trace_file",
+        "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
+        "writer_version",
+    ):
+        row.pop(key, None)
+    _clear_blocker(row)
 
 
 def _reset_for_revision_retry(row: dict[str, object]) -> None:

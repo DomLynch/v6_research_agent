@@ -2777,6 +2777,60 @@ def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPat
     assert "unresolved_dois" not in row
 
 
+def test_daemon_treats_submit_backoff_as_retryable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+
+    class BackoffPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            assert path == "/submissions"
+            assert payload["artifact_type"] == "alpha_memo"
+            return {"ok": False, "status": 429, "body": "{\"detail\":\"agent_backoff_intake_rejections\"}"}
+
+        def get(self, path: str) -> dict[str, object]:
+            raise AssertionError(f"backed-off submission should not be polled: {path}")
+
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: True)
+    row: dict[str, object] = {"topic": "management dashboard forecast accuracy"}
+
+    v6_daemon._run_topic(tmp_path, str(row["topic"]), "agent-v6", DemoClient(), BackoffPublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "submit_backoff"
+    assert "blocked_final" not in row
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
+
+
+def test_daemon_reopens_existing_submit_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "resveratrol exercise adaptation",
+        "generated": True,
+        "blocked_stage": "submit_failed",
+        "blocked_final": True,
+        "submit_response": {"ok": False, "status": 429, "body": "{\"detail\":\"agent_backoff_intake_rejections\"}"},
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert seen == ["resveratrol exercise adaptation"]
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert "blocked_final" not in row
+    assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
+
+
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pair = CandidatePair(
         a=Paper(
