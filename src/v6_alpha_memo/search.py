@@ -163,14 +163,12 @@ class FullrawSearchClient:
         if coverage_error and self.sweep_wait_seconds and _waitable_coverage_error(coverage_error):
             data = self._wait_for_sweep_hit(search_url, payload, headers) or data
             coverage_error = _coverage_error(data)
-        if coverage_error:
-            return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0, error=coverage_error))
-        parsed: list[Paper] = []
-        for item in _items(data):
-            paper = _parse_paper(item)
-            if paper is not None:
-                parsed.append(paper)
+        parsed = _parsed_papers(data)
         papers = _filter_query_papers(parsed, query)
+        if coverage_error:
+            if _empty_partial_stop(data, papers):
+                coverage_error = "async_sweep_stopped_no_hits"
+            return SearchResult(query=query, papers=(), receipt=_receipt(data, hits=0, error=coverage_error))
         if _truthy(os.environ.get("V6_FULLRAW_ABSTRACT_BACKFILL", "0")):
             papers = _backfill_missing_abstracts(papers, self._opener, timeout=min(self.timeout, 10.0))
         return SearchResult(query=query, papers=papers, receipt=_receipt(data, hits=len(papers)))
@@ -483,6 +481,18 @@ def _items(data: object) -> list[object]:
         return []
     raw = data.get("results", data.get("hits", []))
     return raw if isinstance(raw, list) else []
+
+
+def _parsed_papers(data: object) -> list[Paper]:
+    return [paper for item in _items(data) if (paper := _parse_paper(item)) is not None]
+
+
+def _empty_partial_stop(data: object, papers: tuple[Paper, ...]) -> bool:
+    if papers:
+        return False
+    receipt = _receipt(data, hits=0)
+    threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
+    return bool(receipt.partial and receipt.shards_searched >= threshold and receipt.source_count_searched >= 4)
 
 
 def _parse_paper(item: object) -> Paper | None:
