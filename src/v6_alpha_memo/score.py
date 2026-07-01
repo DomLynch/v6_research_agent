@@ -96,6 +96,14 @@ _RESULT_SENTENCE_MARKERS = frozenset({
     "results", "showed", "significant", "significantly", "unchanged",
 })
 _POSITIVE_RESULT_WORDS = frozenset({"corrected", "enhanced", "improved", "increased", "reversed"})
+_BENEFIT_REDUCTION_TARGETS = (
+    "arrhythmia", "arrhythmias", "event", "events", "fibrillation", "fracture",
+    "incidence", "mortality", "pain", "recurrence", "relapse", "risk", "symptoms",
+)
+_CONTEXT_BOUNDARY_TERMS = frozenset({
+    "baseline", "bypass", "coronary", "healthy", "postoperative", "recurrent",
+    "surgery", "surgical", "symptomatic",
+})
 _SPECULATIVE_UPDATE_CONTEXT = frozenset({
     "background", "hypothesized", "hypothesis", "may", "might", "prior",
     "previous", "rationale", "suggest", "suggested",
@@ -192,6 +200,16 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         score += 40
         shape = "modality_boundary"
         reasons.append("same_intervention_modality_boundary")
+        first, second = b, a
+
+    if shape == "shared_anchor" and _roles_fit("context_boundary", a, b, topic_terms, anchors):
+        score += 35
+        shape = "context_boundary"
+        reasons.append("same_intervention_context_boundary")
+    elif shape == "shared_anchor" and _roles_fit("context_boundary", b, a, topic_terms, anchors):
+        score += 35
+        shape = "context_boundary"
+        reasons.append("same_intervention_context_boundary")
         first, second = b, a
 
     if shape == "shared_anchor" and _promise_signal(a) and _negative_result(b) and _roles_fit("promise_reversal", a, b, topic_terms, anchors):
@@ -487,6 +505,16 @@ def _roles_fit(
             and _has(ft | st, _MODALITY)
             and _population_compatible(first, second)
         )
+    if shape == "context_boundary":
+        return (
+            _is_human(first)
+            and _is_human(second)
+            and _positive_result(first)
+            and _negative_update_receipt(second, anchors)
+            and _context_boundary_diff(first, second)
+            and _endpoint_not_drift(first, second)
+            and _population_compatible(first, second)
+        )
     if shape == "protocol_result_mismatch":
         return (
             _protocol_expectation_signal(first)
@@ -605,6 +633,26 @@ def _promise_signal(paper: Paper) -> bool:
     if not _has(_tokens(paper), _PROMISE) or _negative_result(paper):
         return False
     return not _design_or_feasibility_only(paper) or _protocol_expectation_signal(paper)
+
+
+def _positive_result(paper: Paper) -> bool:
+    if not _abstract_reports_result(paper) or _negative_result(paper):
+        return False
+    text = paper.text.casefold()
+    tokens = _tokens(paper)
+    return bool(tokens & (_PROMISE | _POSITIVE_RESULT_WORDS)) or bool(
+        re.search(
+            r"\b(?:decreas(?:e|ed|es)|lower(?:ed)?|reduc(?:e|ed)|reduction)\b"
+            r".{0,70}\b(?:" + "|".join(_BENEFIT_REDUCTION_TARGETS) + r")\b",
+            text,
+        )
+    )
+
+
+def _context_boundary_diff(a: Paper, b: Paper) -> bool:
+    left = _tokens(a) & _CONTEXT_BOUNDARY_TERMS
+    right = _tokens(b) & _CONTEXT_BOUNDARY_TERMS
+    return bool(left and right and left != right)
 
 
 def _protocol_expectation_signal(paper: Paper) -> bool:

@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import cast
 from urllib.error import HTTPError
+from urllib.parse import unquote
 from urllib.request import Request
 
 import pytest
@@ -1279,6 +1280,48 @@ def test_fullraw_client_backfills_missing_abstract_from_pubmed_title(
 
     assert result.papers[0].abstract.startswith("CONTEXT: Small trials")
     assert result.papers[0].url == "https://pubmed.ncbi.nlm.nih.gov/21078810/"
+
+
+def test_fullraw_client_falls_back_to_pubmed_title_when_doi_lookup_misses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    searches: list[str] = []
+
+    def opener(request: Request, timeout: float) -> _Response | _TextResponse:
+        del timeout
+        if request.full_url == "http://fullraw/search":
+            return _Response({
+                "meta": _strict_meta({"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1}),
+                "results": [{
+                    "title": "Efficacy and Safety of Prescription Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation",
+                    "abstract": "",
+                    "source": "openalex",
+                    "year": 2011,
+                    "doi": "10.1016/j.ycar.2011.02.012",
+                }],
+            })
+        if "esearch.fcgi" in request.full_url:
+            searches.append(request.full_url)
+            if "10.1016" in unquote(request.full_url):
+                return _Response({"esearchresult": {"idlist": []}})
+            return _Response({"esearchresult": {"idlist": ["21078810"]}})
+        if "api.semanticscholar.org" in request.full_url:
+            return _Response({"title": "", "abstract": ""})
+        assert "efetch.fcgi" in request.full_url
+        return _TextResponse(
+            "OBJECTIVE: To test prescription omega-3 fatty acids for recurrent atrial fibrillation. "
+            "RESULTS: No significant reduction in recurrent atrial fibrillation was observed."
+        )
+
+    monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
+
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        opener=cast(RequestOpener, opener),
+    ).search("omega 3 atrial fibrillation", limit=3)
+
+    assert len(searches) == 2
+    assert result.papers[0].abstract.startswith("OBJECTIVE")
 
 
 def test_fullraw_client_backfill_limit_is_env_overridable(monkeypatch: pytest.MonkeyPatch) -> None:

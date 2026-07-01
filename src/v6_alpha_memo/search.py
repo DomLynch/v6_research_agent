@@ -542,8 +542,8 @@ def _backfill_missing_abstracts(
         if remaining > 0 and not _has_receipt_abstract(paper):
             replacement = (
                 _cache_abstract_backfill(paper)
-                or _pubmed_backfill(paper, opener, timeout=timeout)
                 or _semantic_scholar_backfill(paper, opener, timeout=timeout)
+                or _pubmed_backfill(paper, opener, timeout=timeout)
             )
             if replacement is not None:
                 enriched.append(replacement)
@@ -595,22 +595,10 @@ def _same_paper(left: Paper, right: Paper) -> bool:
 
 
 def _pubmed_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> Paper | None:
-    term = f"{paper.doi}[DOI]" if paper.doi else f"{paper.title}[Title]"
-    if len(re.findall(r"[a-z][a-z0-9]{2,}", term.casefold())) < 4:
-        return None
-    search_url = (
-        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-        f"?db=pubmed&retmode=json&retmax=1&term={quote(term, safe='')}"
-    )
-    request = Request(search_url, headers={"User-Agent": "v6-alpha-memo/0.1"})
-    try:
-        with opener(request, timeout=max(1.0, timeout)) as response:
-            data = json.loads(response.read().decode())
-    except (OSError, HTTPError, TimeoutError, URLError, json.JSONDecodeError):
-        return None
-    result = data.get("esearchresult") if isinstance(data, dict) else {}
-    ids = result.get("idlist") if isinstance(result, dict) else []
-    pmid = str(ids[0]) if isinstance(ids, list) and ids else ""
+    terms = [f"{paper.title}[Title]"]
+    if paper.doi:
+        terms.insert(0, f"{paper.doi}[DOI]")
+    pmid = _pubmed_id(terms, opener, timeout=timeout)
     if not pmid:
         return None
     fetch_url = (
@@ -635,6 +623,27 @@ def _pubmed_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> 
         url=paper.url or f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
         venue=paper.venue,
     )
+
+
+def _pubmed_id(terms: list[str], opener: RequestOpener, *, timeout: float) -> str:
+    for term in terms:
+        if "[DOI]" not in term and len(re.findall(r"[a-z][a-z0-9]{2,}", term.casefold())) < 4:
+            continue
+        search_url = (
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+            f"?db=pubmed&retmode=json&retmax=1&term={quote(term, safe='')}"
+        )
+        request = Request(search_url, headers={"User-Agent": "v6-alpha-memo/0.1"})
+        try:
+            with opener(request, timeout=max(1.0, timeout)) as response:
+                data = json.loads(response.read().decode())
+        except (OSError, HTTPError, TimeoutError, URLError, json.JSONDecodeError):
+            continue
+        result = data.get("esearchresult") if isinstance(data, dict) else {}
+        ids = result.get("idlist") if isinstance(result, dict) else []
+        if isinstance(ids, list) and ids:
+            return str(ids[0])
+    return ""
 
 
 def _semantic_scholar_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> Paper | None:
