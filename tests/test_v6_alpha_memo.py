@@ -2391,7 +2391,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "trace": trace,
             "query_limit": 3,
             "per_query_limit": 10,
-                "selector_version": 13,
+            "selector_version": 13,
             "query_shape_version": 4,
         }]
     }
