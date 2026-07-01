@@ -833,6 +833,13 @@ def _trace_shards(trace: dict[str, object]) -> int:
     coverage = trace.get("coverage")
     if not isinstance(coverage, list):
         return 0
+    waitable = [
+        _int(item.get("shards_searched"))
+        for item in coverage
+        if isinstance(item, dict) and _waitable_coverage(item)
+    ]
+    if waitable:
+        return max(waitable)
     return max(
         (_int(item.get("shards_searched")) for item in coverage if isinstance(item, dict)),
         default=0,

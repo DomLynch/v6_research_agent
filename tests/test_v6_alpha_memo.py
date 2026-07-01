@@ -3647,6 +3647,22 @@ def test_daemon_records_stale_waiting_shard_progress() -> None:
     assert row.get("wait_stale_count") == 0
 
 
+def test_daemon_tracks_waitable_side_search_progress_not_completed_receipt() -> None:
+    row: dict[str, object] = {}
+
+    v6_daemon._record_wait_progress(row, {"coverage": [
+        {"error": "", "shards_searched": 1525, "shards_total": 1525, "source_count_searched": 5},
+        {"error": "async_sweep_running", "shards_searched": 96},
+    ]})
+    v6_daemon._record_wait_progress(row, {"coverage": [
+        {"error": "", "shards_searched": 1525, "shards_total": 1525, "source_count_searched": 5},
+        {"error": "async_sweep_running", "shards_searched": 141},
+    ]})
+
+    assert row.get("wait_shards") == 141
+    assert row.get("wait_stale_count") == 0
+
+
 def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
     cache_dir = tmp_path / "cache"
