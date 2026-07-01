@@ -1354,6 +1354,62 @@ def test_fullraw_client_reports_queue_full_when_query_not_admitted() -> None:
     assert result.receipt.error == "async_sweep_queue_full"
 
 
+def test_fullraw_completed_cache_prefers_richer_same_size_result(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    receipt = {
+        "sweep_original_query": "cold water immersion training",
+        "sweep_query": "cold water immersion training",
+        "sweep_result_limit": 2,
+        "shards_searched": 1525,
+        "shards_total": 1525,
+        "source_count_searched": 5,
+        "partial_shard_search": False,
+        "sweep_failed_shards": 0,
+    }
+    (cache_dir / "thin.json").write_text(json.dumps({
+        "receipt": receipt,
+        "hits": [
+            {"title": "Cold water immersion training adaptation", "source": "openalex"},
+            {"title": "Cold water immersion strength training", "source": "pubmed"},
+        ],
+    }))
+    (cache_dir / "rich.json").write_text(json.dumps({
+        "receipt": receipt,
+        "hits": [
+            {
+                "title": "Cold water immersion training adaptation",
+                "abstract": "Cold water immersion blunted resistance training adaptation in a trial.",
+                "source": "openalex",
+                "year": 2020,
+                "doi": "10.test/rich",
+            },
+            {
+                "title": "Cold water immersion strength training",
+                "abstract": "Cold water immersion changed strength training outcomes in adults.",
+                "source": "pubmed",
+                "year": 2021,
+                "doi": "10.test/rich2",
+            },
+        ],
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "2")
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del request, timeout
+        raise AssertionError("completed cache should avoid HTTP")
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search(
+        "cold water immersion training",
+        limit=2,
+    )
+
+    assert result.papers[0].abstract.startswith("Cold water immersion blunted")
+
+
 def test_fullraw_client_preserves_exact_waitable_query_before_variants() -> None:
     payloads: list[dict[str, object]] = []
 

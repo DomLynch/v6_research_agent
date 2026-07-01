@@ -374,10 +374,14 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
             result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
             if papers and (match_kind == "exact" or _result_matches_query(result, query)) and (
-                best is None or len(papers) > len(best.papers)
+                best is None or _result_rank(result) > _result_rank(best)
             ):
                 best = result
     return best
+
+
+def _result_rank(result: SearchResult) -> tuple[int, int]:
+    return (len(result.papers), sum(_paper_rank(paper) for paper in result.papers))
 
 
 def _cache_match_kind(query: str, receipt: dict[object, object]) -> str:
