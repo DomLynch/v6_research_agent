@@ -4104,6 +4104,48 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
     assert seen == ["collagen tendon pain exercise"]
 
 
+def test_daemon_stale_wait_beats_high_cache_progress_for_candidate_rank(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "creatine.json").write_text(json.dumps({
+        "hits": [],
+        "receipt": {
+            "sweep_original_query": "creatine cognitive function older adults",
+            "sweep_query": "creatine cognitive function older adults",
+            "shards_searched": 1022,
+            "source_count_searched": 5,
+        },
+    }))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    rows = [
+        {
+            "topic": "creatine cognitive function older adults",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 1022,
+            "wait_stale_count": 19,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1022}]},
+        },
+        {
+            "topic": "vitamin d fracture randomized trial older adults",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 525,
+            "wait_stale_count": 0,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 525}]},
+        },
+    ]
+
+    selected = v6_daemon._candidate_rows(
+        rows,
+        ("creatine cognitive function older adults", "vitamin d fracture randomized trial older adults"),
+    )
+
+    assert [row["topic"] for row in selected] == ["vitamin d fracture randomized trial older adults"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
