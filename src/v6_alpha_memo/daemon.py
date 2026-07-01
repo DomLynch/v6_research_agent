@@ -76,6 +76,8 @@ def _run_pass(
             _clear_blocker(row)
         elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
             _reset_for_revision_retry(row)
+        elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
+            row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
         elif row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting":
             _clear_blocker(row)
     waiting = 0
