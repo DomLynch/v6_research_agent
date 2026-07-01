@@ -229,6 +229,7 @@ def _reset_for_query_shape_retry(row: dict[str, object]) -> None:
         "query_limit", "per_query_limit", "selector_version",
     ):
         row.pop(key, None)
+    row["query_shape_version"] = _QUERY_SHAPE_VERSION
     _clear_blocker(row)
 
 
