@@ -12,6 +12,7 @@ Environment=V6_TOPICS_FILE=/etc/v6-research-agent-topics.txt
 Environment=V6_DAEMON_WRITER=minimax
 Environment=V6_DAEMON_MIN_SCORE=85
 Environment=V6_DAEMON_MAX_REVISION_RETRIES=4
+Environment=V6_DAEMON_SUBMIT_BACKOFF_SECONDS=3600
 Environment=V6_DAEMON_SLEEP_SECONDS=60
 Environment=V6_DAEMON_MAX_WAITING=6
 Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=6

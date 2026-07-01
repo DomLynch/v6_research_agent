@@ -3224,7 +3224,7 @@ def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_waits_for_queued_side_search_after_enough_completed_shapes() -> None:
+def test_daemon_rejects_zero_yield_after_enough_completed_shapes_even_with_side_search() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
         "pair_count": 36,
@@ -3258,7 +3258,7 @@ def test_daemon_waits_for_queued_side_search_after_enough_completed_shapes() -> 
         ],
     }
 
-    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
 def test_daemon_final_rejects_after_enough_completed_shapes_with_zero_scored_pairs() -> None:
@@ -3297,11 +3297,11 @@ def test_daemon_final_rejects_after_enough_completed_shapes_with_zero_scored_pai
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
-def test_daemon_classifies_waiting_trace_with_enough_completed_shapes() -> None:
+def test_daemon_still_waits_for_side_search_when_completed_shapes_have_yield() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
         "pair_count": 36,
-        "scored_count": 0,
+        "scored_count": 1,
         "coverage": [
             {
                 "error": "",
