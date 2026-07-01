@@ -532,13 +532,15 @@ def _blocked_stage(trace: dict[str, object]) -> str:
     coverage = trace.get("coverage")
     if isinstance(coverage, list) and coverage:
         if any(_strict_coverage(item) for item in coverage):
+            if any(_waitable_coverage(item) for item in coverage):
+                return "search_cache_waiting"
             if (
                 _int(trace.get("scored_count")) == 0
                 and _int(trace.get("paper_count")) > 0
                 and _int(trace.get("pair_count")) > 0
             ):
                 return "selector_rejected"
-            return "search_cache_waiting" if any(_waitable_coverage(item) for item in coverage) else "selector_rejected"
+            return "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
         if error_text == "async_sweep_stopped_no_hits":
