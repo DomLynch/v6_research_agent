@@ -2790,7 +2790,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 6
+    assert row["selector_version"] == 7
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -2799,7 +2799,7 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
             "topic": "metformin resistance training",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 6,
+            "selector_version": 7,
             "top_score": 85,
             "top_shape": "protocol_result_mismatch",
             "paper_count": 24,
