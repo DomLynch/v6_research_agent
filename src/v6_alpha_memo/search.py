@@ -163,7 +163,7 @@ class FullrawSearchClient:
             paper = _parse_paper(item)
             if paper is not None:
                 parsed.append(paper)
-        papers = tuple(parsed)
+        papers = _filter_query_papers(parsed, query)
         return SearchResult(query=query, papers=papers, receipt=_receipt(data, hits=len(papers)))
 
     def _post(self, search_url: str, payload: dict[str, object], headers: dict[str, str]) -> object:
@@ -372,7 +372,8 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
             if _coverage_error(payload):
                 continue
-            papers = tuple(paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None)
+            parsed = [paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None]
+            papers = _filter_query_papers(parsed, query)
             result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
             if papers and (match_kind == "exact" or _result_matches_query(result, query)):
                 candidates.append(result)
@@ -441,11 +442,28 @@ _PUBMED_BACKFILL_LIMIT = 4
 
 
 def _result_matches_query(result: SearchResult, query: str) -> bool:
+    return any(_paper_matches_query(paper, query) for paper in result.papers[:5])
+
+
+def _filter_query_papers(papers: list[Paper], query: str) -> tuple[Paper, ...]:
+    return tuple(paper for paper in papers if _paper_matches_query(paper, query))
+
+
+def _paper_matches_query(paper: Paper, query: str) -> bool:
     anchors = frozenset(
         word for word in re.findall(r"[a-z][a-z0-9]{2,}", query.casefold().replace("-", " ")) if word not in _QUERY_DROP
     )
-    needed = 1 if len(anchors) < 3 else 2
-    return not anchors or any(len(_paper_query_terms(paper) & anchors) >= needed for paper in result.papers[:5])
+    if not anchors:
+        return True
+    ordered = tuple(dict.fromkeys(
+        word for word in re.findall(r"[a-z][a-z0-9]{2,}", query.casefold().replace("-", " ")) if word not in _QUERY_DROP
+    ))
+    overlap = _paper_query_terms(paper) & anchors
+    needed = 1 if len(anchors) < 3 else 2 if len(anchors) < 5 else 3
+    if len(overlap) < needed:
+        return False
+    head = set(ordered[:3])
+    return len(anchors) < 4 or len(overlap & head) >= min(2, len(head))
 
 
 def _paper_query_terms(paper: Paper) -> set[str]:
