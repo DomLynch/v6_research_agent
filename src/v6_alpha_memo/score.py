@@ -91,6 +91,11 @@ _ABSTRACT_RESULT_PHRASES = (
     "observed", "reported", "resulted in", "results showed", "showed that",
     "significantly", "was associated", "were associated", "we found",
 )
+_UPDATE_FAILURE_WORDS = frozenset({"attenuated", "blunted", "failed", "impaired", "null", "unchanged"})
+_UPDATE_FAILURE_PHRASES = (
+    "did not", "does not", "failed to", "failure to", "no evidence",
+    "no significant", "not improve", "not improved",
+)
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
@@ -392,7 +397,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
         return (
             _protocol_expectation_signal(first)
             and _has(st, _RESULT | _FAILURE)
-            and _negative_result(second)
+            and _negative_update_receipt(second)
             and _endpoint_compatible(first, second)
             and _population_compatible(first, second)
         )
@@ -435,6 +440,19 @@ def _negative_result(paper: Paper) -> bool:
         "not improve",
     )
     if any(phrase in text for phrase in phrases) or bool(_tokens(paper) & _HARD_NEGATIVE_RESULT_WORDS):
+        return True
+    return bool(
+        re.search(
+            r"\b(?:decreas(?:e|ed|es)|lower(?:ed)?|reduc(?:e|ed))\b"
+            r".{0,50}\b(?:" + "|".join(_ADVERSE_REDUCTION_TARGETS) + r")\b",
+            text,
+        )
+    )
+
+
+def _negative_update_receipt(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    if any(phrase in text for phrase in _UPDATE_FAILURE_PHRASES) or bool(_tokens(paper) & _UPDATE_FAILURE_WORDS):
         return True
     return bool(
         re.search(

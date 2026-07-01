@@ -503,6 +503,30 @@ def test_same_direction_pilot_extension_does_not_publish_as_alpha() -> None:
     assert scored == ()
 
 
+def test_positive_trial_with_withdrawal_worsening_is_not_protocol_update() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx randomized clinical trial improved glutathione and aging hallmarks",
+            "The protocol expected interventionx to improve glutathione deficiency, oxidative stress, "
+            "mitochondrial dysfunction and cognition in older adults. Results found broad improvements.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "b",
+            "Interventionx pilot clinical trial improved glutathione mitochondria inflammation and cognition",
+            "Results found older adults had glutathione deficiency and cognitive decline. Interventionx "
+            "reversed these defects and improved cognition; stopping interventionx for 12 weeks worsened "
+            "some benefits after withdrawal.",
+            "openalex",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "glutathione", "aging"})
+
+    assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_design_only_abstract_does_not_make_directional_title_elite() -> None:
     papers = (
         Paper(
