@@ -3025,6 +3025,33 @@ def test_daemon_retries_submit_backoff_after_retry_time(
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
+def test_daemon_migrates_legacy_submit_backoff_to_timed_cooldown(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise AssertionError("legacy backoff row should be deferred")
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", "60")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "resveratrol exercise adaptation",
+        "blocked_stage": "submit_backoff",
+        "last_submit_response": {"ok": False, "status": 429},
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert seen == []
+    assert row["blocked_stage"] == "submit_backoff"
+    assert isinstance(row["submit_retry_after"], int)
+
+
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     pair = CandidatePair(
         a=Paper(
