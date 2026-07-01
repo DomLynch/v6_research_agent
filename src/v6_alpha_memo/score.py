@@ -67,6 +67,16 @@ _NONPRIMARY_PHRASES = (
     "research highlight", "response to", "systematic review", "too much of a good thing",
     "topic of interest", "viewpoint",
 )
+_DESIGN_ONLY_PHRASES = (
+    "aimed to assess", "aimed to determine", "aims to assess", "aims to determine",
+    "designed to assess", "designed to determine", "designed to test",
+    "study protocol", "trial protocol", "will assess", "will determine", "will test",
+)
+_ABSTRACT_RESULT_PHRASES = (
+    "demonstrated", "did not", "failed to", "found that", "no significant",
+    "observed", "reported", "resulted in", "results showed", "showed that",
+    "significantly", "was associated", "were associated", "we found",
+)
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
@@ -258,6 +268,8 @@ def _receipt_hygiene_reject(a: Paper, b: Paper, anchors: tuple[str, ...]) -> str
         return "reject:non_primary_receipt"
     if not _has_finding_text(a) or not _has_finding_text(b):
         return "reject:title_only_receipt"
+    if _design_only_directional_receipt(a) or _design_only_directional_receipt(b):
+        return "reject:design_only_directional_receipt"
     title_a = _title_terms(a)
     title_b = _title_terms(b)
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
@@ -286,6 +298,24 @@ def _title_terms(paper: Paper) -> set[str]:
 
 def _has_finding_text(paper: Paper) -> bool:
     return len(_WORD_RE.findall(paper.abstract.casefold())) >= 6
+
+
+def _design_only_directional_receipt(paper: Paper) -> bool:
+    title_direction = bool(_title_terms(paper) & (_PROMISE | _FAILURE | _NEGATIVE_RESULT_WORDS))
+    return title_direction and _design_only_abstract(paper)
+
+
+def _design_only_abstract(paper: Paper) -> bool:
+    abstract = paper.abstract.casefold()
+    return any(phrase in abstract for phrase in _DESIGN_ONLY_PHRASES) and not _abstract_reports_result(paper)
+
+
+def _abstract_reports_result(paper: Paper) -> bool:
+    abstract = paper.abstract.casefold()
+    tokens = set(_WORD_RE.findall(abstract))
+    return bool(tokens & (_RESULT | _NEGATIVE_RESULT_WORDS)) or any(
+        phrase in abstract for phrase in _ABSTRACT_RESULT_PHRASES
+    )
 
 
 def _tokens(paper: Paper) -> set[str]:

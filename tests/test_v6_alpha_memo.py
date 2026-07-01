@@ -347,6 +347,51 @@ def test_protocol_result_shape_requires_negative_update_receipt() -> None:
     assert not any(item.shape == "protocol_result_mismatch" for item in scored)
 
 
+def test_design_only_abstract_does_not_make_directional_title_elite() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx enhances resistance training insulin adaptation in adults",
+            "This study was designed to assess whether interventionx changes insulin adaptation "
+            "during resistance training in adults with prediabetes.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does interventionx modify glycaemic control of resistance exercise in adults?",
+            "The trial results showed no significant resistance-training signal for HbA1c glycaemic control.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert scored == ()
+
+
+def test_explicit_protocol_expectation_can_still_score_mismatch() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx protocol expected improved insulin adaptation with resistance training",
+            "The protocol expected interventionx to improve insulin adaptation during resistance training in adults.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Interventionx resistance training trial showed no significant insulin adaptation",
+            "The trial results showed no significant insulin adaptation after resistance training in adults.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert scored
+    assert scored[0].shape == "protocol_result_mismatch"
+    assert scored[0].score >= 85
+
+
 def test_protocol_result_shape_rejects_unrelated_endpoint_families() -> None:
     papers = (
         Paper(
@@ -2474,7 +2519,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["metformin resistance training"]
     assert "submission_id" not in row
-    assert row["selector_version"] == 4
+    assert row["selector_version"] == 5
 
 
 def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
