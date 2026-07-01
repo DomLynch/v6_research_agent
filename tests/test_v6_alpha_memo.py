@@ -1723,7 +1723,9 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "do not attribute the contrast to one moderator" in prompt
     assert "Mention small sample sizes" in prompt
     assert "Prefer context-dependent to age-moderated or deficiency-moderated" in prompt
+    assert "do not use internal scorer labels such as protocol mismatch" in prompt
     assert "do not use a bare topic title" in prompt
+    assert "Do not call receipts matched unless" in prompt
     assert "Do not call interventions equivalent across species/doses" in prompt
     assert "Do not mention dose-equivalent scaling" in prompt
     assert '"finding"' in prompt
@@ -1749,6 +1751,26 @@ def test_title_prefers_specific_shared_receipt_terms() -> None:
     )
 
     assert v6_write._title(scored) == "Alpha memo: nicotinamide riboside exercise performance context boundary"
+
+
+def test_title_hides_internal_protocol_mismatch_label() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper("a", "Resveratrol and exercise combined to treat functional limitations", "", "openalex"),
+            Paper("b", "Exercise training but not resveratrol improves aged men outcomes", "", "pubmed"),
+            ("resveratrol", "exercise"),
+            (),
+        ),
+        100,
+        "protocol_result_mismatch",
+        "update",
+        (),
+    )
+
+    title = v6_write._title(scored)
+
+    assert title == "Alpha memo: resveratrol exercise context boundary"
+    assert "protocol mismatch" not in title
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2790,7 +2812,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 7
+    assert row["selector_version"] == 8
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -2799,7 +2821,7 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
             "topic": "metformin resistance training",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 7,
+            "selector_version": 8,
             "top_score": 85,
             "top_shape": "protocol_result_mismatch",
             "paper_count": 24,

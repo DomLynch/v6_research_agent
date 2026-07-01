@@ -21,7 +21,7 @@ _SHAPE_TITLE = {
     "mechanism_to_human_failure": "translation boundary",
     "modality_boundary": "modality boundary",
     "promise_reversal": "context boundary",
-    "protocol_result_mismatch": "protocol mismatch",
+    "protocol_result_mismatch": "context boundary",
     "subgroup_endpoint_split": "endpoint split",
     "translation_boundary": "translation boundary",
 }
@@ -213,8 +213,10 @@ def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ())
         "differ on multiple axes such as species, dose, route, duration, baseline status, or "
         "sample size, do not attribute the contrast to one moderator; state that the moderator "
         "hypothesis is tentative and confounded by the other axes. Title must combine the shared "
-        "receipt anchor with a relationship noun such as boundary, split, or mismatch; do not use "
+        "receipt anchor with a relationship noun such as boundary or split; do not use internal "
+        "scorer labels such as protocol mismatch, and do not use "
         "a bare topic title. Mention small sample sizes "
+        "Do not call receipts matched unless the supplied title or abstract uses matched. "
         "when the supplied receipt gives them. Prefer context-dependent to age-moderated or "
         "deficiency-moderated unless the receipts directly isolate that moderator. "
         "Do not call interventions equivalent across species/doses unless receipts directly establish equivalence. "
