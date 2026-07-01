@@ -12,6 +12,7 @@ from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -164,6 +165,8 @@ class FullrawSearchClient:
             if paper is not None:
                 parsed.append(paper)
         papers = _filter_query_papers(parsed, query)
+        if _truthy(os.environ.get("V6_FULLRAW_ABSTRACT_BACKFILL", "0")):
+            papers = _backfill_missing_abstracts(papers, self._opener, timeout=min(self.timeout, 10.0))
         return SearchResult(query=query, papers=papers, receipt=_receipt(data, hits=len(papers)))
 
     def _post(self, search_url: str, payload: dict[str, object], headers: dict[str, str]) -> object:
@@ -484,7 +487,7 @@ def _parse_paper(item: object) -> Paper | None:
     if not title:
         return None
     doi = _doi(item.get("doi"))
-    paper_id = _clean(item.get("id") or item.get("openalex_id") or doi or title)
+    paper_id = _clean(item.get("id") or item.get("openalex_id") or item.get("semantic_scholar_id") or doi or title)
     abstract = _clean(item.get("abstract") or item.get("abstract_text") or item.get("description"), limit=4000) or _inverted_abstract(item.get("abstract_inverted_index"))
     return Paper(
         paper_id=paper_id,
@@ -518,6 +521,61 @@ def _receipt(data: object, *, hits: int, error: str = "") -> CoverageReceipt:
         partial=bool(shard.get("partial_shard_search") or meta.get("partial")),
         sweep_failed_shards=_int(shard.get("sweep_failed_shards")) or 0,
         error=error,
+    )
+
+
+def _backfill_missing_abstracts(
+    papers: tuple[Paper, ...],
+    opener: RequestOpener,
+    *,
+    timeout: float,
+) -> tuple[Paper, ...]:
+    enriched: list[Paper] = []
+    remaining = _PUBMED_BACKFILL_LIMIT
+    for paper in papers:
+        if remaining > 0 and not _has_receipt_abstract(paper):
+            replacement = _semantic_scholar_backfill(paper, opener, timeout=timeout)
+            if replacement is not None:
+                enriched.append(replacement)
+                remaining -= 1
+                continue
+        enriched.append(paper)
+    return tuple(enriched)
+
+
+def _has_receipt_abstract(paper: Paper) -> bool:
+    return len(re.findall(r"[a-z][a-z0-9]{2,}", paper.abstract.casefold())) >= 6
+
+
+def _semantic_scholar_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> Paper | None:
+    identifier = f"DOI:{paper.doi}" if paper.doi else paper.paper_id if paper.source == "semantic_scholar" else ""
+    if not identifier:
+        return None
+    url = (
+        "https://api.semanticscholar.org/graph/v1/paper/"
+        f"{quote(identifier, safe='')}?fields=title,abstract,year,venue,url,externalIds"
+    )
+    request = Request(url, headers={"User-Agent": "v6-alpha-memo/0.1"})
+    try:
+        with opener(request, timeout=max(1.0, timeout)) as response:
+            data = json.loads(response.read().decode())
+    except (OSError, HTTPError, TimeoutError, URLError, json.JSONDecodeError):
+        return None
+    abstract = _clean(data.get("abstract"), limit=4000)
+    if not abstract:
+        return None
+    external = data.get("externalIds")
+    external = external if isinstance(external, dict) else {}
+    doi = paper.doi or _doi(external.get("DOI"))
+    return Paper(
+        paper_id=paper.paper_id,
+        title=paper.title,
+        abstract=abstract,
+        source=paper.source,
+        year=paper.year or _int(data.get("year")),
+        doi=doi,
+        url=paper.url or _clean(data.get("url")),
+        venue=paper.venue or _clean(data.get("venue")),
     )
 
 

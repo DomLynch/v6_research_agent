@@ -2408,7 +2408,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "query_limit": 3,
             "per_query_limit": 10,
             "selector_version": 14,
-            "query_shape_version": 4,
+            "query_shape_version": 5,
         }]
     }
 
@@ -2758,12 +2758,12 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
             {
                 "topic": "omega 3 atrial fibrillation cardiovascular prevention",
                 "trace": strict_then_waiting,
-                "query_shape_version": 4,
+                "query_shape_version": 5,
             },
             {
                 "topic": "creatine cognitive function older adults",
                 "trace": {"coverage": [{"error": "async_sweep_running"}]},
-                "query_shape_version": 4,
+                "query_shape_version": 5,
             },
         ]
     }
@@ -2842,13 +2842,13 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "blocked_stage": "search_cache_waiting",
                 "query_limit": 3,
                 "per_query_limit": 10,
-                "query_shape_version": 4,
+                "query_shape_version": 5,
                 "selector_version": 14,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
                 "topic": "vitamin d fracture randomized trial older adults",
-                "query_shape_version": 4,
+                "query_shape_version": 5,
                 "selector_version": 2,
                 "trace": {"coverage": [{"error": "async_sweep_queued"}]},
             },
@@ -2935,7 +2935,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
             {
                 "topic": "time restricted eating resistance training lean mass",
                 "blocked_stage": "search_cache_waiting",
-                "query_shape_version": 4,
+                "query_shape_version": 5,
                 "wait_shards": 1408,
                 "wait_stale_count": 2,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1408}]},
@@ -2943,7 +2943,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
             {
                 "topic": "collagen tendon pain exercise",
                 "blocked_stage": "search_cache_waiting",
-                "query_shape_version": 4,
+                "query_shape_version": 5,
                 "trace": {"coverage": [{"error": "async_sweep_queued"}]},
             },
         ]
@@ -3159,7 +3159,7 @@ def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
             "selector_version": 14,
-            "query_shape_version": 4,
+            "query_shape_version": 5,
             "query_limit": 3,
             "per_query_limit": 10,
             "paper_count": 26,
@@ -3195,7 +3195,7 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
             "blocked_stage": "search_cache_waiting",
             "trace": {"queries": ["resveratrol blunts exercise training", "resveratrol failed primary"]},
             "top_score": 90,
-            "query_shape_version": 1,
+            "query_shape_version": 4,
         }]
     }
 
@@ -3204,7 +3204,7 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["resveratrol blunts exercise training"]
     assert row["blocked_stage"] == "search_cache_waiting"
-    assert row["query_shape_version"] == 4
+    assert row["query_shape_version"] == 5
     assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
