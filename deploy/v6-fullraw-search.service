@@ -10,7 +10,7 @@ EnvironmentFile=/etc/researka-fullraw.env
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONPATH=/opt/v5-memo/src
 Environment=RESEARKA_FULLRAW_INDEX_HOST=127.0.0.1
-Environment=RESEARKA_FULLRAW_INDEX_PORT=9917
+Environment=RESEARKA_FULLRAW_INDEX_PORT=9918
 Environment=RESEARKA_FULLRAW_FAST_HEALTH=1
 Environment=RESEARKA_FULLRAW_SHARD_DIR=/var/lib/v5-memo/fullraw-fts-remote
 Environment=RESEARKA_FULLRAW_SHARD_CATALOG_PATH=/var/lib/v5-memo/fullraw-shard-catalog.json
@@ -34,7 +34,7 @@ Environment=RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=180
 Environment=RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20
 Environment=RESEARKA_FULLRAW_SEARCH_ISOLATED=1
 Environment=V5_MEMO_FULL_RAW_INDEX_HOST=127.0.0.1
-Environment=V5_MEMO_FULL_RAW_INDEX_PORT=9917
+Environment=V5_MEMO_FULL_RAW_INDEX_PORT=9918
 ExecStart=/usr/bin/python3 -m v5_memo.fullraw_index serve
 Restart=always
 RestartSec=10
