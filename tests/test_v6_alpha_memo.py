@@ -1779,6 +1779,10 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "do not claim it improved that endpoint" in prompt
     assert "analogous cross-context signal" in prompt
     assert "do not attribute the contrast to one moderator" in prompt
+    assert "Name exact tissue, organ, anatomy, assay, or outcome domain" in prompt
+    assert "do not replace it with generic tissue, biology, or performance wording" in prompt
+    assert "If receipt years differ" in prompt
+    assert "mechanistic context, clinical update, or direct replication" in prompt
     assert "Mention small sample sizes" in prompt
     assert "Prefer context-dependent to age-moderated or deficiency-moderated" in prompt
     assert "do not use internal scorer labels such as protocol mismatch" in prompt
