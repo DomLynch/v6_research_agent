@@ -791,6 +791,48 @@ def test_modality_boundary_requires_anchor_specific_update_sentence() -> None:
     assert not any(item.shape == "modality_boundary" for item in scored)
 
 
+def test_translation_boundary_rejects_generic_timing_protein_muscle_bridge() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Timing Influence of Carbohydrate-Protein Ingestion on Muscle Soreness and Next-Day Running Performance",
+            "The study tested carbohydrate-protein timing around downhill running in trained humans.",
+            "pubmed",
+        ),
+        Paper(
+            "b",
+            "The impact of aerobic exercise timing on BMAL1 protein expression and antioxidant responses in skeletal muscle of mice",
+            "The mouse study evaluated aerobic exercise timing effects on BMAL1 protein expression.",
+            "openalex",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"protein", "timing", "muscle", "synthesis"})
+
+    assert scored == ()
+
+
+def test_status_only_anchor_is_not_intervention_receipt() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resistance Training Modulates the Humoral Inflammatory Profile of Diabetic Older Adults Using Metformin",
+            "Results showed resistance training changed inflammatory markers in diabetic older adults using metformin.",
+            "pubmed",
+        ),
+        Paper(
+            "b",
+            "Metformin alters skeletal muscle transcriptome adaptations to resistance training in older adults",
+            "Metformin blunted transcriptome and hypertrophy adaptations to resistance training in older adults.",
+            "openalex",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "resistance", "training"})
+
+    assert scored == ()
+
+
 def test_rejects_review_keyword_overlap_before_writing() -> None:
     papers = (
         Paper("a", "Systematic review of leadership and productivity", "productivity evidence", "openalex"),

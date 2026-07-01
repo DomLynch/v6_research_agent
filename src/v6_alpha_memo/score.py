@@ -71,8 +71,8 @@ _CONTEXT_ANCHOR = frozenset({
     "adaptation", "adaptations", "adult", "adults", "aging", "biomarker", "biomarkers",
     "biology", "care", "cell", "cells", "disease", "function", "functions", "gene",
     "genes", "health", "human", "humans", "model", "models", "older", "outcome",
-    "outcomes", "pathway", "pathways", "primary", "protein", "proteins", "training",
-    "trial", "trials",
+    "muscle", "outcomes", "pathway", "pathways", "primary", "protein", "proteins",
+    "synthesis", "timing", "training", "trial", "trials",
 })
 _NONPRIMARY_PHRASES = (
     "case report", "commentary", "dispatch", "editorial", "in brief",
@@ -95,6 +95,7 @@ _RESULT_SENTENCE_MARKERS = frozenset({
     "demonstrated", "failed", "found", "observed", "reported", "resulted",
     "results", "showed", "significant", "significantly", "unchanged",
 })
+_POSITIVE_RESULT_WORDS = frozenset({"corrected", "enhanced", "improved", "increased", "reversed"})
 _SPECULATIVE_UPDATE_CONTEXT = frozenset({
     "background", "hypothesized", "hypothesis", "may", "might", "prior",
     "previous", "rationale", "suggest", "suggested",
@@ -341,6 +342,8 @@ def _receipt_hygiene_reject(
         return "reject:non_primary_receipt"
     if _comparator_only_anchor(a, anchors, topic_terms) or _comparator_only_anchor(b, anchors, topic_terms):
         return "reject:comparator_only_anchor"
+    if _status_only_anchor(a, anchors, topic_terms) or _status_only_anchor(b, anchors, topic_terms):
+        return "reject:status_only_anchor"
     if not _has_finding_text(a) or not _has_finding_text(b):
         return "reject:title_only_receipt"
     if _design_only_directional_receipt(a) or _design_only_directional_receipt(b):
@@ -362,6 +365,23 @@ def _comparator_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms:
             rf"\b{re.escape(anchor)}\b[^.:\n]{{0,90}}\b(?:compared with|compared to|versus|vs\.?)\b",
             title,
         ):
+            return True
+    return False
+
+
+def _status_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: frozenset[str]) -> bool:
+    title = paper.title.casefold()
+    for anchor in anchors:
+        if anchor in _CONTEXT_ANCHOR or (topic_terms and anchor not in topic_terms):
+            continue
+        status_pattern = rf"\b(?:using|receiving|taking|on|treated with)\s+{re.escape(anchor)}\b|\b{re.escape(anchor)}-treated\b"
+        active_pattern = (
+            rf"\b(?:administration|effect|effects|placebo|randomized|supplementation|trial|versus|vs\.?)\b"
+            rf"[^.:\n]{{0,90}}\b{re.escape(anchor)}\b|"
+            rf"\b{re.escape(anchor)}\b[^.:\n]{{0,90}}"
+            rf"\b(?:administration|placebo|randomized|supplementation|treatment|versus|vs\.?)\b"
+        )
+        if re.search(status_pattern, title) and not re.search(active_pattern, title):
             return True
     return False
 
@@ -401,9 +421,18 @@ def _design_only_abstract(paper: Paper) -> bool:
 
 def _abstract_reports_result(paper: Paper) -> bool:
     abstract = paper.abstract.casefold()
-    tokens = set(_WORD_RE.findall(abstract))
-    return bool(tokens & (_RESULT | _NEGATIVE_RESULT_WORDS)) or any(
-        phrase in abstract for phrase in _ABSTRACT_RESULT_PHRASES
+    return any(
+        _sentence_reports_result(sentence)
+        for sentence in _sentences(abstract)
+    )
+
+
+def _sentence_reports_result(sentence: str) -> bool:
+    tokens = set(_WORD_RE.findall(sentence))
+    if tokens & _SPECULATIVE_UPDATE_CONTEXT:
+        return False
+    return bool(tokens & (_RESULT | _NEGATIVE_RESULT_WORDS | _POSITIVE_RESULT_WORDS)) or any(
+        phrase in sentence for phrase in _ABSTRACT_RESULT_PHRASES
     )
 
 
@@ -428,6 +457,8 @@ def _roles_fit(
     if shape == "translation_boundary":
         return (
             _mechanism_model_receipt(first)
+            and _abstract_reports_result(first)
+            and _abstract_reports_result(second)
             and not _negative_result(first)
             and _has(ft | st, _PROMISE)
             and _is_human(second)
@@ -440,6 +471,7 @@ def _roles_fit(
             and _promise_signal(first)
             and _negative_update_receipt(second, anchors)
             and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+            and _endpoint_not_drift(first, second)
             and _population_compatible(first, second)
         )
     if shape == "modality_boundary":
@@ -603,6 +635,12 @@ def _endpoint_compatible(a: Paper, b: Paper) -> bool:
     left = _endpoint_families(a)
     right = _endpoint_families(b)
     return bool(left and right and left & right)
+
+
+def _endpoint_not_drift(a: Paper, b: Paper) -> bool:
+    left = _endpoint_families(a)
+    right = _endpoint_families(b)
+    return not (left and right and not left & right)
 
 
 def _endpoint_families(paper: Paper) -> set[str]:
