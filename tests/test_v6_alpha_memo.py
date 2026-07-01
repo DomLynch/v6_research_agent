@@ -1003,11 +1003,31 @@ def test_fullraw_client_backfills_completed_cache_title_only_hit(
             "sweep_failed_shards": 0,
         },
     }))
+    (cache_dir / "rich-duplicate.json").write_text(json.dumps({
+        "hits": [{
+            "title": "GlyNAC Supplementation Improves Glutathione Deficiency",
+            "abstract": "GlyNAC corrected glutathione deficiency in older adults.",
+            "source": "openalex",
+            "doi": "10.1093/jn/nxab309",
+        }],
+        "receipt": {
+            "sweep_original_query": "glynac glutathione",
+            "sweep_query": "glynac glutathione",
+            "sweep_result_limit": 10,
+            "shards_searched": 32,
+            "shards_total": 1525,
+            "source_count_searched": 2,
+            "partial_shard_search": True,
+            "sweep_failed_shards": 0,
+        },
+    }))
 
-    def opener(request: Request, timeout: float) -> _Response:
-        del timeout
-        assert "api.semanticscholar.org" in request.full_url
-        return _Response({"abstract": "GlyNAC corrected glutathione deficiency in older adults."})
+    calls = 0
+
+    def opener(_request: Request, _timeout: float) -> _Response:
+        nonlocal calls
+        calls += 1
+        raise AssertionError("completed cache duplicate should avoid HTTP")
 
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
     monkeypatch.setenv("V6_FULLRAW_ABSTRACT_BACKFILL", "1")
@@ -1018,6 +1038,7 @@ def test_fullraw_client_backfills_completed_cache_title_only_hit(
     ).search("glynac glutathione", limit=10)
 
     assert result.papers[0].abstract.startswith("GlyNAC corrected")
+    assert calls == 0
 
 
 def test_fullraw_client_filters_noisy_exact_completed_cache(

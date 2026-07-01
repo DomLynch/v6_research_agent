@@ -540,7 +540,7 @@ def _backfill_missing_abstracts(
     remaining = _PUBMED_BACKFILL_LIMIT
     for paper in papers:
         if remaining > 0 and not _has_receipt_abstract(paper):
-            replacement = _semantic_scholar_backfill(paper, opener, timeout=timeout)
+            replacement = _cache_abstract_backfill(paper) or _semantic_scholar_backfill(paper, opener, timeout=timeout)
             if replacement is not None:
                 enriched.append(replacement)
                 remaining -= 1
@@ -551,6 +551,36 @@ def _backfill_missing_abstracts(
 
 def _has_receipt_abstract(paper: Paper) -> bool:
     return len(re.findall(r"[a-z][a-z0-9]{2,}", paper.abstract.casefold())) >= 6
+
+
+def _cache_abstract_backfill(paper: Paper) -> Paper | None:
+    for cache_dir in _sweep_cache_dirs():
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            for item in _items(data):
+                candidate = _parse_paper(item)
+                if candidate is None or not _same_paper(paper, candidate) or not _has_receipt_abstract(candidate):
+                    continue
+                return Paper(
+                    paper_id=paper.paper_id,
+                    title=paper.title,
+                    abstract=candidate.abstract,
+                    source=paper.source,
+                    year=paper.year or candidate.year,
+                    doi=paper.doi or candidate.doi,
+                    url=paper.url or candidate.url,
+                    venue=paper.venue or candidate.venue,
+                )
+    return None
+
+
+def _same_paper(left: Paper, right: Paper) -> bool:
+    if left.doi and right.doi:
+        return left.doi == right.doi
+    return _norm_title(left.title) == _norm_title(right.title)
 
 
 def _semantic_scholar_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> Paper | None:
