@@ -3832,7 +3832,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
     assert seen == ["collagen tendon pain exercise"]
 
 
-def test_daemon_stale_wait_beats_high_cache_progress_for_candidate_rank(
+def test_daemon_stale_wait_deprioritizes_waiting_candidate(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
