@@ -15,7 +15,6 @@ _PROMISE = frozenset({
     "protect", "protected", "raise", "raised", "recovery", "regeneration",
     "superior", "tolerance",
 })
-_TITLE_PROMISE = _PROMISE - frozenset({"benefit", "recovery", "tolerance"})
 _FAILURE = frozenset({
     "attenuate", "attenuated", "attenuates", "blunt", "blunted", "decrease", "decreased",
     "failed", "failure", "impair", "impaired", "limited", "lower", "lowered",

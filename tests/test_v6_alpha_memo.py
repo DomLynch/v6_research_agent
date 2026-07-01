@@ -262,7 +262,7 @@ def test_failed_to_improve_receipt_is_not_a_promise_role() -> None:
     assert scored == ()
 
 
-def test_explicit_result_title_can_support_receipt_when_abstract_missing() -> None:
+def test_explicit_result_title_without_abstract_is_not_enough_for_receipt() -> None:
     papers = (
         Paper(
             "a",
@@ -280,7 +280,7 @@ def test_explicit_result_title_can_support_receipt_when_abstract_missing() -> No
 
     scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "adaptation"})
 
-    assert scored
+    assert scored == ()
 
 
 def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
