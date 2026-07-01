@@ -2100,7 +2100,7 @@ def test_daemon_prioritizes_usable_completed_cache_over_partial_progress(
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
     monkeypatch.setenv("V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT", "25")
 
-    rows = [
+    rows: list[dict[str, object]] = [
         {"topic": "time restricted eating resistance training lean mass"},
         {"topic": "metformin resistance training"},
     ]
