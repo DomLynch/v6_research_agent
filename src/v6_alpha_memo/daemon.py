@@ -254,11 +254,11 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     ranked = sorted(
         indexed,
         key=lambda item: (
+            _stale_waiting_row(item[1]),
             item[1].get("blocked_stage") == "search_cache_waiting"
             and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
             _awaiting_side_search(item[1])
             and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
-            _stale_waiting_row(item[1]),
             -_int(item[1].get("top_score")),
             -cache_progress.get(str(item[1].get("topic")), 0),
             not _attempt_count(item[1]),

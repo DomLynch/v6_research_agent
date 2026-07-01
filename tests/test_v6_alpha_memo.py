@@ -2482,6 +2482,17 @@ def test_daemon_records_stale_waiting_shard_progress() -> None:
 
 def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "time.json").write_text(json.dumps({
+        "hits": [],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time restricted eating resistance training lean mass",
+            "shards_searched": 1408,
+            "source_count_searched": 5,
+        },
+    }))
 
     def fake_build_memo(topic: str, **kwargs: object) -> object:
         del kwargs
@@ -2489,6 +2500,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
         raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
 
     monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
     monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
     board: dict[str, object] = {
         "rows": [
