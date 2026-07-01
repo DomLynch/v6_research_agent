@@ -535,16 +535,18 @@ def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, o
 
 def _clean_revision(data: dict[str, object]) -> bool:
     scores = data.get("rubric_scores")
-    values = scores.values() if isinstance(scores, dict) else ()
+    scores = scores if isinstance(scores, dict) else {}
+    values = scores.values()
     return (
         data.get("decision") == "revise"
         and bool(data.get("resubmission"))
         and not data.get("gate_failures")
-        and not data.get("required_revisions")
         and not data.get("major_issues")
         and data.get("claim_support_verdict") == "supported"
         and data.get("overclaim_verdict") == "none"
-        and all(isinstance(score, int | float) and score >= 4 for score in values)
+        and all(isinstance(score, int | float) and score >= 3 for score in values)
+        and _int(scores.get("source_grounding")) >= 4
+        and _int(scores.get("claim_evidence_alignment")) >= 4
     )
 
 

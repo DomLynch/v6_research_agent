@@ -3138,6 +3138,41 @@ def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> No
     assert "blocked_final" not in row
 
 
+def test_daemon_retries_supported_required_revision_without_manual_edit(tmp_path: Path) -> None:
+    class RequiredRevisePublisher:
+        def get(self, path: str) -> dict[str, object]:
+            assert path == "/submissions/sub-1/decision"
+            return {
+                "ok": True,
+                "json": {
+                    "status": "complete",
+                    "decision": "revise",
+                    "gate_failures": [],
+                    "required_revisions": ["Name the exact tissue and endpoint."],
+                    "major_issues": [],
+                    "rubric_scores": {
+                        "source_grounding": 4,
+                        "claim_evidence_alignment": 4,
+                        "gaps_quality": 3,
+                    },
+                    "claim_support_verdict": "supported",
+                    "overclaim_verdict": "none",
+                    "resubmission": {"allowed": True},
+                },
+            }
+
+    row: dict[str, object] = {"generated": True, "submitted": True, "submission_id": "sub-1"}
+
+    v6_daemon._run_topic(tmp_path, "resveratrol mimics exercise training", "agent-v6", DemoClient(), RequiredRevisePublisher(), row)  # type: ignore[arg-type]
+
+    assert row["revision_retry_count"] == 1
+    assert row["revision_of_object_id"] == "sub-1"
+    assert row["revision_notes"] == ("Name the exact tissue and endpoint.",)
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert "blocked_final" not in row
+
+
 def test_minimax_prompt_includes_revision_notes() -> None:
     prompt = v6_write._prompt((), ("Sharpen the endpoint wording.",))
 
@@ -3162,7 +3197,7 @@ def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.Mo
                 "gate_failures": [],
                 "required_revisions": [],
                 "major_issues": [],
-                "rubric_scores": {"source_grounding": 5},
+                "rubric_scores": {"source_grounding": 5, "claim_evidence_alignment": 5},
                 "claim_support_verdict": "supported",
                 "overclaim_verdict": "none",
             }
@@ -3197,7 +3232,7 @@ def test_daemon_reopens_legacy_clean_revision_without_parent(monkeypatch: pytest
                 "gate_failures": [],
                 "required_revisions": [],
                 "major_issues": [],
-                "rubric_scores": {"source_grounding": 5},
+                "rubric_scores": {"source_grounding": 5, "claim_evidence_alignment": 5},
                 "claim_support_verdict": "supported",
                 "overclaim_verdict": "none",
             }
