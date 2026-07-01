@@ -195,24 +195,25 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
 
 
 def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
-    cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
-    if not cache_dir:
+    cache_dirs = _cache_dirs()
+    if not cache_dirs:
         return {}
     topics = [(str(row.get("topic")), _schedule_terms(str(row.get("topic")))) for row in rows]
     scores: dict[str, int] = {}
-    for path in Path(cache_dir).glob("*.json"):
-        try:
-            data = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        receipt = data.get("receipt") if isinstance(data, dict) else {}
-        receipt = receipt if isinstance(receipt, dict) else {}
-        query_terms = _schedule_terms(f"{receipt.get('sweep_original_query', '')} {receipt.get('sweep_query', '')}")
-        hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
-        value = _int(receipt.get("shards_searched")) + hits * 2000 + _int(receipt.get("source_count_searched")) * 100
-        for topic, terms in topics:
-            if terms and len(terms & query_terms) >= min(2, len(terms)):
-                scores[topic] = max(scores.get(topic, 0), value)
+    for cache_dir in cache_dirs:
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            receipt = data.get("receipt") if isinstance(data, dict) else {}
+            receipt = receipt if isinstance(receipt, dict) else {}
+            query_terms = _schedule_terms(f"{receipt.get('sweep_original_query', '')} {receipt.get('sweep_query', '')}")
+            hits = len(data.get("hits") or []) if isinstance(data, dict) else 0
+            value = _int(receipt.get("shards_searched")) + hits * 2000 + _int(receipt.get("source_count_searched")) * 100
+            for topic, terms in topics:
+                if terms and len(terms & query_terms) >= min(2, len(terms)):
+                    scores[topic] = max(scores.get(topic, 0), value)
     return scores
 
 
@@ -350,12 +351,7 @@ def _topics() -> tuple[str, ...]:
 def _cache_topics() -> tuple[str, ...]:
     limit = max(0, _int_env("V6_DAEMON_MAX_CACHE_TOPICS", 25))
     topics: list[str] = []
-    cache_dirs = ",".join((
-        os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", ""),
-        os.environ.get("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", ""),
-        os.environ.get("RESEARKA_FULLRAW_SWEEP_CACHE_DIR", ""),
-    ))
-    for cache_dir in dict.fromkeys(path.strip() for path in re.split(r"[:,]", cache_dirs) if path.strip()):
+    for cache_dir in _cache_dirs():
         for path in Path(cache_dir).glob("*.json"):
             try:
                 data = json.loads(path.read_text())
@@ -372,6 +368,15 @@ def _cache_topics() -> tuple[str, ...]:
             ):
                 topics.append(str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip())
     return tuple(dict.fromkeys(topic for topic in topics if topic))[:limit]
+
+
+def _cache_dirs() -> tuple[str, ...]:
+    raw = ",".join((
+        os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", ""),
+        os.environ.get("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", ""),
+        os.environ.get("RESEARKA_FULLRAW_SWEEP_CACHE_DIR", ""),
+    ))
+    return tuple(dict.fromkeys(path.strip() for path in re.split(r"[:,]", raw) if path.strip()))
 
 
 def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, object]]:
