@@ -2550,6 +2550,28 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert row["selector_version"] == 6
 
 
+def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "metformin resistance training",
+            "blocked_stage": "selector_rejected",
+            "blocked_final": True,
+            "selector_version": 6,
+            "top_score": 85,
+            "top_shape": "protocol_result_mismatch",
+            "paper_count": 24,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("metformin resistance training",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert row["blocked_stage"] == "selector_rejected"
+    assert "top_score" not in row
+    assert "top_shape" not in row
+    assert "paper_count" not in row
+
+
 def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
