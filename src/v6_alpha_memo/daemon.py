@@ -404,8 +404,11 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
         (str(row.get("topic")), _schedule_terms(str(row.get("topic"))), _schedule_ordered_terms(str(row.get("topic"))))
         for row in rows
     ]
-    scores: dict[str, int] = {}
+    primary_cache_dir = os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", "").strip()
+    primary_scores: dict[str, int] = {}
+    extra_scores: dict[str, int] = {}
     for cache_dir in cache_dirs:
+        scores = primary_scores if cache_dir == primary_cache_dir else extra_scores
         for path in Path(cache_dir).glob("*.json"):
             try:
                 data = json.loads(path.read_text())
@@ -433,7 +436,7 @@ def _cache_progress_by_topic(rows: list[dict[str, object]]) -> dict[str, int]:
                 related = usable and bool(ordered_terms) and ordered_terms[0] in query_terms
                 if terms and (exact or related) and len(terms & query_terms) >= min(2, len(terms)):
                     scores[topic] = max(scores.get(topic, 0), value + (10_000_000 if exact and usable else 0))
-    return scores
+    return {**extra_scores, **primary_scores}
 
 
 def _promote_duplicate_cache_progress() -> None:

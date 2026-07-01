@@ -3550,6 +3550,59 @@ def test_daemon_prioritizes_shard_completion_over_hit_count(monkeypatch: pytest.
     assert selected == [rows[1]]
 
 
+def test_daemon_primary_cache_progress_beats_extra_cache_for_active_completion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    primary = tmp_path / "primary"
+    extra = tmp_path / "extra"
+    primary.mkdir()
+    extra.mkdir()
+    (primary / "time-partial.json").write_text(json.dumps({
+        "hits": [{"title": "Time partial"}],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time restricted eating resistance training lean mass",
+            "shards_searched": 400,
+            "source_count_searched": 4,
+        },
+    }))
+    (extra / "time-complete.json").write_text(json.dumps({
+        "hits": [{"title": f"Extra complete time result {i}"} for i in range(25)],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time resistance mass",
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    (primary / "creatine-near-complete.json").write_text(json.dumps({
+        "hits": [{"title": f"Creatine result {i}"} for i in range(10)],
+        "receipt": {
+            "sweep_original_query": "creatine cognitive function older adults",
+            "sweep_query": "creatine cognitive function older adults",
+            "shards_searched": 1319,
+            "source_count_searched": 5,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(primary))
+    monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+
+    rows: list[dict[str, object]] = [
+        {"topic": "time restricted eating resistance training lean mass", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+        {"topic": "creatine cognitive function older adults", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+    ]
+
+    selected = v6_daemon._candidate_rows(
+        rows,
+        ("time restricted eating resistance training lean mass", "creatine cognitive function older adults"),
+    )
+
+    assert selected == [rows[1]]
+
+
 def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
