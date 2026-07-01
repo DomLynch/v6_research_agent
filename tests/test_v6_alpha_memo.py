@@ -2465,6 +2465,55 @@ def test_daemon_rotates_side_waiting_high_score_behind_regular_waiting_row(
     assert seen == ["generic waiting"]
 
 
+def test_daemon_records_stale_waiting_shard_progress() -> None:
+    row: dict[str, object] = {}
+
+    v6_daemon._record_wait_progress(row, {"coverage": [{"shards_searched": 1408}]})
+    v6_daemon._record_wait_progress(row, {"coverage": [{"shards_searched": 1408}]})
+
+    assert row.get("wait_shards") == 1408
+    assert row.get("wait_stale_count") == 1
+
+    v6_daemon._record_wait_progress(row, {"coverage": [{"shards_searched": 1410}]})
+
+    assert row.get("wait_shards") == 1410
+    assert row.get("wait_stale_count") == 0
+
+
+def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {
+                "topic": "time restricted eating resistance training lean mass",
+                "blocked_stage": "search_cache_waiting",
+                "query_shape_version": 3,
+                "wait_shards": 1408,
+                "wait_stale_count": 2,
+                "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1408}]},
+            },
+            {
+                "topic": "collagen tendon pain exercise",
+                "blocked_stage": "search_cache_waiting",
+                "query_shape_version": 3,
+                "trace": {"coverage": [{"error": "async_sweep_queued"}]},
+            },
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("time restricted eating resistance training lean mass", "collagen tendon pain exercise"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["collagen tendon pain exercise"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 

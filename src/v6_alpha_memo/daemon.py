@@ -109,10 +109,12 @@ def _run_pass(
                 "query_shape_version": _QUERY_SHAPE_VERSION,
             })
             if stage == "search_cache_waiting":
+                _record_wait_progress(row, exc.trace)
                 waiting += 1
                 if waiting >= max_waiting:
                     break
             else:
+                _clear_wait_progress(row)
                 row["blocked_final"] = True
         except Exception as exc:
             row.update({
@@ -208,6 +210,7 @@ def _run_topic(
 def _clear_blocker(row: dict[str, object]) -> None:
     for key in ("blocked_stage", "blocked_final", "error", "traceback"):
         row.pop(key, None)
+    _clear_wait_progress(row)
 
 
 def _stale_search_depth(row: dict[str, object]) -> bool:
@@ -255,6 +258,7 @@ def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
             and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
             _awaiting_side_search(item[1])
             and cache_progress.get(str(item[1].get("topic")), 0) <= 0,
+            _stale_waiting_row(item[1]),
             -_int(item[1].get("top_score")),
             -cache_progress.get(str(item[1].get("topic")), 0),
             not _attempt_count(item[1]),
@@ -628,6 +632,36 @@ def _awaiting_side_search(row: dict[str, object]) -> bool:
         isinstance(coverage, list)
         and any(_strict_coverage(item) for item in coverage)
         and any(_waitable_coverage(item) for item in coverage)
+    )
+
+
+def _stale_waiting_row(row: dict[str, object]) -> bool:
+    return _int(row.get("wait_stale_count")) >= _int_env("V6_DAEMON_STALE_WAIT_PASSES", 2)
+
+
+def _record_wait_progress(row: dict[str, object], trace: dict[str, object]) -> None:
+    shards = _trace_shards(trace)
+    previous = _int(row.get("wait_shards"))
+    if shards and previous and shards <= previous:
+        row["wait_stale_count"] = _int(row.get("wait_stale_count")) + 1
+    else:
+        row["wait_stale_count"] = 0
+    if shards:
+        row["wait_shards"] = shards
+
+
+def _clear_wait_progress(row: dict[str, object]) -> None:
+    for key in ("wait_shards", "wait_stale_count"):
+        row.pop(key, None)
+
+
+def _trace_shards(trace: dict[str, object]) -> int:
+    coverage = trace.get("coverage")
+    if not isinstance(coverage, list):
+        return 0
+    return max(
+        (_int(item.get("shards_searched")) for item in coverage if isinstance(item, dict)),
+        default=0,
     )
 
 
