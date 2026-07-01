@@ -415,6 +415,8 @@ def test_explicit_protocol_expectation_can_still_score_mismatch() -> None:
     assert scored
     assert scored[0].shape == "protocol_result_mismatch"
     assert scored[0].score >= 85
+    assert "worth testing as a positive signal" in scored[0].expectation_update
+    assert "made us expect interventionx would travel" not in scored[0].expectation_update
 
 
 def test_protocol_result_shape_rejects_unrelated_endpoint_families() -> None:
@@ -1719,6 +1721,7 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Do not say blunted, interfered, worsened, or impaired unless the receipt uses that exact direction" in prompt
     assert "preserve softer receipt language such as tendency" in prompt
     assert "label it as expected/planned rather than an observed result" in prompt
+    assert "do not claim it improved that endpoint" in prompt
     assert "analogous cross-context signal" in prompt
     assert "do not attribute the contrast to one moderator" in prompt
     assert "Mention small sample sizes" in prompt
@@ -2812,7 +2815,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 8
+    assert row["selector_version"] == 9
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -2821,7 +2824,7 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
             "topic": "metformin resistance training",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 8,
+            "selector_version": 9,
             "top_score": 85,
             "top_shape": "protocol_result_mismatch",
             "paper_count": 24,
