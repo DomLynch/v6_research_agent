@@ -580,10 +580,6 @@ def _has(tokens: set[str], needles: frozenset[str]) -> bool:
     return bool(tokens & needles)
 
 
-def _negative(tokens: set[str]) -> bool:
-    return _has(tokens, _FAILURE) or ("not" in tokens and _has(tokens, _PROMISE))
-
-
 def _negative_result(paper: Paper) -> bool:
     text = paper.text.casefold()
     phrases = (

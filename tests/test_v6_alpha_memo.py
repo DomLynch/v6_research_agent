@@ -24,10 +24,43 @@ from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
-from v6_alpha_memo.run import DemoClient, NoMemoError, build_memo
+from v6_alpha_memo.run import NoMemoError, build_memo
 from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
 from v6_alpha_memo.write import judge_with_minimax
+
+
+class DemoClient:
+    def search(self, query: str, *, limit: int = 25) -> SearchResult:
+        del limit
+        q = query.casefold()
+        papers: tuple[Paper, ...]
+        if any(term in q for term in ("ai", "retrieval", "factuality", "benchmark")):
+            papers = (
+                Paper("ai-promise", "Retrieval augmented generation improves factuality on a benchmark", "The model improved answer factuality when retrieval augmented generation supplied citations.", "openalex", 2023, "10.demo/ai-promise"),
+                Paper("ai-update", "Retrieval augmented generation failed to reduce human citation errors in field use", "In a human task study, retrieval augmented generation produced null gains and reduced citation accuracy.", "semantic_scholar", 2024, "10.demo/ai-update"),
+            )
+        elif any(term in q for term in ("business", "management", "marketing")):
+            papers = (
+                Paper("biz-promise", "Management dashboard intervention improved forecast accuracy in a pilot", "A pilot program showed the dashboard improved forecast accuracy and analyst confidence.", "openalex", 2021, "10.demo/biz-promise"),
+                Paper("biz-update", "Management dashboard intervention failed in a randomized field experiment", "A field experiment found null productivity gains and reduced forecast accuracy for dashboard users.", "pubmed", 2022, "10.demo/biz-update"),
+            )
+        else:
+            papers = (
+                Paper("promise", "Resveratrol activates mitochondrial exercise-mimetic pathways in mice", "A mouse model showed resveratrol improved exercise adaptation and activated mitochondrial pathways.", "openalex", 2012, "10.demo/promise"),
+                Paper("update", "Resveratrol blunted human exercise training adaptation in a randomized trial", "In older human participants, resveratrol supplementation reduced training-induced improvements.", "pubmed", 2014, "10.demo/update"),
+                Paper("bad", "Systematic review of resveratrol and health outcomes", "A review summarized heterogeneous evidence across many outcomes.", "openalex", 2020, "10.demo/review"),
+            )
+        receipt = CoverageReceipt(
+            hits=len(papers),
+            shards_searched=50,
+            shards_total=1300,
+            papers_searched=46_768_695,
+            papers_total=1_379_119_449,
+            sources_searched=("openalex", "pubmed", "semantic_scholar"),
+            partial=True,
+        )
+        return SearchResult(query=query, papers=papers, receipt=receipt)
 
 
 @pytest.fixture(autouse=True)

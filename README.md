@@ -5,7 +5,7 @@ Lean alpha memo agent for finding receipt-pair novelty shapes.
 ## Run
 
 ```bash
-PYTHONPATH=src python3 -m v6_alpha_memo --demo --topic "resveratrol exercise adaptation"
+PYTHONPATH=src python3 -m v6_alpha_memo --topic "resveratrol exercise adaptation" --trace
 ```
 
 For live fullraw search, set:

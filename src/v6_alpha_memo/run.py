@@ -137,14 +137,13 @@ def build_memo(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--topic", required=True)
-    parser.add_argument("--demo", action="store_true")
     parser.add_argument("--writer", choices=["template", "minimax"], default="template")
     parser.add_argument("--queries", type=int, default=8)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--trace", action="store_true")
     args = parser.parse_args()
 
-    client: SearchClient = DemoClient() if args.demo else FullrawSearchClient.from_env()
+    client: SearchClient = FullrawSearchClient.from_env()
     try:
         run = build_memo(
             args.topic,
@@ -208,22 +207,6 @@ def _waitable_search_error(error: str) -> bool:
     return error.startswith(("async_sweep_", "fullraw_incomplete:", "fullraw_low_source_count:")) or error == "fullraw_partial"
 
 
-class DemoClient(SearchClient):
-    def search(self, query: str, *, limit: int = 25) -> SearchResult:
-        del limit
-        papers = _demo_papers(query)
-        receipt = CoverageReceipt(
-            hits=len(papers),
-            shards_searched=50,
-            shards_total=1300,
-            papers_searched=46_768_695,
-            papers_total=1_379_119_449,
-            sources_searched=("openalex", "pubmed", "semantic_scholar"),
-            partial=True,
-        )
-        return SearchResult(query=query, papers=papers, receipt=receipt)
-
-
 def _best_receipt(results: tuple[SearchResult, ...]) -> CoverageReceipt:
     if not results:
         return CoverageReceipt()
@@ -273,25 +256,6 @@ _GENERIC_TOPIC_TERMS = frozenset({
 def _topic_context_tokens(paper: Paper) -> set[str]:
     text = f"{paper.title} {paper.abstract[:700]}"
     return set(re.findall(r"[a-z][a-z0-9]{2,}", text.casefold()))
-
-
-def _demo_papers(query: str) -> tuple[Paper, ...]:
-    q = query.casefold()
-    if any(term in q for term in ("ai", "retrieval", "factuality", "benchmark")):
-        return (
-            Paper("ai-promise", "Retrieval augmented generation improves factuality on a benchmark", "The model improved answer factuality when retrieval augmented generation supplied citations.", "openalex", 2023, "10.demo/ai-promise"),
-            Paper("ai-update", "Retrieval augmented generation failed to reduce human citation errors in field use", "In a human task study, retrieval augmented generation produced null gains and reduced citation accuracy.", "semantic_scholar", 2024, "10.demo/ai-update"),
-        )
-    if any(term in q for term in ("business", "management", "marketing")):
-        return (
-            Paper("biz-promise", "Management dashboard intervention improved forecast accuracy in a pilot", "A pilot program showed the dashboard improved forecast accuracy and analyst confidence.", "openalex", 2021, "10.demo/biz-promise"),
-            Paper("biz-update", "Management dashboard intervention failed in a randomized field experiment", "A field experiment found null productivity gains and reduced forecast accuracy for dashboard users.", "pubmed", 2022, "10.demo/biz-update"),
-        )
-    return (
-        Paper("promise", "Resveratrol activates mitochondrial exercise-mimetic pathways in mice", "A mouse model showed resveratrol improved exercise adaptation and activated mitochondrial pathways.", "openalex", 2012, "10.demo/promise"),
-        Paper("update", "Resveratrol blunted human exercise training adaptation in a randomized trial", "In older human participants, resveratrol supplementation reduced training-induced improvements.", "pubmed", 2014, "10.demo/update"),
-        Paper("bad", "Systematic review of resveratrol and health outcomes", "A review summarized heterogeneous evidence across many outcomes.", "openalex", 2020, "10.demo/review"),
-    )
 
 
 if __name__ == "__main__":
