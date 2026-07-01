@@ -313,12 +313,13 @@ def _stale_search_depth(row: dict[str, object]) -> bool:
 def _stale_waiting_search_config(row: dict[str, object]) -> bool:
     if row.get("submitted") or row.get("public") or row.get("blocked_stage") != "search_cache_waiting":
         return False
-    if _stale_waiting_row(row):
-        return False
+    query_limit = _int(row.get("query_limit"))
+    per_query_limit = _int(row.get("per_query_limit"))
+    selector_version = _int(row.get("selector_version"))
     return (
-        _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
-        or _int(row.get("query_limit")) < _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
-        or _int(row.get("selector_version")) < _SELECTOR_VERSION
+        bool(per_query_limit and per_query_limit != _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT))
+        or bool(query_limit and query_limit != _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT))
+        or bool(selector_version and selector_version < _SELECTOR_VERSION)
     )
 
 
