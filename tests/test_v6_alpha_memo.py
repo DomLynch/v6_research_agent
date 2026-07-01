@@ -919,6 +919,51 @@ def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     assert result.receipt.source_count_searched == 5
 
 
+def test_fullraw_client_filters_noisy_exact_completed_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "cached.json").write_text(json.dumps({
+        "hits": [
+            {
+                "id": "noise",
+                "title": "Matrix-assisted laser desorption time-of-flight mass spectrometry for antibiotic resistance",
+                "abstract": "The assay detected resistance using time of flight mass spectrometry.",
+                "source": "openalex",
+            },
+            {
+                "id": "hit",
+                "title": "Time-restricted eating during resistance training changes lean mass",
+                "abstract": "Adults completed time-restricted eating with resistance training and lean mass outcomes.",
+                "source": "pubmed",
+            },
+        ],
+        "receipt": {
+            "sweep_original_query": "time restricted eating resistance training lean mass",
+            "sweep_query": "time restricted eating resistance training lean mass",
+            "sweep_result_limit": 10,
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "semantic_scholar_abstracts": 1, "biorxiv": 1},
+            "partial_shard_search": False,
+            "sweep_failed_shards": 0,
+        },
+    }))
+
+    def opener(_request: Request, _timeout: float) -> _Response:
+        raise AssertionError("strict completed cache should be reused after paper filtering")
+
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=cast(RequestOpener, opener)).search(
+        "time restricted eating resistance training lean mass",
+        limit=10,
+    )
+
+    assert [paper.paper_id for paper in result.papers] == ["hit"]
+
+
 def test_fullraw_client_uses_extra_completed_sweep_cache_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
