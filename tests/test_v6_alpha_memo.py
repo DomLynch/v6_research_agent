@@ -1977,8 +1977,16 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
     monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
     board: dict[str, object] = {
         "rows": [
-            {"topic": "omega 3 atrial fibrillation cardiovascular prevention", "trace": strict_then_waiting},
-            {"topic": "creatine cognitive function older adults", "trace": {"coverage": [{"error": "async_sweep_running"}]}},
+            {
+                "topic": "omega 3 atrial fibrillation cardiovascular prevention",
+                "trace": strict_then_waiting,
+                "query_shape_version": 2,
+            },
+            {
+                "topic": "creatine cognitive function older adults",
+                "trace": {"coverage": [{"error": "async_sweep_running"}]},
+                "query_shape_version": 2,
+            },
         ]
     }
 
@@ -2191,6 +2199,38 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert seen == ["metformin resistance training"]
     assert "submission_id" not in row
     assert row["selector_version"] == 2
+
+
+def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "resveratrol blunts exercise training",
+            "blocked_stage": "search_cache_waiting",
+            "trace": {"queries": ["resveratrol blunts exercise training", "resveratrol failed primary"]},
+            "top_score": 90,
+            "query_shape_version": 1,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol blunts exercise training",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen == ["resveratrol blunts exercise training"]
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert row["query_shape_version"] == 2
+    assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
 def test_domain_classifier_does_not_match_ai_inside_training() -> None:

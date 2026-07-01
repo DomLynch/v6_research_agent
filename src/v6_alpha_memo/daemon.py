@@ -22,6 +22,7 @@ _DEFAULT_QUERY_LIMIT = 3
 _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 2
+_QUERY_SHAPE_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +79,8 @@ def _run_pass(
         elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
+        elif _stale_query_shape_version(row):
+            _reset_for_query_shape_retry(row)
         elif _stale_selector_version(row):
             _reset_for_selector_retry(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
@@ -100,6 +103,7 @@ def _run_pass(
                 "query_limit": _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT),
                 "per_query_limit": _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT),
                 "selector_version": _SELECTOR_VERSION,
+                "query_shape_version": _QUERY_SHAPE_VERSION,
             })
             if stage == "search_cache_waiting":
                 waiting += 1
@@ -144,6 +148,7 @@ def _run_topic(
                 "query_limit": query_limit,
                 "per_query_limit": per_query_limit,
                 "selector_version": _SELECTOR_VERSION,
+                "query_shape_version": _QUERY_SHAPE_VERSION,
             })
             return
         slug = _slug(topic)
@@ -163,6 +168,7 @@ def _run_topic(
             "query_limit": query_limit,
             "per_query_limit": per_query_limit,
             "selector_version": _SELECTOR_VERSION,
+            "query_shape_version": _QUERY_SHAPE_VERSION,
         })
         _clear_blocker(row)
         response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected, row))
@@ -211,6 +217,19 @@ def _stale_search_depth(row: dict[str, object]) -> bool:
 
 def _stale_selector_version(row: dict[str, object]) -> bool:
     return bool(row.get("blocked_final") and not row.get("public") and _int(row.get("selector_version")) < _SELECTOR_VERSION)
+
+
+def _stale_query_shape_version(row: dict[str, object]) -> bool:
+    return bool(not row.get("submitted") and not row.get("public") and _int(row.get("query_shape_version")) < _QUERY_SHAPE_VERSION)
+
+
+def _reset_for_query_shape_retry(row: dict[str, object]) -> None:
+    for key in (
+        "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
+        "query_limit", "per_query_limit", "selector_version",
+    ):
+        row.pop(key, None)
+    _clear_blocker(row)
 
 
 def _attempt_count(row: dict[str, object]) -> int:
