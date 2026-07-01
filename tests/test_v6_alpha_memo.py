@@ -360,10 +360,7 @@ def test_cross_species_endpoint_drift_stays_below_publish_threshold() -> None:
 
     scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
 
-    assert scored
-    assert scored[0].shape == "mechanism_to_human_failure"
-    assert scored[0].score < 85
-    assert "penalty:cross_species_endpoint_drift" in scored[0].reasons
+    assert not scored
 
 
 def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
@@ -3434,6 +3431,27 @@ def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
         assert "no elite receipt-geometry pair" in str(exc)
     else:
         raise AssertionError("irrelevant receipt pair should not pass")
+
+
+def test_score_rejects_cross_species_tissue_drift() -> None:
+    papers = (
+        Paper(
+            "mouse-gut",
+            "Resveratrol attenuated high intensity exercise training-induced inflammation in intestine of mice",
+            "Moderate exercise has benefits for human health, but this mouse study tested resveratrol against intestinal damage and inflammation.",
+            "openalex",
+        ),
+        Paper(
+            "human-cv",
+            "Resveratrol blunts the positive effects of exercise training on cardiovascular health in aged men",
+            "Healthy physically inactive men were randomized to exercise training with resveratrol or placebo; cardiovascular health parameters were measured.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
+
+    assert not scored
 
 
 def test_build_memo_rejects_generic_topic_word_overlap() -> None:

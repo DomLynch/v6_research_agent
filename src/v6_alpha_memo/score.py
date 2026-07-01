@@ -95,6 +95,14 @@ _ENDPOINT_FAMILIES = {
     "vascular": frozenset({"blood", "cardiovascular", "endothelial", "pressure", "vascular"}),
     "inflammation": frozenset({"inflammation", "inflammatory", "oxidative", "stress"}),
 }
+_TISSUE_FAMILIES = {
+    "gut": frozenset({"colon", "gastrointestinal", "gut", "intestinal", "intestine"}),
+    "muscle": frozenset({"muscle", "myotube", "skeletal"}),
+    "vascular": frozenset({"arterial", "artery", "blood", "cardiovascular", "heart", "vascular"}),
+    "brain": frozenset({"brain", "cognition", "cognitive", "neural", "neuronal"}),
+    "liver": frozenset({"hepatic", "liver"}),
+    "adipose": frozenset({"adipose", "fat"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,9 +211,13 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
     ):
         score += 10
         reasons.append("direct_mechanism_to_human_anchor")
-    if shape == "mechanism_to_human_failure" and _animal_only(first) and _is_human(second) and not _endpoint_compatible(first, second):
-        score -= 15
-        reasons.append("penalty:cross_species_endpoint_drift")
+    if shape == "mechanism_to_human_failure" and _animal_marker(first) and _is_human(second):
+        if _tissue_drift(first, second):
+            score = 0
+            reasons.append("reject:cross_species_tissue_drift")
+        elif not _endpoint_compatible(first, second):
+            score -= 15
+            reasons.append("penalty:cross_species_endpoint_drift")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")
@@ -452,6 +464,10 @@ def _animal_only(paper: Paper) -> bool:
     return _has(tokens, _ANIMAL) and not _has(tokens, _HUMAN_OUTCOME)
 
 
+def _animal_marker(paper: Paper) -> bool:
+    return _has(_tokens(paper), _ANIMAL)
+
+
 def _endpoint_compatible(a: Paper, b: Paper) -> bool:
     left = _endpoint_families(a)
     right = _endpoint_families(b)
@@ -461,6 +477,17 @@ def _endpoint_compatible(a: Paper, b: Paper) -> bool:
 def _endpoint_families(paper: Paper) -> set[str]:
     tokens = _tokens(paper)
     return {family for family, words in _ENDPOINT_FAMILIES.items() if tokens & words}
+
+
+def _tissue_drift(a: Paper, b: Paper) -> bool:
+    left = _tissue_families(a)
+    right = _tissue_families(b)
+    return bool(left and right and not left & right)
+
+
+def _tissue_families(paper: Paper) -> set[str]:
+    tokens = _tokens(paper)
+    return {family for family, words in _TISSUE_FAMILIES.items() if tokens & words}
 
 
 def _population_compatible(a: Paper, b: Paper) -> bool:
