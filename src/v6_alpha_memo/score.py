@@ -453,7 +453,12 @@ def _roles_fit(
     if _human_topic(topic_terms) and not _is_human(second):
         return False
     if shape == "mechanism_to_human_failure":
-        return _mechanism_model_receipt(first) and _is_human(second) and _negative_update_receipt(second, anchors)
+        return (
+            _mechanism_model_receipt(first)
+            and _abstract_reports_result(first)
+            and _is_human(second)
+            and _negative_update_receipt(second, anchors)
+        )
     if shape == "translation_boundary":
         return (
             _mechanism_model_receipt(first)
