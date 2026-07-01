@@ -2660,6 +2660,55 @@ def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPa
     assert "submitted" not in row
 
 
+def test_daemon_skips_invalid_doi_pair_when_later_pair_is_publishable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bad_pair = CandidatePair(
+        a=Paper("a", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex", doi="10.bad/missing"),
+        b=Paper("b", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed"),
+        anchors=("interventionx",),
+    )
+    good_pair = CandidatePair(
+        a=Paper("c", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex", doi="10.good/a"),
+        b=Paper("d", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed", doi="10.good/b"),
+        anchors=("interventionx",),
+    )
+    run = v6_run.V6Run(
+        "stale memo",
+        (
+            ScoredPair(bad_pair, 95, "promise_reversal", "bad update", ("shared_anchor:interventionx",)),
+            ScoredPair(good_pair, 90, "promise_reversal", "good update", ("shared_anchor:interventionx",)),
+        ),
+        (),
+        paper_count=4,
+        pair_count=2,
+        scored_count=2,
+    )
+    seen: dict[str, object] = {}
+
+    class FakePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            seen["payload"] = payload
+            return {"ok": True, "json": {"submission": {"id": "sub-2"}}}
+
+        def get(self, path: str) -> dict[str, object]:
+            return {"ok": True, "json": {"status": "pending"}}
+
+    monkeypatch.setenv("V6_DAEMON_WRITER", "template")
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: not doi.startswith("10.bad/"))
+    row: dict[str, object] = {"topic": "interventionx endpoint"}
+
+    v6_daemon._run_topic(tmp_path, "interventionx endpoint", "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
+
+    payload = cast(dict[str, object], seen["payload"])
+    sources = cast(list[dict[str, object]], payload["source_bundle"])
+    assert [source["doi"] for source in sources] == ["10.good/a", "10.good/b"]
+    assert row["submitted"] is True
+    assert "unresolved_dois" not in row
+
+
 def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
     row: dict[str, object] = {
         "topic": "taurine aging biomarker supplementation",

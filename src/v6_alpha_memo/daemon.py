@@ -14,9 +14,10 @@ from typing import cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from v6_alpha_memo.run import NoMemoError, build_memo
+from v6_alpha_memo.run import NoMemoError, V6Run, _best_receipt, build_memo
 from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import FullrawSearchClient, Paper
+from v6_alpha_memo.write import render_memo, render_with_minimax
 
 _DEFAULT_QUERY_LIMIT = 3
 _DEFAULT_PER_QUERY_LIMIT = 10
@@ -158,14 +159,16 @@ def _run_topic(
     if not row.get("generated"):
         query_limit = _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
         per_query_limit = _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
+        writer = os.environ.get("V6_DAEMON_WRITER", "minimax")
         run = build_memo(
             topic,
             client=client,
             query_limit=query_limit,
             per_query_limit=per_query_limit,
-            writer=os.environ.get("V6_DAEMON_WRITER", "minimax"),
+            writer=writer,
             revision_notes=_row_revision_notes(row),
         )
+        run = _first_publishable_run(run, writer=writer, revision_notes=_row_revision_notes(row))
         selected = run.top_pairs[0]
         min_score = int(os.environ.get("V6_DAEMON_MIN_SCORE", "85"))
         if selected.score < min_score:
@@ -253,6 +256,28 @@ def _clear_blocker(row: dict[str, object]) -> None:
     for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois"):
         row.pop(key, None)
     _clear_wait_progress(row)
+
+
+def _first_publishable_run(run: V6Run, *, writer: str, revision_notes: tuple[str, ...]) -> V6Run:
+    for selected in run.top_pairs:
+        if not _unresolved_dois(selected):
+            if selected == run.top_pairs[0]:
+                return run
+            receipt = _best_receipt(run.results)
+            memo = (
+                render_with_minimax((selected,), receipt=receipt, judge=False, revision_notes=revision_notes)
+                if writer == "minimax"
+                else render_memo(selected, receipt=receipt)
+            )
+            return V6Run(
+                memo,
+                (selected,),
+                run.results,
+                paper_count=run.paper_count,
+                pair_count=run.pair_count,
+                scored_count=run.scored_count,
+            )
+    return run
 
 
 def _stale_search_depth(row: dict[str, object]) -> bool:
