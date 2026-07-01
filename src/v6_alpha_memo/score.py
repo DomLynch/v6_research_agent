@@ -39,7 +39,8 @@ _HUMAN_OUTCOME_STUDY = frozenset({
     "participants", "patient", "patients", "placebo-controlled", "randomized",
     "subject", "subjects", "trial",
 })
-_PROTOCOL = frozenset({"expected", "hypothesis", "intended", "planned", "protocol"})
+_PROTOCOL = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned", "protocol"})
+_PROTOCOL_EXPECTATION = frozenset({"expected", "hypothesis", "hypothesized", "intended", "planned"})
 _RESULT = frozenset({"found", "observed", "result", "results", "showed", "shows"})
 _BOUNDARY = frozenset({
     "context", "dose", "endpoint", "endpoints", "market", "modality", "program",
@@ -90,7 +91,7 @@ _HUMAN_TOPIC = frozenset({
 _ENDPOINT_FAMILIES = {
     "metabolic": frozenset({"glycaemic", "glycemic", "glucose", "hba1c", "insulin", "metabolic"}),
     "morphology": frozenset({"hypertrophy", "mass", "muscle", "transcriptome", "transcriptomic"}),
-    "performance": frozenset({"fitness", "performance", "strength", "vo2", "vo2peak"}),
+    "performance": frozenset({"fitness", "function", "functional", "performance", "physical", "strength", "vo2", "vo2peak"}),
     "vascular": frozenset({"blood", "cardiovascular", "endothelial", "pressure", "vascular"}),
     "inflammation": frozenset({"inflammation", "inflammatory", "oxidative", "stress"}),
 }
@@ -354,7 +355,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
         return _promise_signal(first) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
         return (
-            _has(ft, _PROTOCOL)
+            _protocol_expectation_signal(first)
             and _has(st, _RESULT | _FAILURE)
             and _negative_result(second)
             and _endpoint_compatible(first, second)
@@ -402,7 +403,23 @@ def _negative_result(paper: Paper) -> bool:
 
 
 def _promise_signal(paper: Paper) -> bool:
-    return _has(_tokens(paper), _PROMISE) and not _negative_result(paper)
+    if not _has(_tokens(paper), _PROMISE) or _negative_result(paper):
+        return False
+    return not _design_or_feasibility_only(paper) or _protocol_expectation_signal(paper)
+
+
+def _protocol_expectation_signal(paper: Paper) -> bool:
+    tokens = _tokens(paper)
+    return _has(tokens, _PROTOCOL_EXPECTATION) and _has(tokens, _PROMISE) and not _negative_result(paper)
+
+
+def _design_or_feasibility_only(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    design_markers = (
+        "aim was to", "aimed to", "designed to", "feasibility", "pilot",
+        "safety and feasibility", "to evaluate", "to investigate",
+    )
+    return not _abstract_reports_result(paper) and any(marker in text for marker in design_markers)
 
 
 def _human_topic(topic_terms: frozenset[str]) -> bool:
@@ -427,7 +444,7 @@ def _animal_only(paper: Paper) -> bool:
 def _endpoint_compatible(a: Paper, b: Paper) -> bool:
     left = _endpoint_families(a)
     right = _endpoint_families(b)
-    return not left or not right or bool(left & right)
+    return bool(left and right and left & right)
 
 
 def _endpoint_families(paper: Paper) -> set[str]:

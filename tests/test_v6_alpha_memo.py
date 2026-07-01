@@ -419,6 +419,28 @@ def test_explicit_protocol_expectation_can_still_score_mismatch() -> None:
     assert "made us expect interventionx would travel" not in scored[0].expectation_update
 
 
+def test_pilot_feasibility_receipt_does_not_become_positive_expectation() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Resveratrol and exercise combined to treat functional limitations in late life: A pilot randomized controlled trial",
+            "To evaluate the safety and feasibility of combining exercise and resveratrol. "
+            "Outcome measures included indices of physical function and skeletal muscle outcomes.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle",
+            "Results showed exercise training improved skeletal muscle endpoints, but resveratrol did not add benefit.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
+
+    assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_protocol_result_shape_rejects_unrelated_endpoint_families() -> None:
     papers = (
         Paper(
@@ -1935,8 +1957,8 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
     run = build_memo("dashboard forecast accuracy", client=MultiPairClient(), query_limit=1, writer="minimax")
 
     assert len(run.top_pairs) == 1
-    assert run.top_pairs[0].pair.a.paper_id == "a"
-    assert run.top_pairs[0].pair.b.paper_id == "b"
+    assert run.top_pairs[0].pair.a.paper_id == "c"
+    assert run.top_pairs[0].pair.b.paper_id == "d"
     assert run.memo.splitlines()[0] == f"# {v6_write._title(run.top_pairs[0])}"
     assert calls == 2
 
@@ -2815,7 +2837,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 9
+    assert row["selector_version"] == 10
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -2824,7 +2846,7 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
             "topic": "metformin resistance training",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 9,
+            "selector_version": 10,
             "top_score": 85,
             "top_shape": "protocol_result_mismatch",
             "paper_count": 24,
