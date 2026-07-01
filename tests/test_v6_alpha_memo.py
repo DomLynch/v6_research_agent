@@ -40,6 +40,7 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
     assert any(query.startswith("marketing null failed primary endpoint") for query in queries)
     assert any("baseline subgroup high low response" in query for query in queries)
     assert any("mechanism model human failed translation" in query for query in queries)
+    assert any("trial experiment results no effect" in query for query in queries)
     assert any("replication failure" in query for query in queries)
 
 
@@ -49,6 +50,14 @@ def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
     assert queries[0] == "cold water immersion resistance training"
     assert queries[1] == "cold water immersion resistance training mechanism model human failed translation"
     assert queries[2] == "cold null failed primary endpoint water immersion resistance training"
+
+
+def test_query_shapes_keep_short_compound_head_together() -> None:
+    queries = query_shapes("omega 3 atrial fibrillation cardiovascular prevention", limit=3)
+    vitamin_queries = query_shapes("vitamin D fracture randomized trial", limit=3)
+
+    assert queries[2] == "omega 3 null failed primary endpoint atrial fibrillation cardiovascular prevention"
+    assert vitamin_queries[2] == "vitamin D null failed primary endpoint fracture randomized trial"
 
 
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
@@ -2539,12 +2548,12 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
             {
                 "topic": "omega 3 atrial fibrillation cardiovascular prevention",
                 "trace": strict_then_waiting,
-                "query_shape_version": 3,
+                "query_shape_version": 4,
             },
             {
                 "topic": "creatine cognitive function older adults",
                 "trace": {"coverage": [{"error": "async_sweep_running"}]},
-                "query_shape_version": 3,
+                "query_shape_version": 4,
             },
         ]
     }
@@ -2623,13 +2632,13 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "blocked_stage": "search_cache_waiting",
                 "query_limit": 3,
                 "per_query_limit": 10,
-                "query_shape_version": 3,
+                "query_shape_version": 4,
                 "selector_version": 10,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
                 "topic": "vitamin d fracture randomized trial older adults",
-                "query_shape_version": 3,
+                "query_shape_version": 4,
                 "selector_version": 2,
                 "trace": {"coverage": [{"error": "async_sweep_queued"}]},
             },
@@ -2716,7 +2725,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
             {
                 "topic": "time restricted eating resistance training lean mass",
                 "blocked_stage": "search_cache_waiting",
-                "query_shape_version": 3,
+                "query_shape_version": 4,
                 "wait_shards": 1408,
                 "wait_stale_count": 2,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1408}]},
@@ -2724,7 +2733,7 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
             {
                 "topic": "collagen tendon pain exercise",
                 "blocked_stage": "search_cache_waiting",
-                "query_shape_version": 3,
+                "query_shape_version": 4,
                 "trace": {"coverage": [{"error": "async_sweep_queued"}]},
             },
         ]
@@ -2961,7 +2970,7 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["resveratrol blunts exercise training"]
     assert row["blocked_stage"] == "search_cache_waiting"
-    assert row["query_shape_version"] == 3
+    assert row["query_shape_version"] == 4
     assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
