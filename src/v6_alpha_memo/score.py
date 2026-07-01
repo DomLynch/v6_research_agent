@@ -91,6 +91,14 @@ _ABSTRACT_RESULT_PHRASES = (
     "observed", "reported", "resulted in", "results showed", "showed that",
     "significantly", "was associated", "were associated", "we found",
 )
+_RESULT_SENTENCE_MARKERS = frozenset({
+    "demonstrated", "failed", "found", "observed", "reported", "resulted",
+    "results", "showed", "significant", "significantly", "unchanged",
+})
+_SPECULATIVE_UPDATE_CONTEXT = frozenset({
+    "background", "hypothesized", "hypothesis", "may", "might", "prior",
+    "previous", "rationale", "suggest", "suggested",
+})
 _UPDATE_FAILURE_WORDS = frozenset({"attenuated", "blunted", "failed", "null", "unchanged"})
 _UPDATE_FAILURE_PHRASES = (
     "did not", "does not", "failed to", "failure to", "no evidence",
@@ -381,7 +389,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if _human_topic(topic_terms) and not _is_human(second):
         return False
     if shape == "mechanism_to_human_failure":
-        return _mechanism_model_receipt(first) and _is_human(second) and _negative_result(second)
+        return _mechanism_model_receipt(first) and _is_human(second) and _negative_update_receipt(second)
     if shape == "translation_boundary":
         return (
             _mechanism_model_receipt(first)
@@ -391,9 +399,9 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
             and _has(st, _LIMITED_HUMAN | _BOUNDARY)
         )
     if shape == "subgroup_endpoint_split":
-        return _is_human(first) and _is_human(second) and _promise_signal(first) and _negative_result(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+        return _is_human(first) and _is_human(second) and _promise_signal(first) and _negative_update_receipt(second) and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
     if shape == "modality_boundary":
-        return _promise_signal(first) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
+        return _promise_signal(first) and _negative_update_receipt(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
         return (
             _protocol_expectation_signal(first)
@@ -405,7 +413,7 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
-        return _promise_signal(first) and _negative_result(second)
+        return _promise_signal(first) and _negative_update_receipt(second)
     return False
 
 
@@ -456,7 +464,22 @@ def _negative_update_receipt(paper: Paper) -> bool:
     if _negative_update_text(title):
         return True
     abstract = paper.abstract.casefold()
-    return ("primary" in abstract or "endpoint" in abstract) and _negative_update_text(abstract)
+    return any(_observed_negative_update_sentence(sentence) for sentence in _sentences(abstract))
+
+
+def _sentences(text: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in re.split(r"[.!?;]\s+", text) if part.strip())
+
+
+def _observed_negative_update_sentence(sentence: str) -> bool:
+    tokens = set(_WORD_RE.findall(sentence))
+    if tokens & _SPECULATIVE_UPDATE_CONTEXT:
+        return False
+    return _negative_update_text(sentence) and (
+        bool(tokens & _RESULT_SENTENCE_MARKERS)
+        or bool(tokens & _UPDATE_FAILURE_WORDS)
+        or any(phrase in sentence for phrase in _ABSTRACT_RESULT_PHRASES)
+    )
 
 
 def _negative_update_text(text: str) -> bool:

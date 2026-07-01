@@ -394,6 +394,33 @@ def test_cross_species_pharmacokinetic_to_clinical_endpoint_is_rejected() -> Non
     assert scored == ()
 
 
+def test_background_attenuation_rationale_is_not_human_failure_result() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Effects Of Metformin Administration With Swimming Training In Fructose Induced Insulin Resistance Rats",
+            "This rat study aimed to determine whether metformin plus swimming would increase improvement "
+            "in insulin sensitivity; the outcome was currently unknown.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does metformin modify the effect on glycaemic control of aerobic exercise, resistance exercise or both?",
+            "Prior studies suggested metformin might attenuate exercise effects on glycaemia or fitness. "
+            "In metformin users, aerobic training produced a significant HbA1c reduction compared with control.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(
+        mine_pairs(papers),
+        topic_terms={"metformin", "resistance", "training", "adaptation"},
+    )
+
+    assert not any(item.score >= 85 for item in scored)
+    assert not any(item.shape == "mechanism_to_human_failure" for item in scored)
+
+
 def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
     papers = (
         Paper(
