@@ -216,6 +216,7 @@ def _run_topic(
             "generated": True,
             "memo_file": str(memo_path),
             "trace_file": str(trace_path),
+            "pending_payload": _payload(topic, agent_id, run.memo, selected, row),
             "top_score": selected.score,
             "top_shape": selected.shape,
             "paper_count": run.paper_count,
@@ -228,17 +229,8 @@ def _run_topic(
             "writer_version": _WRITER_VERSION,
         })
         _clear_blocker(row)
-        response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected, row))
-        row["submit_response"] = response
-        if response.get("ok"):
-            submission = cast(dict[str, object], response.get("json", {})).get("submission")
-            submission = submission if isinstance(submission, dict) else {}
-            row.update({"submitted": True, "submission_id": submission.get("id")})
-        elif _waitable_submit_response(response):
-            _reset_for_submit_retry(row)
-            _mark_submit_backoff(row)
-        else:
-            row.update({"blocked_stage": "submit_failed", "blocked_final": True})
+    if row.get("generated") and not row.get("submitted") and row.get("pending_payload"):
+        _submit_pending_row(publisher, row)
 
     if row.get("submitted") and not row.get("public") and row.get("submission_id"):
         decision = publisher.get(f"/submissions/{row['submission_id']}/decision")
@@ -266,6 +258,25 @@ def _clear_blocker(row: dict[str, object]) -> None:
     for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois", "submit_retry_after", "submit_backoff_count"):
         row.pop(key, None)
     _clear_wait_progress(row)
+
+
+def _submit_pending_row(publisher: Publisher, row: dict[str, object]) -> None:
+    payload = row.get("pending_payload")
+    if not isinstance(payload, dict):
+        return
+    response = publisher.post("/submissions", payload)
+    row["submit_response"] = response
+    if response.get("ok"):
+        submission = cast(dict[str, object], response.get("json", {})).get("submission")
+        submission = submission if isinstance(submission, dict) else {}
+        row.update({"submitted": True, "submission_id": submission.get("id")})
+        row.pop("pending_payload", None)
+        _clear_blocker(row)
+    elif _waitable_submit_response(response):
+        row["last_submit_response"] = response
+        _mark_submit_backoff(row)
+    else:
+        row.update({"blocked_stage": "submit_failed", "blocked_final": True})
 
 
 def _first_publishable_run(run: V6Run, *, writer: str, revision_notes: tuple[str, ...]) -> V6Run:

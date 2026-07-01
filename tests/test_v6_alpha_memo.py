@@ -2963,10 +2963,55 @@ def test_daemon_treats_submit_backoff_as_retryable(monkeypatch: pytest.MonkeyPat
 
     assert row["blocked_stage"] == "submit_backoff"
     assert "blocked_final" not in row
-    assert "generated" not in row
+    assert row["generated"] is True
+    assert isinstance(row["pending_payload"], dict)
     assert "submitted" not in row
     assert isinstance(row["submit_retry_after"], int)
     assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
+
+
+def test_daemon_retries_pending_submit_without_rebuilding(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen = {"build": 0, "post": 0}
+
+    def fake_build_memo(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        seen["build"] += 1
+        raise AssertionError("submit retry should reuse pending payload")
+
+    class OkPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            assert path == "/submissions"
+            assert payload["artifact_type"] == "alpha_memo"
+            seen["post"] += 1
+            return {"ok": True, "json": {"submission": {"id": "sub-2"}}}
+
+        def get(self, path: str) -> dict[str, object]:
+            assert path == "/submissions/sub-2/decision"
+            return {"ok": True, "json": {"status": "pending"}}
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "management dashboard forecast accuracy",
+        "generated": True,
+        "blocked_stage": "submit_backoff",
+        "submit_retry_after": 0,
+        "submit_backoff_count": 1,
+        "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
+        "selector_version": v6_daemon._SELECTOR_VERSION,
+        "pending_payload": {"artifact_type": "alpha_memo", "title": "Alpha memo"},
+    }
+
+    v6_daemon._run_pass(tmp_path, (str(row["topic"]),), "agent-v6", DemoClient(), OkPublisher(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert seen == {"build": 0, "post": 1}
+    assert row["submitted"] is True
+    assert row["submission_id"] == "sub-2"
+    assert "pending_payload" not in row
+    assert "blocked_stage" not in row
 
 
 def test_daemon_defers_waitable_submit_failure_until_backoff_expires(
