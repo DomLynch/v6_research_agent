@@ -95,8 +95,15 @@ def build_memo(
         )
     receipt = _best_receipt(results)
     if writer == "minimax":
-        scored = judge_with_minimax(scored)
-        if not scored:
+        deterministic = scored
+        judged = judge_with_minimax(scored)
+        if judged and judged[0].score >= 85:
+            scored = judged
+        elif deterministic[0].score >= 85:
+            scored = (deterministic[0],)
+        elif judged:
+            scored = judged
+        else:
             raise NoMemoError(
                 _trace(
                     results,
@@ -106,10 +113,6 @@ def build_memo(
                     scored_count=0,
                 )
             )
-        if scored[0].score < 85:
-            deterministic = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
-            if deterministic and deterministic[0].score >= 85:
-                scored = (deterministic[0],)
         memo = render_with_minimax(scored, receipt=receipt, judge=False, revision_notes=revision_notes)
     else:
         memo = render_memo(scored[0], receipt=receipt)

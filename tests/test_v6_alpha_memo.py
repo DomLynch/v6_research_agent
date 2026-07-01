@@ -1745,6 +1745,38 @@ def test_build_memo_does_not_let_minimax_downgrade_a_grade_pair(monkeypatch: pyt
     assert run.top_pairs[0].pair.a.paper_id != "c"
 
 
+def test_build_memo_uses_a_grade_pair_when_minimax_rejects_all(monkeypatch: pytest.MonkeyPatch) -> None:
+    class AGradeClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Tool X improves benchmark accuracy in a mechanistic model",
+                    "The model showed tool x enhanced accuracy and improved performance.",
+                    "openalex",
+                ),
+                Paper(
+                    "b",
+                    "Tool X failed to improve human analyst decisions in a randomized field trial",
+                    "Human analysts using tool x had null results and reduced decision quality.",
+                    "semantic_scholar",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
+
+    def fake_judge(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, ...]:
+        assert top_pairs[0].score >= 85
+        return ()
+
+    monkeypatch.delenv("V6_MINIMAX_API_KEY", raising=False)
+    monkeypatch.setattr(v6_run, "judge_with_minimax", fake_judge)
+
+    run = build_memo("tool x", client=AGradeClient(), query_limit=1, writer="minimax")
+
+    assert run.top_pairs[0].score >= 85
+
+
 def test_daemon_payload_uses_selected_pair_receipts() -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     selected = run.top_pairs[0]
