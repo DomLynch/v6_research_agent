@@ -2317,6 +2317,41 @@ def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyP
     assert calls == 2
 
 
+def test_minimax_writer_falls_back_when_receipt_titles_do_not_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    selected = run.top_pairs[0]
+    calls = 0
+
+    def fake_urlopen(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del request, timeout
+        calls += 1
+        if calls == 1:
+            return _Response({"content": [{"type": "text", "text": '{"choice": 1, "reason": "sharp"}'}]})
+        return _Response({
+            "content": [{
+                "type": "text",
+                "text": (
+                    "# Alpha memo: wrong receipt boundary\n\n"
+                    "**One-sentence alpha:** x\n\n"
+                    f"**Receipt 1:** {selected.pair.a.title} — finding.\n\n"
+                    "**Receipt 2:** Unbundled strength-training paper — finding.\n\n"
+                    "**Why this is surprising:** q\n\n"
+                    "**Caveats/falsifiers:**\n- w"
+                ),
+            }]
+        })
+
+    monkeypatch.setenv("V6_MINIMAX_API_KEY", "test-key")
+    monkeypatch.setattr(v6_write, "urlopen", fake_urlopen)
+
+    memo = v6_write.render_with_minimax(run.top_pairs[:1])
+
+    assert selected.pair.b.title in memo
+    assert "Unbundled strength-training paper" not in memo
+    assert calls == 2
+
+
 def test_minimax_writer_falls_back_on_inline_title_memo(monkeypatch: pytest.MonkeyPatch) -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     calls = 0
