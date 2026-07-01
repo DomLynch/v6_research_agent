@@ -1275,6 +1275,27 @@ def test_fullraw_client_parses_hits_and_coverage_receipt() -> None:
     assert result.papers[0].doi == "10.test/metformin"
 
 
+def test_fullraw_client_infers_doi_from_receipt_text() -> None:
+    payload: dict[str, object] = {
+        "meta": _strict_meta({"openalex": 1, "pubmed": 1}),
+        "results": [{
+            "id": "W3157213023",
+            "title": "Omega-3 Fatty Acids for the Prevention of Recurrent Symptomatic Atrial Fibrillation",
+            "abstract": "J Am Coll Cardiol. doi: 10.1016/j.jacc.2012.11.021. Results showed null recurrence prevention.",
+            "source": "openalex",
+            "year": 2012,
+        }],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "omega atrial fibrillation",
+        limit=3,
+    )
+
+    assert result.papers[0].doi == "10.1016/j.jacc.2012.11.021"
+    assert result.papers[0].url == "https://doi.org/10.1016/j.jacc.2012.11.021"
+
+
 def test_fullraw_client_stops_empty_irrelevant_partial_sweep() -> None:
     payload: dict[str, object] = {
         "meta": {

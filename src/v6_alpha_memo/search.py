@@ -501,9 +501,10 @@ def _parse_paper(item: object) -> Paper | None:
     title = _clean(item.get("title") or item.get("display_name") or item.get("name"))
     if not title:
         return None
-    doi = _doi(item.get("doi"))
-    paper_id = _clean(item.get("id") or item.get("openalex_id") or item.get("semantic_scholar_id") or doi or title)
     abstract = _clean(item.get("abstract") or item.get("abstract_text") or item.get("description"), limit=4000) or _inverted_abstract(item.get("abstract_inverted_index"))
+    url = _clean(item.get("url"))
+    doi = _doi(item.get("doi")) or _doi(url) or _doi(f"{title} {abstract}")
+    paper_id = _clean(item.get("id") or item.get("openalex_id") or item.get("semantic_scholar_id") or doi or title)
     return Paper(
         paper_id=paper_id,
         title=title,
@@ -511,7 +512,7 @@ def _parse_paper(item: object) -> Paper | None:
         source=_clean(item.get("source") or item.get("raw_source") or item.get("provider")) or "fullraw",
         year=_int(item.get("year") or item.get("publication_year")),
         doi=doi,
-        url=_clean(item.get("url")) or (f"https://doi.org/{doi}" if doi else ""),
+        url=url or (f"https://doi.org/{doi}" if doi else ""),
         venue=_clean(item.get("venue") or item.get("journal") or item.get("source_name")),
     )
 
@@ -710,8 +711,9 @@ def _clean(value: object, *, limit: int = 500) -> str:
 
 
 def _doi(value: object) -> str:
-    text = _clean(value, limit=250).removeprefix("https://doi.org/").removeprefix("doi:")
-    return text.casefold()
+    text = _clean(value, limit=4000).casefold()
+    match = re.search(r"10\.[^\s/]+/[^\s<>\"]+", text.removeprefix("https://doi.org/").removeprefix("doi:"))
+    return match.group(0).rstrip(".,;:)]}") if match else ""
 
 
 def _int(value: object) -> int | None:
