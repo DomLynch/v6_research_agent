@@ -2388,7 +2388,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "trace": trace,
             "query_limit": 3,
             "per_query_limit": 10,
-            "selector_version": 13,
+            "selector_version": 14,
             "query_shape_version": 4,
         }]
     }
@@ -2824,7 +2824,7 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "query_limit": 3,
                 "per_query_limit": 10,
                 "query_shape_version": 4,
-                "selector_version": 13,
+                "selector_version": 14,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
@@ -3106,7 +3106,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 13
+    assert row["selector_version"] == 14
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -3204,7 +3204,7 @@ def test_daemon_reopens_waiting_rows_from_old_search_config(
     assert seen["topic"] == "vitamin d fracture randomized trial older adults"
     assert seen["query_limit"] == 8
     assert seen["per_query_limit"] == 25
-    assert row["selector_version"] == 13
+    assert row["selector_version"] == 14
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
