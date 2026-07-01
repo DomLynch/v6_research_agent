@@ -346,6 +346,27 @@ def test_protocol_result_shape_requires_negative_update_receipt() -> None:
     assert not any(item.shape == "protocol_result_mismatch" for item in scored)
 
 
+def test_protocol_result_shape_rejects_unrelated_endpoint_families() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx alters muscle transcriptome adaptations to resistance training in older adults",
+            "The protocol expected interventionx to improve muscle hypertrophy and transcriptome adaptations.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Does interventionx modify glycaemic control of aerobic exercise, resistance exercise or both?",
+            "The trial results showed no significant resistance-training signal for HbA1c glycaemic control.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_scores_same_intervention_training_modality_boundary() -> None:
     papers = (
         Paper(

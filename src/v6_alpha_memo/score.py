@@ -72,6 +72,13 @@ _HUMAN_TOPIC = frozenset({
     "adult", "adults", "employee", "employees", "field", "firm", "firms",
     "human", "humans", "men", "participants", "people", "trial", "women", "workers",
 })
+_ENDPOINT_FAMILIES = {
+    "metabolic": frozenset({"glycaemic", "glycemic", "glucose", "hba1c", "insulin", "metabolic"}),
+    "morphology": frozenset({"hypertrophy", "mass", "muscle", "transcriptome", "transcriptomic"}),
+    "performance": frozenset({"fitness", "performance", "strength", "vo2", "vo2peak"}),
+    "vascular": frozenset({"blood", "cardiovascular", "endothelial", "pressure", "vascular"}),
+    "inflammation": frozenset({"inflammation", "inflammatory", "oxidative", "stress"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,7 +313,12 @@ def _roles_fit(shape: str, first: Paper, second: Paper, topic_terms: frozenset[s
     if shape == "modality_boundary":
         return _promise_signal(first) and _negative_result(second) and _has(st, _ADAPTATION) and _has(ft | st, _MODALITY)
     if shape == "protocol_result_mismatch":
-        return _has(ft, _PROTOCOL) and _has(st, _RESULT | _FAILURE) and _negative_result(second)
+        return (
+            _has(ft, _PROTOCOL)
+            and _has(st, _RESULT | _FAILURE)
+            and _negative_result(second)
+            and _endpoint_compatible(first, second)
+        )
     if shape == "promise_reversal":
         if _animal_only(second) and (_human_topic(topic_terms) or _is_human(first)):
             return False
@@ -364,6 +376,17 @@ def _is_human(paper: Paper) -> bool:
 def _animal_only(paper: Paper) -> bool:
     tokens = _tokens(paper)
     return _has(tokens, _ANIMAL) and not _has(tokens, _HUMAN_OUTCOME)
+
+
+def _endpoint_compatible(a: Paper, b: Paper) -> bool:
+    left = _endpoint_families(a)
+    right = _endpoint_families(b)
+    return not left or not right or bool(left & right)
+
+
+def _endpoint_families(paper: Paper) -> set[str]:
+    tokens = _tokens(paper)
+    return {family for family, words in _ENDPOINT_FAMILIES.items() if tokens & words}
 
 
 def _short(text: str) -> str:
