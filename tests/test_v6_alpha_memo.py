@@ -2910,6 +2910,49 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
+def test_daemon_reopens_waiting_rows_from_old_search_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen.update(kwargs)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_QUERY_LIMIT", "8")
+    monkeypatch.setenv("V6_DAEMON_PER_QUERY_LIMIT", "25")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "vitamin d fracture randomized trial older adults",
+            "blocked_stage": "search_cache_waiting",
+            "query_limit": 2,
+            "per_query_limit": 10,
+            "selector_version": 2,
+            "query_shape_version": 3,
+        }]
+    }
+
+    v6_daemon._run_pass(
+        tmp_path,
+        ("vitamin d fracture randomized trial older adults",),
+        "agent-v6",
+        cast(FullrawSearchClient, DemoClient()),
+        cast(v6_daemon.Publisher, object()),
+        board,
+    )
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen["topic"] == "vitamin d fracture randomized trial older adults"
+    assert seen["query_limit"] == 8
+    assert seen["per_query_limit"] == 25
+    assert row["selector_version"] == 10
+    assert row["blocked_stage"] == "search_cache_waiting"
+
+
 def test_domain_classifier_does_not_match_ai_inside_training() -> None:
     assert v6_daemon._domain("resveratrol mimics exercise training") == "longevity_research"
     assert v6_daemon._domain("retrieval augmented generation benchmark") == "ai_research"

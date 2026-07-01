@@ -83,7 +83,11 @@ def _run_pass(
             _reset_for_query_shape_retry(row)
         elif _stale_selector_version(row):
             _reset_for_selector_retry(row)
-        elif (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting") or _stale_search_depth(row):
+        elif (
+            _stale_waiting_search_config(row)
+            or (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting")
+            or _stale_search_depth(row)
+        ):
             _clear_blocker(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
             row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
@@ -221,6 +225,18 @@ def _stale_search_depth(row: dict[str, object]) -> bool:
     return (
         _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
         or _int(row.get("query_limit")) < _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
+    )
+
+
+def _stale_waiting_search_config(row: dict[str, object]) -> bool:
+    if row.get("submitted") or row.get("public") or row.get("blocked_stage") != "search_cache_waiting":
+        return False
+    if _stale_waiting_row(row):
+        return False
+    return (
+        _int(row.get("per_query_limit")) < _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
+        or _int(row.get("query_limit")) < _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
+        or _int(row.get("selector_version")) < _SELECTOR_VERSION
     )
 
 
