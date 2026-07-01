@@ -1990,12 +1990,12 @@ def test_daemon_rotates_strict_waiting_topic_behind_active_search(monkeypatch: p
             {
                 "topic": "omega 3 atrial fibrillation cardiovascular prevention",
                 "trace": strict_then_waiting,
-                "query_shape_version": 2,
+                "query_shape_version": 3,
             },
             {
                 "topic": "creatine cognitive function older adults",
                 "trace": {"coverage": [{"error": "async_sweep_running"}]},
-                "query_shape_version": 2,
+                "query_shape_version": 3,
             },
         ]
     }
@@ -2239,7 +2239,7 @@ def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
     row = cast(list[dict[str, object]], board["rows"])[0]
     assert seen == ["resveratrol blunts exercise training"]
     assert row["blocked_stage"] == "search_cache_waiting"
-    assert row["query_shape_version"] == 2
+    assert row["query_shape_version"] == 3
     assert row["trace"] == {"coverage": [{"error": "async_sweep_queued"}]}
 
 
