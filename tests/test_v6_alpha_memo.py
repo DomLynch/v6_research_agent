@@ -1983,7 +1983,10 @@ def test_daemon_prioritizes_ready_cache_topic_over_stale_waiting_row(
     assert seen == ["resveratrol blunts exercise training"]
 
 
-def test_daemon_prioritizes_previous_high_score_waiting_row(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_daemon_rotates_side_waiting_high_score_behind_regular_waiting_row(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     seen: list[str] = []
 
     def fake_build_memo(topic: str, **kwargs: object) -> object:
@@ -2010,7 +2013,7 @@ def test_daemon_prioritizes_previous_high_score_waiting_row(monkeypatch: pytest.
 
     v6_daemon._run_pass(tmp_path, ("generic waiting", "resveratrol mimics exercise training"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
 
-    assert seen == ["resveratrol mimics exercise training"]
+    assert seen == ["generic waiting"]
 
 
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
