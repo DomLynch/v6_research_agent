@@ -23,6 +23,7 @@ _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 11
 _QUERY_SHAPE_VERSION = 4
+_WRITER_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +84,9 @@ def _run_pass(
             _reset_for_query_shape_retry(row)
         elif _stale_selector_version(row):
             _reset_for_selector_retry(row)
+        elif _stale_writer_version(row) and _needs_revision_retry(row):
+            _store_revision_notes(row)
+            _reset_for_revision_retry(row)
         elif (
             _stale_waiting_search_config(row)
             or (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting")
@@ -188,6 +192,7 @@ def _run_topic(
             "per_query_limit": per_query_limit,
             "selector_version": _SELECTOR_VERSION,
             "query_shape_version": _QUERY_SHAPE_VERSION,
+            "writer_version": _WRITER_VERSION,
         })
         _clear_blocker(row)
         response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected, row))
@@ -252,6 +257,15 @@ def _stale_waiting_search_config(row: dict[str, object]) -> bool:
 
 def _stale_selector_version(row: dict[str, object]) -> bool:
     return bool(row.get("blocked_final") and not row.get("public") and _int(row.get("selector_version")) < _SELECTOR_VERSION)
+
+
+def _stale_writer_version(row: dict[str, object]) -> bool:
+    return bool(
+        row.get("generated")
+        and not row.get("public")
+        and _int(row.get("writer_version")) < _WRITER_VERSION
+        and (row.get("blocked_final") or row.get("decision") in {"reject", "revise"})
+    )
 
 
 def _stale_query_shape_version(row: dict[str, object]) -> bool:
@@ -567,6 +581,7 @@ def _reset_for_revision_retry(row: dict[str, object]) -> None:
     for key in (
         "generated", "submitted", "accepted", "public", "submission_id", "decision",
         "publication", "submit_response", "decision_response", "memo_file", "trace_file",
+        "writer_version",
     ):
         row.pop(key, None)
     _clear_blocker(row)

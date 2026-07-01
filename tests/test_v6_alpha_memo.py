@@ -3270,6 +3270,53 @@ def test_daemon_reopens_legacy_clean_revision_without_parent(monkeypatch: pytest
     assert row["blocked_stage"] == "search_cache_waiting"
 
 
+def test_daemon_rebuilds_old_writer_reject_with_revision_notes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen["revision_notes"] = kwargs.get("revision_notes")
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    row: dict[str, object] = {
+        "topic": "resveratrol augment exercise training protocol",
+        "generated": True,
+        "submitted": True,
+        "submission_id": "sub-bad",
+        "blocked_final": True,
+        "decision": "reject",
+        "selector_version": 11,
+        "writer_version": 1,
+        "decision_response": {
+            "json": {
+                "decision": "reject",
+                "required_revisions": ["Remove unsupported trailing evidence."],
+                "major_issues": ["Unsupported trailing evidence."],
+            }
+        },
+    }
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+
+    v6_daemon._run_pass(
+        tmp_path,
+        ("resveratrol augment exercise training protocol",),
+        "agent-v6",
+        cast(FullrawSearchClient, DemoClient()),
+        cast(v6_daemon.Publisher, object()),
+        {"rows": [row]},
+    )
+
+    assert seen["revision_notes"] == ("Remove unsupported trailing evidence.", "Unsupported trailing evidence.")
+    assert row["revision_retry_count"] == 1
+    assert row["revision_of_object_id"] == "sub-bad"
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert row["blocked_stage"] == "search_cache_waiting"
+
+
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
     class IrrelevantClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
