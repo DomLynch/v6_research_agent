@@ -1652,7 +1652,7 @@ def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_rejects_completed_strict_search_with_zero_scored_pairs() -> None:
+def test_daemon_waits_for_side_search_even_with_zero_scored_pairs() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
         "pair_count": 36,
@@ -1670,35 +1670,45 @@ def test_daemon_rejects_completed_strict_search_with_zero_scored_pairs() -> None
         ],
     }
 
-    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_reconciles_stale_waiting_zero_score_row(tmp_path: Path) -> None:
+def test_daemon_keeps_stale_waiting_zero_score_row_waiting_for_side_search(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    trace: dict[str, object] = {
+        "paper_count": 9,
+        "pair_count": 36,
+        "scored_count": 0,
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
+        ],
+    }
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del topic, kwargs
+        raise NoMemoError(trace)
+
     row: dict[str, object] = {
         "topic": "omega 3 atrial fibrillation cardiovascular prevention",
         "blocked_stage": "search_cache_waiting",
-        "trace": {
-            "paper_count": 9,
-            "pair_count": 36,
-            "scored_count": 0,
-            "coverage": [
-                {
-                    "error": "",
-                    "shards_searched": 1525,
-                    "shards_total": 1525,
-                    "partial": False,
-                    "sweep_failed_shards": 0,
-                    "source_count_searched": 5,
-                },
-                {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
-            ],
-        },
+        "trace": trace,
     }
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
 
     v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
 
-    assert row["blocked_stage"] == "selector_rejected"
-    assert row["blocked_final"] is True
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert "blocked_final" not in row
 
 
 def test_daemon_final_rejects_after_strict_receipt_without_waitable_search() -> None:
