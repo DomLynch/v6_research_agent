@@ -574,6 +574,30 @@ def test_explicit_protocol_expectation_can_still_score_mismatch() -> None:
     assert "made us expect interventionx would travel" not in scored[0].expectation_update
 
 
+def test_protocol_result_keeps_primary_endpoint_null_despite_secondary_improvement() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Interventionx protocol expected improved insulin adaptation with resistance training",
+            "The protocol expected interventionx to improve insulin adaptation during resistance training in adults.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Interventionx trial had null primary insulin endpoint but improved secondary strength",
+            "Results showed no significant improvement in the primary insulin adaptation endpoint, "
+            "although secondary strength improved after resistance training.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert scored
+    assert scored[0].shape == "protocol_result_mismatch"
+    assert scored[0].score >= 85
+
+
 def test_pilot_feasibility_receipt_does_not_become_positive_expectation() -> None:
     papers = (
         Paper(

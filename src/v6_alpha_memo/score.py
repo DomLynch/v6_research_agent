@@ -91,10 +91,11 @@ _ABSTRACT_RESULT_PHRASES = (
     "observed", "reported", "resulted in", "results showed", "showed that",
     "significantly", "was associated", "were associated", "we found",
 )
-_UPDATE_FAILURE_WORDS = frozenset({"attenuated", "blunted", "failed", "impaired", "null", "unchanged"})
+_UPDATE_FAILURE_WORDS = frozenset({"attenuated", "blunted", "failed", "null", "unchanged"})
 _UPDATE_FAILURE_PHRASES = (
     "did not", "does not", "failed to", "failure to", "no evidence",
-    "no significant", "not improve", "not improved",
+    "no significant", "not improve", "not improved", "impaired adaptation",
+    "impaired adaptations", "impaired performance", "impaired strength",
 )
 _ANIMAL = frozenset({"mice", "mouse", "rat", "rats"})
 _HUMAN_TOPIC = frozenset({
