@@ -249,8 +249,9 @@ _CONTEXT_REQUIRED_TOPIC_TERMS = frozenset({"adaptation", "adaptations", "exercis
 _MODALITY_REQUIRED_TOPIC_TERMS = frozenset({"exercise", "resistance", "training"})
 _GENERIC_TOPIC_TERMS = frozenset({
     "adaptation", "adaptations", "aging", "adult", "adults", "exercise", "function",
-    "human", "humans", "longevity", "mitochondrial", "older", "performance", "primary",
-    "resistance", "training", "trial", "trials",
+    "augment", "boundary", "comparison", "expected", "human", "humans", "longevity",
+    "mismatch", "mitochondrial", "older", "performance", "primary", "protocol",
+    "resistance", "response", "supplement", "supplementation", "training", "trial", "trials",
 })
 
 

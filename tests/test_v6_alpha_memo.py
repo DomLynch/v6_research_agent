@@ -159,6 +159,31 @@ def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     assert scored == ()
 
 
+def test_topic_fit_ignores_shape_words_without_losing_context() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Protocol expected resveratrol and exercise combined to improve functional limitations in late life",
+            "A pilot randomized protocol tested whether resveratrol combined with exercise would improve function.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Exercise training, but not resveratrol, improves metabolic and inflammatory status in skeletal muscle",
+            "Results showed exercise training improved skeletal muscle endpoints, but resveratrol did not add benefit.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(
+        mine_pairs(papers),
+        topic_terms={"resveratrol", "augment", "exercise", "training", "protocol"},
+    )
+
+    assert scored
+    assert v6_run._topic_fit(scored[0], {"resveratrol", "augment", "exercise", "training", "protocol"})
+
+
 def test_build_memo_rejects_modality_only_topic_fit() -> None:
     class Client:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
