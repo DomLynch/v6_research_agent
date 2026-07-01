@@ -103,6 +103,7 @@ _TISSUE_FAMILIES = {
     "liver": frozenset({"hepatic", "liver"}),
     "adipose": frozenset({"adipose", "fat"}),
 }
+_PK_ENDPOINT = frozenset({"concentration", "dose", "dosage", "exposure", "pharmacokinetic", "pharmacokinetics", "plasma"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,9 +216,12 @@ def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()
         if _tissue_drift(first, second):
             score = 0
             reasons.append("reject:cross_species_tissue_drift")
-        elif not _endpoint_compatible(first, second):
-            score -= 15
-            reasons.append("penalty:cross_species_endpoint_drift")
+        elif _has(_tokens(first), _PK_ENDPOINT) != _has(_tokens(second), _PK_ENDPOINT):
+            score = 0
+            reasons.append("reject:cross_species_pk_endpoint_drift")
+        elif _endpoint_families(first) and _endpoint_families(second) and not _endpoint_compatible(first, second):
+            score = 0
+            reasons.append("reject:cross_species_endpoint_drift")
     if shape != "shared_anchor" and not _role_matches_topic(first, second, topic_terms):
         score = 0
         reasons.append("role_mismatch:topic_construct")

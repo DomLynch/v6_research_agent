@@ -28,6 +28,13 @@ from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, m
 from v6_alpha_memo.write import judge_with_minimax
 
 
+@pytest.fixture(autouse=True)
+def _isolate_minimax_secret(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("V6_MINIMAX_API_KEY", raising=False)
+    monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+    monkeypatch.setattr("v6_alpha_memo.write.Path.home", lambda: tmp_path)
+
+
 def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
     queries = query_shapes("marketing attribution incrementality")
     aging_queries = query_shapes("everolimus aging immune function", limit=8)
@@ -361,6 +368,30 @@ def test_cross_species_endpoint_drift_stays_below_publish_threshold() -> None:
     scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise", "training"})
 
     assert not scored
+
+
+def test_cross_species_pharmacokinetic_to_clinical_endpoint_is_rejected() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Swimming training reduced metformin concentration after single dosage administration in insulin resistance rats",
+            "In insulin resistant rats, swimming training reduced metformin plasma concentration after dosing.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Metformin plus exercise training did not improve peak VO2 or insulin sensitivity in humans",
+            "In a human trial, adding metformin to exercise training did not improve peak VO2 or insulin sensitivity.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(
+        mine_pairs(papers),
+        topic_terms={"metformin", "resistance", "training", "adaptation"},
+    )
+
+    assert scored == ()
 
 
 def test_vague_trial_title_without_abstract_is_still_not_a_receipt() -> None:
