@@ -116,7 +116,7 @@ def _run_pass(
                 row.pop(key, None)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
-    for row in _candidate_rows(rows):
+    for row in _candidate_rows(rows, topics):
         if row.get("blocked_final"):
             continue
         topic = str(row["topic"])
@@ -357,11 +357,18 @@ def _attempt_count(row: dict[str, object]) -> int:
     return len(coverage) if isinstance(coverage, list) else 0
 
 
-def _candidate_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> list[dict[str, object]]:
     active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
+    active_topics = set(topics)
     cache_progress = _cache_progress_by_topic(rows)
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
-    searchable = [row for row in rows if not row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
+    searchable = [
+        row for row in rows
+        if str(row.get("topic")) in active_topics
+        and not row.get("submitted")
+        and not row.get("public")
+        and not row.get("blocked_final")
+    ]
     indexed = list(enumerate(searchable))
     ranked = sorted(
         indexed,

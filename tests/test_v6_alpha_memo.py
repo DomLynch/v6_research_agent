@@ -3169,6 +3169,31 @@ def test_daemon_focuses_started_topics_before_fresh_rows(monkeypatch: pytest.Mon
     assert seen == ["waiting one", "waiting two"]
 
 
+def test_daemon_ignores_inactive_cache_rows_when_cache_topics_are_off(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [
+            {"topic": "inactive cache topic", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {"topic": "active topic"},
+        ]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("active topic",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert seen == ["active topic"]
+
+
 def test_daemon_marks_selector_rejects_final(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def fake_build_memo(topic: str, **kwargs: object) -> object:
         del topic, kwargs
