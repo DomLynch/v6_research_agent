@@ -2964,10 +2964,11 @@ def test_daemon_treats_submit_backoff_as_retryable(monkeypatch: pytest.MonkeyPat
     assert "blocked_final" not in row
     assert "generated" not in row
     assert "submitted" not in row
+    assert isinstance(row["submit_retry_after"], int)
     assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
 
 
-def test_daemon_reopens_existing_submit_backoff(
+def test_daemon_defers_waitable_submit_failure_until_backoff_expires(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -2988,12 +2989,40 @@ def test_daemon_reopens_existing_submit_backoff(
         "submit_response": {"ok": False, "status": 429, "body": "{\"detail\":\"agent_backoff_intake_rejections\"}"},
     }
 
+    monkeypatch.setenv("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", "60")
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert seen == []
+    assert row["blocked_stage"] == "submit_backoff"
+    assert "blocked_final" not in row
+    assert isinstance(row["submit_retry_after"], int)
+    assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
+
+
+def test_daemon_retries_submit_backoff_after_retry_time(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "resveratrol exercise adaptation",
+        "blocked_stage": "submit_backoff",
+        "submit_retry_after": 0,
+    }
+
     v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
 
     assert seen == ["resveratrol exercise adaptation"]
     assert row["blocked_stage"] == "search_cache_waiting"
-    assert "blocked_final" not in row
-    assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
 
 
 def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
