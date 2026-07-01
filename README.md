@@ -11,7 +11,7 @@ PYTHONPATH=src python3 -m v6_alpha_memo --demo --topic "resveratrol exercise ada
 For live fullraw search, set:
 
 ```bash
-export V6_FULLRAW_SEARCH_URL="http://127.0.0.1:9917/search"
+export V6_FULLRAW_SEARCH_URL="http://127.0.0.1:9918/search"
 export V6_MINIMAX_API_KEY="..."
 ```
 
