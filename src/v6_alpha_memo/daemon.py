@@ -261,7 +261,7 @@ def _run_topic(
 
 
 def _clear_blocker(row: dict[str, object]) -> None:
-    for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois", "submit_retry_after"):
+    for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois", "submit_retry_after", "submit_backoff_count"):
         row.pop(key, None)
     _clear_wait_progress(row)
 
@@ -363,6 +363,7 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     active_limit = max(1, _int_env("V6_DAEMON_ACTIVE_TOPIC_LIMIT", _DEFAULT_ACTIVE_TOPIC_LIMIT))
     active_topics = set(topics)
     cache_progress = _cache_progress_by_topic(rows)
+    submit_backoff_active = _submit_backoff_deadline(rows) > int(time.time())
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
     searchable = [
         row for row in rows
@@ -371,6 +372,7 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
         and not row.get("public")
         and not row.get("blocked_final")
         and not _submit_backoff_active(row)
+        and not (submit_backoff_active and row.get("blocked_stage") == "submit_backoff")
     ]
     indexed = list(enumerate(searchable))
     ranked = sorted(
@@ -687,9 +689,15 @@ def _submit_backoff_active(row: dict[str, object]) -> bool:
     return row.get("blocked_stage") == "submit_backoff" and _int(row.get("submit_retry_after")) > int(time.time())
 
 
+def _submit_backoff_deadline(rows: list[dict[str, object]]) -> int:
+    return max((_int(row.get("submit_retry_after")) for row in rows if row.get("blocked_stage") == "submit_backoff"), default=0)
+
+
 def _mark_submit_backoff(row: dict[str, object]) -> None:
+    count = _int(row.get("submit_backoff_count")) + 1
     row["blocked_stage"] = "submit_backoff"
-    row["submit_retry_after"] = int(time.time()) + max(60, _int_env("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", 900))
+    row["submit_backoff_count"] = count
+    row["submit_retry_after"] = int(time.time()) + max(60, _int_env("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", 900)) * min(2 ** (count - 1), 4)
 
 
 def _reset_for_submit_retry(row: dict[str, object]) -> None:
