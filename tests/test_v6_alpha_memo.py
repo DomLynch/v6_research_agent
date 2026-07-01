@@ -2975,6 +2975,43 @@ def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
+def test_daemon_waits_for_queued_side_search_after_enough_completed_shapes() -> None:
+    trace: dict[str, object] = {
+        "paper_count": 9,
+        "pair_count": 36,
+        "scored_count": 0,
+        "coverage": [
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {
+                "error": "",
+                "shards_searched": 1525,
+                "shards_total": 1525,
+                "partial": False,
+                "sweep_failed_shards": 0,
+                "source_count_searched": 5,
+            },
+            {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
+        ],
+    }
+
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+
+
 def test_daemon_final_rejects_after_enough_completed_shapes_with_zero_scored_pairs() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
@@ -3005,14 +3042,13 @@ def test_daemon_final_rejects_after_enough_completed_shapes_with_zero_scored_pai
                 "sweep_failed_shards": 0,
                 "source_count_searched": 5,
             },
-            {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
         ],
     }
 
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
-def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path) -> None:
+def test_daemon_classifies_waiting_trace_with_enough_completed_shapes() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
         "pair_count": 36,
@@ -3045,26 +3081,8 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             {"error": "async_sweep_queued", "shards_searched": 0, "source_count_searched": 0},
         ],
     }
-    board: dict[str, object] = {
-        "rows": [{
-            "topic": "omega 3 atrial fibrillation cardiovascular prevention",
-            "blocked_stage": "search_cache_waiting",
-            "trace": trace,
-            "query_limit": 3,
-            "per_query_limit": 10,
-            "selector_version": v6_daemon._SELECTOR_VERSION,
-            "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
-        }]
-    }
 
-    v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
-
-    row = cast(list[dict[str, object]], board["rows"])[0]
-    assert row["blocked_stage"] == "selector_rejected"
-    assert row["blocked_final"] is True
-    assert row["paper_count"] == 9
-    assert row["pair_count"] == 36
-    assert row["scored_count"] == 0
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
 def test_daemon_keeps_stale_waiting_zero_score_row_waiting_for_side_search(

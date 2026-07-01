@@ -22,7 +22,7 @@ from v6_alpha_memo.write import render_memo, render_with_minimax
 _DEFAULT_QUERY_LIMIT = 3
 _DEFAULT_PER_QUERY_LIMIT = 10
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
-_SELECTOR_VERSION = 27
+_SELECTOR_VERSION = 29
 _QUERY_SHAPE_VERSION = 8
 _WRITER_VERSION = 5
 
@@ -757,6 +757,8 @@ def _blocked_stage(trace: dict[str, object]) -> str:
     if isinstance(coverage, list) and coverage:
         strict_count = sum(1 for item in coverage if _strict_coverage(item))
         if strict_count:
+            if any(_waitable_coverage(item) for item in coverage):
+                return "search_cache_waiting"
             if (
                 strict_count >= _int_env("V6_DAEMON_MIN_COMPLETED_SHAPES", 3)
                 and _int(trace.get("scored_count")) == 0
@@ -764,8 +766,6 @@ def _blocked_stage(trace: dict[str, object]) -> str:
                 and _int(trace.get("pair_count")) > 0
             ):
                 return "selector_rejected"
-            if any(_waitable_coverage(item) for item in coverage):
-                return "search_cache_waiting"
             if (
                 _int(trace.get("scored_count")) == 0
                 and _int(trace.get("paper_count")) > 0
