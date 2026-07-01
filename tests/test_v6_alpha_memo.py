@@ -1406,7 +1406,7 @@ def test_daemon_payload_uses_selected_pair_receipts() -> None:
     run = build_memo("management dashboard forecast accuracy", client=DemoClient())
     selected = run.top_pairs[0]
 
-    payload = v6_daemon._payload("management dashboard forecast accuracy", "agent-v6", run.memo, selected)
+    payload = v6_daemon._payload("management dashboard forecast accuracy", "agent-v6", run.memo, selected, {})
     bundle = payload["source_bundle"]
 
     assert isinstance(bundle, list)
@@ -1416,6 +1416,24 @@ def test_daemon_payload_uses_selected_pair_receipts() -> None:
     ]
     assert payload["agent_id"] == "agent-v6"
     assert payload["artifact_type"] == "alpha_memo"
+
+
+def test_daemon_payload_marks_revision_parent() -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    selected = run.top_pairs[0]
+
+    payload = v6_daemon._payload(
+        "management dashboard forecast accuracy",
+        "agent-v6",
+        run.memo,
+        selected,
+        {"revision_of_object_id": "sub-parent"},
+    )
+
+    metadata = payload["metadata"]
+    assert isinstance(metadata, dict)
+    assert payload["revision_of_object_id"] == "sub-parent"
+    assert metadata["revision_of_object_id"] == "sub-parent"
 
 
 def test_daemon_clears_stale_blocker_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -1915,6 +1933,7 @@ def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> No
     v6_daemon._run_topic(tmp_path, "resveratrol mimics exercise training", "agent-v6", DemoClient(), CleanRevisePublisher(), row)  # type: ignore[arg-type]
 
     assert row["revision_retry_count"] == 1
+    assert row["revision_of_object_id"] == "sub-1"
     assert "generated" not in row
     assert "submitted" not in row
     assert "blocked_final" not in row

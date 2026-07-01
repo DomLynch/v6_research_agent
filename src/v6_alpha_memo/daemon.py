@@ -140,7 +140,7 @@ def _run_topic(
             "scored_count": run.scored_count,
         })
         _clear_blocker(row)
-        response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected))
+        response = publisher.post("/submissions", _payload(topic, agent_id, run.memo, selected, row))
         row["submit_response"] = response
         if response.get("ok"):
             submission = cast(dict[str, object], response.get("json", {})).get("submission")
@@ -272,12 +272,16 @@ def _schedule_terms(value: str) -> set[str]:
     return {word for word in re.findall(r"[a-z][a-z0-9]{2,}", value.casefold()) if word not in drop}
 
 
-def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict[str, object]:
+def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: dict[str, object]) -> dict[str, object]:
     pair = selected.pair
     domain = _domain(topic)
     score = int(selected.score)
     bundle = [_source(pair.a), _source(pair.b)]
-    return {
+    revision_of = str(row.get("revision_of_object_id") or "").strip()
+    metadata = {"article_type": "alpha_memo", "domain_slug": domain, "topic": _slug(topic)}
+    if revision_of:
+        metadata["revision_of_object_id"] = revision_of
+    payload: dict[str, object] = {
         "artifact_type": "alpha_memo",
         "article_type": "alpha_memo",
         "author_agent_id": agent_id,
@@ -292,7 +296,7 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict
         "source_bundle": bundle,
         "novelty_score": float(score),
         "confidence_score": 80.0,
-        "metadata": {"article_type": "alpha_memo", "domain_slug": domain, "topic": _slug(topic)},
+        "metadata": metadata,
         "evidence_bundle": {
             "sources": bundle,
             "direct_source_count": len(bundle),
@@ -313,6 +317,9 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair) -> dict
             },
         },
     }
+    if revision_of:
+        payload["revision_of_object_id"] = revision_of
+    return payload
 
 
 def _source(paper: Paper) -> dict[str, object]:
@@ -416,6 +423,8 @@ def _row_clean_revision(row: dict[str, object]) -> bool:
 
 
 def _reset_for_revision_retry(row: dict[str, object]) -> None:
+    if row.get("submission_id"):
+        row["revision_of_object_id"] = row["submission_id"]
     row["revision_retry_count"] = _int(row.get("revision_retry_count")) + 1
     for key in (
         "generated", "submitted", "accepted", "public", "submission_id", "decision",
