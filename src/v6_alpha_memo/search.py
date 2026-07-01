@@ -202,9 +202,9 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     compact = " ".join(words[:4])
     alpha_seed = " ".join((*words[:1], "null", "failed", "primary", "endpoint", *words[1:]))
     templates = (
+        "{seed} mechanism model human failed translation",
         alpha_seed,
         "{seed} baseline subgroup high low response",
-        "{seed} mechanism model human failed translation",
         "{seed} endpoint split randomized trial placebo",
         "{seed} intervention opposite endpoint boundary condition",
         "{seed} field experiment intervention null effect",
@@ -212,7 +212,7 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} same intervention different modality adaptation",
     )
     shaped = tuple(template.format(seed=seed) for template in templates if seed)
-    queries = [seed, *shaped[:1], compact, *shaped[1:]]
+    queries = [seed, *shaped[:2], compact, *shaped[2:]]
     return tuple(dict.fromkeys(queries))[: max(1, limit)]
 
 

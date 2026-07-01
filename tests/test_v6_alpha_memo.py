@@ -46,8 +46,8 @@ def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
     queries = query_shapes("cold water immersion resistance training", limit=3)
 
     assert queries[0] == "cold water immersion resistance training"
-    assert queries[1] == "cold null failed primary endpoint water immersion resistance training"
-    assert queries[2] == "cold water immersion resistance"
+    assert queries[1] == "cold water immersion resistance training mechanism model human failed translation"
+    assert queries[2] == "cold null failed primary endpoint water immersion resistance training"
 
 
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
@@ -1188,8 +1188,8 @@ def test_build_memo_continues_later_shapes_when_fullraw_is_waiting() -> None:
     coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
     assert client.queries == [
         "resveratrol exercise adaptation",
+        "resveratrol exercise adaptation mechanism model human failed translation",
         "resveratrol null failed primary endpoint exercise adaptation",
-        "resveratrol exercise adaptation baseline subgroup high low response",
     ]
     assert [row["error"] for row in coverage] == ["async_sweep_queued"] * 3
 
