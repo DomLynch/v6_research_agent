@@ -1408,6 +1408,7 @@ def test_fullraw_client_backfills_missing_abstract_from_pubmed_title(
         assert "efetch.fcgi" in request.full_url
         return _TextResponse(
             "CONTEXT: Small trials suggested omega-3 fatty acids may provide a safe option. "
+            "doi: 10.1016/j.jacc.2012.11.021. "
             "OBJECTIVE: To test prescription omega-3 fatty acids for recurrent symptomatic atrial fibrillation. "
             "RESULTS: The randomized trial found no significant reduction in recurrent atrial fibrillation."
         )
@@ -1420,6 +1421,7 @@ def test_fullraw_client_backfills_missing_abstract_from_pubmed_title(
     ).search("omega 3 atrial fibrillation", limit=3)
 
     assert result.papers[0].abstract.startswith("CONTEXT: Small trials")
+    assert result.papers[0].doi == "10.1016/j.jacc.2012.11.021"
     assert result.papers[0].url == "https://pubmed.ncbi.nlm.nih.gov/21078810/"
 
 

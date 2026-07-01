@@ -629,7 +629,7 @@ def _pubmed_backfill(paper: Paper, opener: RequestOpener, *, timeout: float) -> 
         abstract=abstract,
         source=paper.source,
         year=paper.year,
-        doi=paper.doi,
+        doi=paper.doi or _doi(abstract),
         url=paper.url or f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
         venue=paper.venue,
     )
