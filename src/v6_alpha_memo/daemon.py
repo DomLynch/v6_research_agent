@@ -76,8 +76,16 @@ def _run_pass(
     for row in rows:
         if row.get("public"):
             _clear_blocker(row)
-        elif row.get("blocked_stage") == "submit_backoff" and (
-            "submit_retry_after" not in row or "submit_backoff_count" not in row
+        elif (
+            (
+                row.get("blocked_stage") == "submit_backoff"
+                and ("submit_retry_after" not in row or "submit_backoff_count" not in row)
+            )
+            or (
+                not row.get("submitted")
+                and not row.get("public")
+                and _waitable_submit_response(row.get("last_submit_response"))
+            )
         ):
             _mark_submit_backoff(row)
         elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):

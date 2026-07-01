@@ -3285,6 +3285,29 @@ def test_daemon_migrates_legacy_submit_backoff_to_timed_cooldown(
     assert row["submit_backoff_count"] == 1
 
 
+def test_daemon_treats_orphaned_429_submit_response_as_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del topic, kwargs
+        raise AssertionError("row should cool down before another submit")
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", "60")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    row: dict[str, object] = {
+        "topic": "resveratrol augment exercise training protocol",
+        "last_submit_response": {"ok": False, "status": 429, "body": "{\"detail\":\"agent_backoff_intake_rejections\"}"},
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol augment exercise training protocol",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "submit_backoff"
+    assert isinstance(row["submit_retry_after"], int)
+    assert row["submit_backoff_count"] == 1
+
+
 def test_submit_backoff_is_exponential_and_lane_wide(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("V6_DAEMON_SUBMIT_BACKOFF_SECONDS", "60")
     row: dict[str, object] = {}
