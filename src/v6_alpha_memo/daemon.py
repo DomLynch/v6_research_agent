@@ -90,7 +90,14 @@ def _run_pass(
         ):
             _clear_blocker(row)
         elif row.get("blocked_stage") == "search_cache_waiting" and _blocked_stage_from_row(row) == "selector_rejected":
-            row.update({"blocked_stage": "selector_rejected", "blocked_final": True})
+            trace = cast(dict[str, object], row.get("trace"))
+            row.update({
+                "blocked_stage": "selector_rejected",
+                "blocked_final": True,
+                "paper_count": trace.get("paper_count"),
+                "pair_count": trace.get("pair_count"),
+                "scored_count": trace.get("scored_count"),
+            })
         elif row.get("blocked_stage") == "selector_rejected" and not row.get("generated") and not row.get("submitted"):
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
