@@ -1773,7 +1773,15 @@ def test_daemon_prioritizes_previous_high_score_waiting_row(monkeypatch: pytest.
     board: dict[str, object] = {
         "rows": [
             {"topic": "generic waiting", "blocked_stage": "search_cache_waiting", "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
-            {"topic": "resveratrol mimics exercise training", "blocked_stage": "search_cache_waiting", "top_score": 100, "trace": {"coverage": [{"error": "async_sweep_queued"}]}},
+            {
+                "topic": "resveratrol mimics exercise training",
+                "blocked_stage": "search_cache_waiting",
+                "top_score": 100,
+                "trace": {"coverage": [
+                    {"error": "", "shards_searched": 1525, "shards_total": 1525, "source_count_searched": 5},
+                    {"error": "async_sweep_queued"},
+                ]},
+            },
         ]
     }
 
