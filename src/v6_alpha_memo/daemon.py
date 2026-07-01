@@ -107,6 +107,9 @@ def _run_pass(
             row.update({
                 "blocked_stage": stage,
                 "trace": exc.trace,
+                "paper_count": exc.trace.get("paper_count"),
+                "pair_count": exc.trace.get("pair_count"),
+                "scored_count": exc.trace.get("scored_count"),
                 "query_limit": _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT),
                 "per_query_limit": _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT),
                 "selector_version": _SELECTOR_VERSION,

@@ -2238,6 +2238,9 @@ def test_daemon_keeps_stale_waiting_zero_score_row_waiting_for_side_search(
     v6_daemon._run_pass(tmp_path, ("omega 3 atrial fibrillation cardiovascular prevention",), "agent-v6", DemoClient(), object(), {"rows": [row]})  # type: ignore[arg-type]
 
     assert row["blocked_stage"] == "search_cache_waiting"
+    assert row["paper_count"] == 9
+    assert row["pair_count"] == 36
+    assert row["scored_count"] == 0
     assert "blocked_final" not in row
 
 
@@ -2925,7 +2928,9 @@ def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
     assert row["blocked_stage"] == "selector_rejected"
     assert "top_score" not in row
     assert "top_shape" not in row
-    assert "paper_count" not in row
+    assert row["paper_count"] == 2
+    assert row["pair_count"] == 1
+    assert row["scored_count"] == 0
 
 
 def test_daemon_reopens_unpublished_rows_from_old_query_shape_version(
