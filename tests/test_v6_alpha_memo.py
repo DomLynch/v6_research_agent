@@ -2680,6 +2680,38 @@ def test_daemon_reopens_stale_final_row_when_search_depth_increases(
     assert row["per_query_limit"] == 25
 
 
+def test_daemon_reopens_stale_final_row_when_query_breadth_increases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen.update(kwargs)
+        raise NoMemoError({"coverage": [{"error": ""}]})
+
+    monkeypatch.setenv("V6_DAEMON_QUERY_LIMIT", "8")
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "resveratrol exercise adaptation",
+            "blocked_stage": "selector_rejected",
+            "blocked_final": True,
+            "query_limit": 2,
+            "per_query_limit": 25,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("resveratrol exercise adaptation",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen["topic"] == "resveratrol exercise adaptation"
+    assert seen["query_limit"] == 8
+    assert row["blocked_stage"] == "selector_rejected"
+    assert row["query_limit"] == 8
+
+
 def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
