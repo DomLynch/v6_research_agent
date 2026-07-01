@@ -625,6 +625,27 @@ def test_protocol_result_keeps_primary_endpoint_null_despite_secondary_improveme
     assert scored[0].score >= 85
 
 
+def test_protocol_result_rejects_specific_population_drift() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Effect of interventionx versus standard treatment on non-obese patients with polycystic ovary syndrome",
+            "The protocol hypothesized interventionx would improve strength and metabolic endpoints in PCOS patients.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Interventionx blunts resistance training hypertrophy in older adults",
+            "Results showed interventionx blunted resistance training hypertrophy in older adults.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"interventionx", "resistance", "training"})
+
+    assert not any(item.score >= 85 and item.shape == "protocol_result_mismatch" for item in scored)
+
+
 def test_pilot_feasibility_receipt_does_not_become_positive_expectation() -> None:
     papers = (
         Paper(
@@ -2719,7 +2740,7 @@ def test_daemon_preserves_counts_when_waiting_trace_final_rejects(tmp_path: Path
             "trace": trace,
             "query_limit": 3,
             "per_query_limit": 10,
-            "selector_version": 19,
+            "selector_version": 20,
             "query_shape_version": 7,
         }]
     }
@@ -3206,7 +3227,7 @@ def test_daemon_runs_open_row_before_waiting_cache_progress(
                 "query_limit": 3,
                 "per_query_limit": 10,
                 "query_shape_version": 7,
-                "selector_version": 19,
+                "selector_version": 20,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
@@ -3488,7 +3509,7 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert "submission_id" not in row
     assert "top_score" not in row
     assert row["trace"] == {"coverage": [{"error": ""}]}
-    assert row["selector_version"] == 19
+    assert row["selector_version"] == 20
 
 
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
@@ -3521,7 +3542,7 @@ def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None
             "topic": "time restricted eating resistance training lean mass",
             "blocked_stage": "selector_rejected",
             "blocked_final": True,
-            "selector_version": 19,
+            "selector_version": 20,
             "query_shape_version": 7,
             "query_limit": 3,
             "per_query_limit": 10,
@@ -3610,7 +3631,7 @@ def test_daemon_reopens_waiting_rows_from_old_search_config(
     assert seen["topic"] == "vitamin d fracture randomized trial older adults"
     assert seen["query_limit"] == 8
     assert seen["per_query_limit"] == 25
-    assert row["selector_version"] == 19
+    assert row["selector_version"] == 20
     assert row["blocked_stage"] == "search_cache_waiting"
 
 

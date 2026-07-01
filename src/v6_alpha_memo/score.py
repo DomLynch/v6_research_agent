@@ -125,6 +125,14 @@ _TISSUE_FAMILIES = {
     "liver": frozenset({"hepatic", "liver"}),
     "adipose": frozenset({"adipose", "fat"}),
 }
+_POPULATION_FAMILIES = {
+    "athlete": frozenset({"athlete", "athletes", "trained"}),
+    "diabetes": frozenset({"diabetes", "diabetic", "t2d"}),
+    "healthy": frozenset({"healthy"}),
+    "obesity": frozenset({"obese", "obesity", "overweight"}),
+    "older": frozenset({"aged", "elderly", "older", "seniors"}),
+    "pcos": frozenset({"pcos", "polycystic"}),
+}
 _PK_ENDPOINT = frozenset({"concentration", "dose", "dosage", "exposure", "pharmacokinetic", "pharmacokinetics", "plasma"})
 
 
@@ -561,7 +569,16 @@ def _tissue_families(paper: Paper) -> set[str]:
 
 
 def _population_compatible(a: Paper, b: Paper) -> bool:
-    return not ((_animal_only(a) and _is_human(b)) or (_animal_only(b) and _is_human(a)))
+    if (_animal_only(a) and _is_human(b)) or (_animal_only(b) and _is_human(a)):
+        return False
+    left = _population_families(a)
+    right = _population_families(b)
+    return not (left and right and not left & right)
+
+
+def _population_families(paper: Paper) -> set[str]:
+    tokens = _tokens(paper)
+    return {family for family, words in _POPULATION_FAMILIES.items() if tokens & words}
 
 
 def _short(text: str) -> str:
