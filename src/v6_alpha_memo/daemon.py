@@ -23,7 +23,7 @@ _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 34
 _QUERY_SHAPE_VERSION = 9
-_WRITER_VERSION = 10
+_WRITER_VERSION = 11
 
 
 @dataclass(frozen=True, slots=True)
@@ -538,13 +538,27 @@ def _payload_validation_issues(payload: dict[str, object]) -> tuple[str, ...]:
     memo = str(payload.get("body_markdown") or payload.get("markdown") or "")
     bundle = payload.get("source_bundle")
     sources = bundle if isinstance(bundle, list) else []
+    issues: list[str] = []
+    malformed = tuple(
+        doi
+        for doi in (
+            _normalize_doi(str(source.get("doi")))
+            for source in sources
+            if isinstance(source, dict) and source.get("doi")
+        )
+        if not _valid_doi_format(doi)
+    )
+    if malformed:
+        issues.append("malformed_doi:" + ",".join(malformed))
     bundled = {
         _normalize_doi(str(source.get("doi")))
         for source in sources
         if isinstance(source, dict) and source.get("doi")
     }
     extra = tuple(doi for doi in _memo_dois(memo) if doi not in bundled)
-    return ("unbundled_doi:" + ",".join(extra),) if extra else ()
+    if extra:
+        issues.append("unbundled_doi:" + ",".join(extra))
+    return tuple(issues)
 
 
 def _memo_dois(memo: str) -> tuple[str, ...]:
@@ -555,6 +569,10 @@ def _memo_dois(memo: str) -> tuple[str, ...]:
 
 def _normalize_doi(value: str) -> str:
     return value.casefold().rstrip(".,;:)]}")
+
+
+def _valid_doi_format(value: str) -> bool:
+    return bool(re.fullmatch(r"10\.\d{4,9}/[-._;()/:a-z0-9]+", value.casefold()))
 
 
 def _source(paper: Paper) -> dict[str, object]:
