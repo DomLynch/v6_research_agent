@@ -336,6 +336,55 @@ def test_rejects_repository_deposit_as_alpha_receipt() -> None:
     assert score_pairs(pairs, topic_terms={"creatine", "cognitive", "older", "adults"}) == ()
 
 
+def test_rejects_preprint_repository_receipts_as_alpha_evidence() -> None:
+    papers = (
+        Paper(
+            "authorea",
+            "Resveratrol supplementation improves exercise adaptation in trained adults",
+            "Results showed resveratrol supplementation improved exercise adaptation in trained adults.",
+            "openalex",
+            doi="10.22541/au.167601089.97672985/v1",
+            url="https://www.authorea.com/doi/full/10.22541/au.167601089.97672985/v1",
+        ),
+        Paper(
+            "trial",
+            "Resveratrol supplementation did not improve exercise adaptation in older adults",
+            "Results showed resveratrol supplementation did not improve exercise adaptation in older adults.",
+            "pubmed",
+            doi="10.1186/demo-resveratrol",
+        ),
+    )
+    pairs = mine_pairs(papers)
+    scored_all = score_all_pairs(pairs, topic_terms={"resveratrol", "exercise", "adaptation"})
+
+    assert any("reject:repository_receipt" in item.reasons for item in scored_all)
+    assert score_pairs(pairs, topic_terms={"resveratrol", "exercise", "adaptation"}) == ()
+
+
+def test_rejects_concordant_null_pairs_as_promise_reversal() -> None:
+    papers = (
+        Paper(
+            "timing-a",
+            "Protein timing did not improve muscle protein synthesis after exercise",
+            "Results showed protein timing did not improve muscle protein synthesis after exercise.",
+            "pubmed",
+            doi="10.1016/demo-timing-a",
+        ),
+        Paper(
+            "timing-b",
+            "Carbohydrate protein timing did not improve muscle recovery after exercise",
+            "Results showed carbohydrate protein timing did not improve muscle recovery after exercise.",
+            "openalex",
+            doi="10.1016/demo-timing-b",
+        ),
+    )
+    pairs = mine_pairs(papers)
+    scored_all = score_all_pairs(pairs, topic_terms={"protein", "timing", "muscle"})
+
+    assert any("reject:concordant_null_pair" in item.reasons for item in scored_all)
+    assert score_pairs(pairs, topic_terms={"protein", "timing", "muscle"}) == ()
+
+
 def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     papers = (
         Paper(
@@ -2855,6 +2904,71 @@ def test_title_hides_internal_protocol_mismatch_label() -> None:
 
     assert title == "Alpha memo: resveratrol exercise context boundary"
     assert "protocol mismatch" not in title
+
+
+def test_translation_boundary_title_uses_cautious_public_label() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper("a", "Resveratrol activates exercise mimetic pathways in mice", "", "openalex"),
+            Paper("b", "Resveratrol has bounded exercise adaptation evidence in humans", "", "pubmed"),
+            ("resveratrol", "exercise"),
+            (),
+        ),
+        100,
+        "translation_boundary",
+        "update",
+        (),
+    )
+
+    title = v6_write._title(scored)
+
+    assert title == "Alpha memo: resveratrol exercise cross-context signal"
+    assert "translation boundary" not in title
+
+
+def test_memo_validator_blocks_overclaim_title_and_grammar_fragment() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper(
+                "a",
+                "GlyNAC supplementation improves glutathione markers in older adults",
+                "Results showed GlyNAC supplementation improved glutathione markers in older adults.",
+                "pubmed",
+                doi="10.demo/glynac-a",
+            ),
+            Paper(
+                "b",
+                "GlyNAC supplementation did not improve exercise performance",
+                "Results showed GlyNAC supplementation did not improve exercise performance.",
+                "openalex",
+                doi="10.demo/glynac-b",
+            ),
+            ("glynac", "glutathione"),
+            (),
+        ),
+        100,
+        "promise_reversal",
+        "update",
+        (),
+    )
+    memo = """# Alpha memo: glynac improves translation boundary
+
+**One-sentence alpha:** He made us expect a direct performance improvement.
+
+**Receipt 1:** GlyNAC supplementation improves glutathione markers in older adults | finding: Results showed GlyNAC supplementation improved glutathione markers in older adults.
+
+**Receipt 2:** GlyNAC supplementation did not improve exercise performance | finding: Results showed GlyNAC supplementation did not improve exercise performance.
+
+**Why this is surprising:** The receipts differ.
+
+**Caveats/falsifiers:**
+- Reject if later trials isolate a direct performance benefit.
+"""
+
+    issues = v6_write.validate_memo_against_pair(memo, scored)
+
+    assert "title_overclaim" in issues
+    assert "grammar_fragment" in issues
 
 
 def test_mechanism_to_human_title_uses_cross_context_signal() -> None:

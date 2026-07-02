@@ -64,8 +64,10 @@ _MODALITY = frozenset({
 })
 _BAD_ANCHOR = frozenset({
     "adult", "adults", "associated", "background", "care", "cohort", "combination",
-    "conclusion", "control", "divided", "elisa", "older", "primary", "retrospective",
-    "found", "reduce", "reduces", "response", "significant", "significantly", "time",
+    "conclusion", "control", "did", "divided", "does", "effect", "effects", "elisa",
+    "found", "improve", "improved", "improves", "not", "older", "primary",
+    "retrospective", "reduce", "reduces", "response", "significant", "significantly",
+    "supplementation", "time",
 })
 _CONTEXT_ANCHOR = frozenset({
     "adaptation", "adaptations", "adult", "adults", "aging", "biomarker", "biomarkers",
@@ -439,7 +441,32 @@ def _weak_stat_receipt(paper: Paper) -> bool:
 
 
 def _concordant_null_pair(a: Paper, b: Paper, anchors: tuple[str, ...]) -> bool:
-    return _negative_update_receipt(a, anchors) and _negative_update_receipt(b, anchors)
+    return (
+        _negative_update_receipt(a, anchors)
+        and _negative_update_receipt(b, anchors)
+        and _null_or_no_benefit_receipt(a)
+        and _null_or_no_benefit_receipt(b)
+    )
+
+
+def _null_or_no_benefit_receipt(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return any(
+        phrase in text
+        for phrase in (
+            "did not",
+            "does not",
+            "failed to",
+            "no benefit",
+            "no difference",
+            "no evidence",
+            "no significant",
+            "not improve",
+            "not improved",
+            "null",
+            "unchanged",
+        )
+    )
 
 
 def _repository_receipt(paper: Paper) -> bool:
