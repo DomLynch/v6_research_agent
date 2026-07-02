@@ -73,7 +73,7 @@ def _run_pass(
     board: dict[str, object],
 ) -> None:
     rows = _rows(board, topics)
-    _refresh_submit_blocker(board, rows, topics)
+    _sync_submit_blocker(board, rows, topics)
     for row in rows:
         if row.get("public"):
             _clear_blocker(row)
@@ -128,7 +128,7 @@ def _run_pass(
         ):
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
-    _refresh_submit_blocker(board, rows, topics)
+    _sync_submit_blocker(board, rows, topics)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in _candidate_rows(rows, topics):
@@ -488,6 +488,24 @@ def _refresh_submit_blocker(board: dict[str, object], rows: list[dict[str, objec
         board["submit_blocked_until"] = deadline
     else:
         board.pop("submit_blocked_until", None)
+    return deadline
+
+
+def _sync_submit_blocker(board: dict[str, object], rows: list[dict[str, object]], topics: tuple[str, ...]) -> int:
+    deadline = _refresh_submit_blocker(board, rows, topics)
+    if deadline <= int(time.time()):
+        return deadline
+    for row in rows:
+        if (
+            str(row.get("topic")) in set(topics)
+            and row.get("generated")
+            and row.get("pending_payload")
+            and not row.get("submitted")
+            and not row.get("public")
+            and not row.get("blocked_final")
+            and _int(row.get("submit_retry_after")) < deadline
+        ):
+            _defer_submit_backoff(row, deadline)
     return deadline
 
 
