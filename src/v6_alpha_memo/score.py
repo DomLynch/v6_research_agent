@@ -366,6 +366,8 @@ def _receipt_hygiene_reject(
         return "reject:supplement_receipt"
     if _weak_stat_receipt(a) or _weak_stat_receipt(b):
         return "reject:weak_statistical_signal"
+    if _repository_receipt(a) or _repository_receipt(b):
+        return "reject:repository_receipt"
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
     if _comparator_only_anchor(a, anchors, topic_terms) or _comparator_only_anchor(b, anchors, topic_terms):
@@ -432,6 +434,11 @@ def _supplement_receipt(paper: Paper) -> bool:
 def _weak_stat_receipt(paper: Paper) -> bool:
     text = paper.text.casefold()
     return "tendency" in text or "trend toward" in text or "not statistically confirmed" in text
+
+
+def _repository_receipt(paper: Paper) -> bool:
+    text = f"{paper.source} {paper.venue} {paper.url} {paper.doi}".casefold()
+    return "zenodo" in text or paper.doi.casefold().startswith("10.5281/zenodo")
 
 
 def _title_terms(paper: Paper) -> set[str]:
