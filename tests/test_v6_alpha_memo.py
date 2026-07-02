@@ -37,19 +37,19 @@ class DemoClient:
         papers: tuple[Paper, ...]
         if any(term in q for term in ("ai", "retrieval", "factuality", "benchmark")):
             papers = (
-                Paper("ai-promise", "Retrieval augmented generation improves factuality on a benchmark", "The model improved answer factuality when retrieval augmented generation supplied citations.", "openalex", 2023, "10.demo/ai-promise"),
-                Paper("ai-update", "Retrieval augmented generation failed to reduce human citation errors in field use", "In a human task study, retrieval augmented generation produced null gains and reduced citation accuracy.", "semantic_scholar", 2024, "10.demo/ai-update"),
+                Paper("ai-promise", "Retrieval augmented generation improves factuality on a benchmark", "The model improved answer factuality when retrieval augmented generation supplied citations.", "openalex", 2023, "10.1000/demo-ai-promise"),
+                Paper("ai-update", "Retrieval augmented generation failed to reduce human citation errors in field use", "In a human task study, retrieval augmented generation produced null gains and reduced citation accuracy.", "semantic_scholar", 2024, "10.1000/demo-ai-update"),
             )
         elif any(term in q for term in ("business", "management", "marketing")):
             papers = (
-                Paper("biz-promise", "Management dashboard intervention improved forecast accuracy in a pilot", "A pilot program showed the dashboard improved forecast accuracy and analyst confidence.", "openalex", 2021, "10.demo/biz-promise"),
-                Paper("biz-update", "Management dashboard intervention failed in a randomized field experiment", "A field experiment found null productivity gains and reduced forecast accuracy for dashboard users.", "pubmed", 2022, "10.demo/biz-update"),
+                Paper("biz-promise", "Management dashboard intervention improved forecast accuracy in a pilot", "A pilot program showed the dashboard improved forecast accuracy and analyst confidence.", "openalex", 2021, "10.1000/demo-biz-promise"),
+                Paper("biz-update", "Management dashboard intervention failed in a randomized field experiment", "A field experiment found null productivity gains and reduced forecast accuracy for dashboard users.", "pubmed", 2022, "10.1000/demo-biz-update"),
             )
         else:
             papers = (
-                Paper("promise", "Resveratrol activates mitochondrial exercise-mimetic pathways in mice", "A mouse model showed resveratrol improved exercise adaptation and activated mitochondrial pathways.", "openalex", 2012, "10.demo/promise"),
-                Paper("update", "Resveratrol blunted human exercise training adaptation in a randomized trial", "In older human participants, resveratrol supplementation reduced training-induced improvements.", "pubmed", 2014, "10.demo/update"),
-                Paper("bad", "Systematic review of resveratrol and health outcomes", "A review summarized heterogeneous evidence across many outcomes.", "openalex", 2020, "10.demo/review"),
+                Paper("promise", "Resveratrol activates mitochondrial exercise-mimetic pathways in mice", "A mouse model showed resveratrol improved exercise adaptation and activated mitochondrial pathways.", "openalex", 2012, "10.1000/demo-promise"),
+                Paper("update", "Resveratrol blunted human exercise training adaptation in a randomized trial", "In older human participants, resveratrol supplementation reduced training-induced improvements.", "pubmed", 2014, "10.1000/demo-update"),
+                Paper("bad", "Systematic review of resveratrol and health outcomes", "A review summarized heterogeneous evidence across many outcomes.", "openalex", 2020, "10.1000/demo-review"),
             )
         receipt = CoverageReceipt(
             hits=len(papers),
@@ -3472,6 +3472,24 @@ def test_pending_payload_blocks_unbundled_doi_before_submit() -> None:
     assert row["writer_validation_issues"] == ("unbundled_doi:10.1113/jphysiol.2012.237743",)
 
 
+def test_pending_payload_blocks_malformed_doi_before_submit() -> None:
+    class NeverPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"invalid payload should not submit: {path} {payload}")
+
+    row: dict[str, object] = {
+        "pending_payload": {
+            "body_markdown": "No DOI leak.",
+            "source_bundle": [{"doi": "10.demo/not-a-real-prefix"}],
+        }
+    }
+
+    v6_daemon._submit_pending_row(NeverPublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "writer_validation_failed"
+    assert row["writer_validation_issues"] == ("malformed_doi:10.demo/not-a-real-prefix",)
+
+
 def test_daemon_retries_pending_submit_without_rebuilding(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -3719,8 +3737,8 @@ def test_daemon_skips_invalid_doi_pair_when_later_pair_is_publishable(
         anchors=("interventionx",),
     )
     good_pair = CandidatePair(
-        a=Paper("c", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex", doi="10.good/a"),
-        b=Paper("d", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed", doi="10.good/b"),
+        a=Paper("c", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex", doi="10.1000/good-a"),
+        b=Paper("d", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed", doi="10.1000/good-b"),
         anchors=("interventionx",),
     )
     run = v6_run.V6Run(
@@ -3753,7 +3771,7 @@ def test_daemon_skips_invalid_doi_pair_when_later_pair_is_publishable(
 
     payload = cast(dict[str, object], seen["payload"])
     sources = cast(list[dict[str, object]], payload["source_bundle"])
-    assert [source["doi"] for source in sources] == ["10.good/a", "10.good/b"]
+    assert [source["doi"] for source in sources] == ["10.1000/good-a", "10.1000/good-b"]
     assert row["submitted"] is True
     assert "unresolved_dois" not in row
 
