@@ -134,15 +134,23 @@ def _run_pass(
     for row in _candidate_rows(rows, topics):
         if row.get("blocked_final"):
             continue
+        submit_deadline = 0
+        submit_allowed = True
         if not row.get("submitted"):
-            deadline = _refresh_submit_blocker(board, rows, topics)
-            if deadline > int(time.time()):
+            submit_deadline = _refresh_submit_blocker(board, rows, topics)
+            submit_allowed = submit_deadline <= int(time.time())
+            if not submit_allowed and row.get("generated") and row.get("pending_payload"):
+                _defer_submit_backoff(row, submit_deadline)
+                continue
+            if not submit_allowed and row.get("blocked_stage") == "submit_backoff":
                 if row.get("generated") and row.get("pending_payload"):
-                    _defer_submit_backoff(row, deadline)
+                    _defer_submit_backoff(row, submit_deadline)
                 continue
         topic = str(row["topic"])
         try:
-            _run_topic(run_dir, topic, agent_id, client, publisher, row)
+            _run_topic(run_dir, topic, agent_id, client, publisher, row, allow_submit=submit_allowed)
+            if not submit_allowed and row.get("generated") and row.get("pending_payload") and not row.get("submitted"):
+                _defer_submit_backoff(row, submit_deadline)
             _refresh_submit_blocker(board, rows, topics)
         except NoMemoError as exc:
             stage = _blocked_stage(exc.trace)
@@ -180,6 +188,8 @@ def _run_topic(
     client: FullrawSearchClient,
     publisher: Publisher,
     row: dict[str, object],
+    *,
+    allow_submit: bool = True,
 ) -> None:
     if not row.get("generated"):
         query_limit = _int_env("V6_DAEMON_QUERY_LIMIT", _DEFAULT_QUERY_LIMIT)
@@ -265,7 +275,7 @@ def _run_topic(
             "writer_version": _WRITER_VERSION,
         })
         _clear_blocker(row)
-    if row.get("generated") and not row.get("submitted") and row.get("pending_payload"):
+    if allow_submit and row.get("generated") and not row.get("submitted") and row.get("pending_payload"):
         _submit_pending_row(publisher, row)
 
     if row.get("submitted") and not row.get("public") and row.get("submission_id"):
@@ -443,13 +453,17 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     active_rows = [row for row in rows if str(row.get("topic")) in active_topics]
     submit_backoff_active = _submit_backoff_deadline(active_rows) > int(time.time())
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
-    searchable = [] if submit_backoff_active else [
+    searchable = [
         row for row in rows
         if str(row.get("topic")) in active_topics
         and not row.get("submitted")
         and not row.get("public")
         and not row.get("blocked_final")
         and not _submit_backoff_active(row)
+        and not (
+            submit_backoff_active
+            and (row.get("generated") or row.get("pending_payload") or row.get("blocked_stage") == "submit_backoff")
+        )
     ]
     indexed = list(enumerate(searchable))
     ranked = sorted(

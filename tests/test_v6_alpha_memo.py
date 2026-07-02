@@ -3453,6 +3453,50 @@ def test_lane_backoff_blocks_fresh_submit_in_same_pass(tmp_path: Path) -> None:
     assert rows[1]["submit_retry_after"] == rows[0]["submit_retry_after"]
 
 
+def test_lane_backoff_allows_fresh_candidate_generation_without_submit(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    run = build_memo("management dashboard forecast accuracy", client=DemoClient())
+    deadline = int(time.time()) + 600
+
+    class NeverPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"submit should wait for backoff: {path} {payload}")
+
+        def get(self, path: str) -> dict[str, object]:
+            raise AssertionError(f"generated-only pass should not poll: {path}")
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "2")
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: True)
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "creatine cognitive function older adults",
+            "blocked_stage": "submit_backoff",
+            "submit_retry_after": deadline,
+            "submit_backoff_count": 2,
+        },
+        {"topic": "management dashboard forecast accuracy"},
+    ]
+
+    v6_daemon._run_pass(
+        tmp_path,
+        ("creatine cognitive function older adults", "management dashboard forecast accuracy"),
+        "agent-v6",
+        cast(FullrawSearchClient, DemoClient()),
+        cast(v6_daemon.Publisher, NeverPublisher()),
+        {"rows": rows},
+    )
+
+    fresh = rows[1]
+    assert fresh["generated"] is True
+    assert isinstance(fresh["pending_payload"], dict)
+    assert fresh["blocked_stage"] == "submit_backoff"
+    assert fresh["submit_retry_after"] == deadline
+    assert "submitted" not in fresh
+
+
 def test_active_submit_backoff_does_not_extend_each_pass(tmp_path: Path) -> None:
     deadline = int(time.time()) + 600
     row: dict[str, object] = {
