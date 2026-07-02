@@ -4494,8 +4494,8 @@ def test_domain_classifier_does_not_match_ai_inside_training() -> None:
     assert v6_daemon._domain("marketing attribution incrementality") == "management_research"
 
 
-def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> None:
-    class CleanRevisePublisher:
+def test_daemon_retries_reviewer_revision_without_manual_edit(tmp_path: Path) -> None:
+    class ReviewerRevisePublisher:
         def get(self, path: str) -> dict[str, object]:
             assert path == "/submissions/sub-1/decision"
             return {
@@ -4516,7 +4516,7 @@ def test_daemon_retries_clean_revision_without_manual_edit(tmp_path: Path) -> No
 
     row: dict[str, object] = {"generated": True, "submitted": True, "submission_id": "sub-1"}
 
-    v6_daemon._run_topic(tmp_path, "resveratrol mimics exercise training", "agent-v6", DemoClient(), CleanRevisePublisher(), row)  # type: ignore[arg-type]
+    v6_daemon._run_topic(tmp_path, "resveratrol mimics exercise training", "agent-v6", DemoClient(), ReviewerRevisePublisher(), row)  # type: ignore[arg-type]
 
     assert row["revision_retry_count"] == 1
     assert row["revision_of_object_id"] == "sub-1"
@@ -4568,7 +4568,7 @@ def test_minimax_prompt_includes_revision_notes() -> None:
     assert "Sharpen the endpoint wording." in prompt
 
 
-def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_daemon_reopens_final_reviewer_revision_on_next_pass(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def fake_build_memo(topic: str, **kwargs: object) -> object:
         del topic, kwargs
         raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
@@ -4649,7 +4649,7 @@ def test_live_service_config_uses_wider_strict_search() -> None:
     assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
 
 
-def test_daemon_reopens_legacy_clean_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     def fake_build_memo(topic: str, **kwargs: object) -> object:
         del topic, kwargs
         raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})

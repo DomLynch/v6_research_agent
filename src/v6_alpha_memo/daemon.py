@@ -661,23 +661,6 @@ def _retryable_revision(data: dict[str, object]) -> bool:
     )
 
 
-def _clean_revision(data: dict[str, object]) -> bool:
-    scores = data.get("rubric_scores")
-    scores = scores if isinstance(scores, dict) else {}
-    values = scores.values()
-    return (
-        data.get("decision") == "revise"
-        and bool(data.get("resubmission"))
-        and not data.get("gate_failures")
-        and not data.get("major_issues")
-        and data.get("claim_support_verdict") == "supported"
-        and data.get("overclaim_verdict") == "none"
-        and all(isinstance(score, int | float) and score >= 3 for score in values)
-        and _int(scores.get("source_grounding")) >= 4
-        and _int(scores.get("claim_evidence_alignment")) >= 4
-    )
-
-
 def _row_retryable_revision(row: dict[str, object]) -> bool:
     response = row.get("decision_response")
     data = response.get("json") if isinstance(response, dict) else None
