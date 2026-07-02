@@ -441,16 +441,22 @@ def _weak_stat_receipt(paper: Paper) -> bool:
 
 
 def _concordant_null_pair(a: Paper, b: Paper, anchors: tuple[str, ...]) -> bool:
-    return (
-        _negative_update_receipt(a, anchors)
-        and _negative_update_receipt(b, anchors)
-        and _null_or_no_benefit_receipt(a)
-        and _null_or_no_benefit_receipt(b)
+    return _null_update_receipt(a, anchors) and _null_update_receipt(b, anchors)
+
+
+def _null_update_receipt(paper: Paper, anchors: tuple[str, ...]) -> bool:
+    direct_anchors = tuple(
+        anchor for anchor in anchors if anchor not in _BAD_ANCHOR and anchor not in _CONTEXT_ANCHOR and anchor not in _MODALITY
+    )
+    if not _mentions_anchor(paper.text, direct_anchors):
+        return False
+    return any(
+        _null_or_no_benefit_text(sentence) and _sentence_reports_result(sentence)
+        for sentence in (*_sentences(paper.abstract.casefold()), paper.title.casefold())
     )
 
 
-def _null_or_no_benefit_receipt(paper: Paper) -> bool:
-    text = paper.text.casefold()
+def _null_or_no_benefit_text(text: str) -> bool:
     return any(
         phrase in text
         for phrase in (
@@ -460,6 +466,10 @@ def _null_or_no_benefit_receipt(paper: Paper) -> bool:
             "no benefit",
             "no difference",
             "no evidence",
+            "no group-by-time",
+            "no group by time",
+            "no interaction",
+            "no interactions",
             "no significant",
             "not improve",
             "not improved",

@@ -385,6 +385,30 @@ def test_rejects_concordant_null_pairs_as_promise_reversal() -> None:
     assert score_pairs(pairs, topic_terms={"protein", "timing", "muscle"}) == ()
 
 
+def test_rejects_neutral_title_concordant_null_timing_pair() -> None:
+    papers = (
+        Paper(
+            "whey",
+            "Effect of timing of whey protein supplement on muscle damage markers after eccentric exercise",
+            "Results showed no significant group differences across timing arms for muscle damage markers after eccentric exercise.",
+            "pubmed",
+            doi="10.1000/protein-timing-a",
+        ),
+        Paper(
+            "carb-protein",
+            "Effect of carbohydrate-protein supplement timing on acute exercise-induced muscle damage",
+            "Results showed no group-by-time interactions for creatine kinase, maximal voluntary contraction, or soreness.",
+            "openalex",
+            doi="10.1000/protein-timing-b",
+        ),
+    )
+    pairs = mine_pairs(papers)
+    scored_all = score_all_pairs(pairs, topic_terms={"protein", "timing", "muscle"})
+
+    assert any("reject:concordant_null_pair" in item.reasons for item in scored_all)
+    assert score_pairs(pairs, topic_terms={"protein", "timing", "muscle"}) == ()
+
+
 def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     papers = (
         Paper(
