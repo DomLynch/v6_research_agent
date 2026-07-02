@@ -83,12 +83,15 @@ def _run_pass(
                 and ("submit_retry_after" not in row or "submit_backoff_count" not in row)
             )
             or (
-                not row.get("submitted")
+                row.get("blocked_stage") != "submit_backoff"
+                and not row.get("submitted")
                 and not row.get("public")
                 and _waitable_submit_response(row.get("last_submit_response"))
             )
         ):
             _mark_submit_backoff(row)
+        elif _submit_backoff_active(row):
+            continue
         elif row.get("blocked_final") and _row_retryable_revision(row) and _needs_revision_retry(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
