@@ -3298,11 +3298,6 @@ def test_active_submit_backoff_does_not_extend_each_pass(tmp_path: Path) -> None
         "submit_retry_after": deadline,
         "submit_backoff_count": 4,
         "last_submit_response": {"status": 429, "body": "agent_backoff_intake_rejections"},
-        "query_limit": 5,
-        "per_query_limit": 20,
-        "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
-        "selector_version": v6_daemon._SELECTOR_VERSION,
-        "writer_version": v6_daemon._WRITER_VERSION,
     }
     board: dict[str, object] = {"rows": [row]}
 
