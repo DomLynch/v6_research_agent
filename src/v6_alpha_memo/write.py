@@ -13,9 +13,11 @@ from v6_alpha_memo.search import CoverageReceipt, Paper
 
 _MINIMAX_BASE_URL = "https://api.minimax.io/anthropic"
 _TITLE_DROP = frozenset({
-    "acute", "after", "and", "controlled", "double", "effects", "for", "in",
-    "individuals", "older", "randomized", "study", "supplementation", "the",
-    "trial", "with",
+    "acute", "after", "and", "blunt", "blunted", "blunts", "controlled", "did",
+    "does", "double", "effects", "for", "improve", "improved", "improves",
+    "increase", "increased", "increases", "in", "individuals", "mimic",
+    "mimics", "not", "older", "protect", "protected", "randomized", "reduce",
+    "reduced", "reduces", "study", "supplementation", "the", "trial", "with",
 })
 _SHAPE_TITLE = {
     "mechanism_to_human_failure": "cross-context evidence signal",
@@ -23,8 +25,13 @@ _SHAPE_TITLE = {
     "promise_reversal": "context boundary",
     "protocol_result_mismatch": "context boundary",
     "subgroup_endpoint_split": "endpoint split",
-    "translation_boundary": "translation boundary",
+    "translation_boundary": "cross-context signal",
 }
+_TITLE_OVERCLAIM = re.compile(
+    r"\b(?:blunts?|improves?|increases?|mimics?|protects?|reduces?|translation boundary)\b",
+    flags=re.IGNORECASE,
+)
+_GRAMMAR_FRAGMENT = re.compile(r"\b(?:he|she|it|they)\s+made\s+us\s+expect\b", flags=re.IGNORECASE)
 
 
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
@@ -184,6 +191,11 @@ def validate_memo_against_pair(memo: str, scored: ScoredPair) -> tuple[str, ...]
     issues: list[str] = []
     if not _valid_memo(memo):
         issues.append("invalid_memo_shape")
+    title = _memo_title(memo)
+    if title and _title_overclaims(title):
+        issues.append("title_overclaim")
+    if _grammar_fragment(memo):
+        issues.append("grammar_fragment")
     if not _uses_selected_receipts(memo, scored):
         issues.append("selected_receipt_title_missing")
     bundled = {_normalize_doi(doi) for doi in (scored.pair.a.doi, scored.pair.b.doi) if doi}
@@ -191,6 +203,21 @@ def validate_memo_against_pair(memo: str, scored: ScoredPair) -> tuple[str, ...]
     if extra:
         issues.append("unbundled_doi:" + ",".join(extra))
     return tuple(issues)
+
+
+def _memo_title(memo: str) -> str:
+    for line in memo.splitlines():
+        if line.strip():
+            return line.strip()
+    return ""
+
+
+def _title_overclaims(title: str) -> bool:
+    return bool(_TITLE_OVERCLAIM.search(title))
+
+
+def _grammar_fragment(memo: str) -> bool:
+    return bool(_GRAMMAR_FRAGMENT.search(memo))
 
 
 def _compact(value: str) -> str:

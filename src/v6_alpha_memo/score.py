@@ -366,6 +366,8 @@ def _receipt_hygiene_reject(
         return "reject:supplement_receipt"
     if _weak_stat_receipt(a) or _weak_stat_receipt(b):
         return "reject:weak_statistical_signal"
+    if _concordant_null_pair(a, b, anchors):
+        return "reject:concordant_null_pair"
     if _repository_receipt(a) or _repository_receipt(b):
         return "reject:repository_receipt"
     if _nonprimary(a) or _nonprimary(b):
@@ -436,9 +438,25 @@ def _weak_stat_receipt(paper: Paper) -> bool:
     return "tendency" in text or "trend toward" in text or "not statistically confirmed" in text
 
 
+def _concordant_null_pair(a: Paper, b: Paper, anchors: tuple[str, ...]) -> bool:
+    return _negative_update_receipt(a, anchors) and _negative_update_receipt(b, anchors)
+
+
 def _repository_receipt(paper: Paper) -> bool:
     text = f"{paper.source} {paper.venue} {paper.url} {paper.doi}".casefold()
-    return "zenodo" in text or paper.doi.casefold().startswith("10.5281/zenodo")
+    doi = paper.doi.casefold()
+    repository_terms = (
+        "authorea",
+        "biorxiv",
+        "medrxiv",
+        "preprint",
+        "preprints.org",
+        "research square",
+        "ssrn",
+        "zenodo",
+    )
+    repository_doi_prefixes = ("10.1101/", "10.22541/au.", "10.5281/zenodo")
+    return any(term in text for term in repository_terms) or doi.startswith(repository_doi_prefixes)
 
 
 def _title_terms(paper: Paper) -> set[str]:
