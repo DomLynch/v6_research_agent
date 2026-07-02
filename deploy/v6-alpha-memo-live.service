@@ -16,9 +16,9 @@ Environment=V6_DAEMON_SUBMIT_BACKOFF_SECONDS=3600
 Environment=V6_DAEMON_SLEEP_SECONDS=60
 Environment=V6_DAEMON_MAX_WAITING=6
 Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=3
-Environment=V6_DAEMON_QUERY_LIMIT=3
-Environment=V6_DAEMON_PER_QUERY_LIMIT=10
-Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2
+Environment=V6_DAEMON_QUERY_LIMIT=5
+Environment=V6_DAEMON_PER_QUERY_LIMIT=20
+Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=3
 Environment=V6_MAX_EMPTY_WAITABLE_QUERIES=3
 Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=5
 Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=1
@@ -32,7 +32,7 @@ Environment=V6_FULLRAW_ABSTRACT_BACKFILL=1
 Environment=V6_FULLRAW_ABSTRACT_BACKFILL_LIMIT=8
 Environment=V6_FULLRAW_SWEEP_CACHE_DIR=/var/lib/v6-research-agent/fullraw-sweep-cache
 Environment=V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS=/var/lib/v5-memo/fullraw-sweep-cache
-ExecStart=/bin/bash -lc 'set -a; source /etc/researka-fullraw.env; set +a; export V6_FULLRAW_SEARCH_URL="${V6_FULLRAW_SEARCH_URL:-http://127.0.0.1:9918/search}"; export V6_FULLRAW_TOKEN="${RESEARKA_FULLRAW_TOKEN:-${RESEARKA_FULLRAW_INDEX_TOKEN:-}}"; exec /opt/v6-research-agent/.venv/bin/python -m v6_alpha_memo.daemon'
+ExecStart=/bin/bash -lc 'set -a; source /etc/researka-fullraw.env; set +a; export V6_FULLRAW_SEARCH_URL="${V6_FULLRAW_SEARCH_URL:-http://127.0.0.1:9918/search}"; export V6_FULLRAW_TOKEN="${RESEARKA_FULLRAW_TOKEN:-${RESEARKA_FULLRAW_INDEX_TOKEN:-}}"; export V6_REPO_COMMIT="${V6_REPO_COMMIT:-$(git rev-parse --short HEAD 2>/dev/null || true)}"; exec /opt/v6-research-agent/.venv/bin/python -m v6_alpha_memo.daemon'
 Restart=always
 RestartSec=30
 

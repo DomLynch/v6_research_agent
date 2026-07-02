@@ -2,6 +2,8 @@
 
 Lean alpha memo agent for finding receipt-pair novelty shapes.
 
+Deploy from `v6-live`. Default `main` is not the live release ref.
+
 ## Run
 
 ```bash
@@ -17,3 +19,6 @@ export V6_MINIMAX_API_KEY="..."
 
 Live VPS deployment uses `deploy/v6-alpha-memo-live.service` with the
 isolated `deploy/v6-fullraw-search.service` lane on port `9918`.
+Strict live search stays complete-only: `5` query shapes, `20` hits per
+shape, `3` completed shapes before final selector rejection, and no partial
+fullraw receipts submitted.

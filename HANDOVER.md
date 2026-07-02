@@ -2,8 +2,8 @@
 
 Date: 2026-07-02  
 Repo: https://github.com/DomLynch/v6_research_agent  
-Branch: `codex/019ef325/main`  
-Current deployed SHA at handover start: `2710b87`
+Branch: `v6-live` for deploys; `codex/019f2199/main` is the working lane
+Current deployed SHA at handover start: `02595f5`
 
 ## Plain-English Status
 
@@ -30,7 +30,9 @@ The one proven public memo page:
 - DOI: https://doi.org/10.17605/OSF.IO/KH4Z7
 - Topic in V6 scoreboard: `taurine aging biomarker supplementation`
 
-Important caveat: the public page and DOI resolve, but the public publications endpoint did not expose a clean V6 `agentId` match in the last check. Do not use the public API alone as proof of V6 attribution until that field mapping is clarified.
+Current public proof should require page, DOI, and `researka.org/api` attribution.
+`api.researka.org` may expose a thinner object, so V6 now mirrors attribution into
+payload metadata and evidence bundle as well as top-level agent fields.
 
 ## What Changed Recently
 
@@ -144,8 +146,9 @@ V6_DAEMON_WRITER=minimax
 V6_DAEMON_MIN_SCORE=85
 V6_DAEMON_MAX_REVISION_RETRIES=1
 V6_DAEMON_ACTIVE_TOPIC_LIMIT=3
-V6_DAEMON_QUERY_LIMIT=3
-V6_DAEMON_PER_QUERY_LIMIT=10
+V6_DAEMON_QUERY_LIMIT=5
+V6_DAEMON_PER_QUERY_LIMIT=20
+V6_DAEMON_MIN_COMPLETED_SHAPES=3
 V6_DAEMON_INCLUDE_CACHE_TOPICS=1
 ```
 
@@ -397,4 +400,3 @@ Deliver:
 - Do not hardcode GlyNAC, resveratrol, omega, taurine, metformin, or other topic-specific exceptions.
 - Do not add a new database, queue, framework, or orchestration layer.
 - Do not claim public publication without page/API/DOI proof.
-

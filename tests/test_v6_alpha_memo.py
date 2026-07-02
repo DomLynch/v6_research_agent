@@ -174,22 +174,22 @@ def test_nonliteral_shared_anchor_can_pass_when_receipts_match_topic_context() -
     papers = (
         Paper(
             "a",
-            "Cholecalciferol reduced fracture risk in older adults randomized trial",
-            "Results showed cholecalciferol reduced fracture risk in older adults by 30% in a randomized trial.",
+            "Toolx improves human analyst decisions in a mechanistic benchmark",
+            "The benchmark showed toolx improved human analyst decision accuracy.",
             "openalex",
         ),
         Paper(
             "b",
-            "Cholecalciferol did not reduce fracture risk in older adults randomized trial",
-            "Results showed cholecalciferol did not reduce fracture risk in older adults (p=0.80).",
+            "Toolx failed to improve human analyst decisions in a randomized field trial",
+            "Results showed toolx failed to improve human analyst decisions in a randomized field trial.",
             "pubmed",
         ),
     )
 
-    scored = score_pairs(mine_pairs(papers), topic_terms={"vitamin", "fracture", "randomized", "trial", "older", "adults"})
+    scored = score_pairs(mine_pairs(papers), topic_terms={"human", "analyst", "decisions"})
 
     assert scored
-    assert "cholecalciferol" in scored[0].pair.anchors
+    assert "toolx" in scored[0].pair.anchors
 
 
 def test_no_memo_trace_includes_rejection_histogram() -> None:
@@ -3132,13 +3132,22 @@ def test_daemon_payload_uses_selected_pair_receipts() -> None:
 
     payload = v6_daemon._payload("management dashboard forecast accuracy", "agent-v6", run.memo, selected, {})
     bundle = payload["source_bundle"]
+    metadata = payload["metadata"]
+    evidence = payload["evidence_bundle"]
 
     assert isinstance(bundle, list)
+    assert isinstance(metadata, dict)
+    assert isinstance(evidence, dict)
     assert [item["title"] for item in bundle if isinstance(item, dict)] == [
         selected.pair.a.title,
         selected.pair.b.title,
     ]
     assert payload["agent_id"] == "agent-v6"
+    assert metadata["agent_id"] == "agent-v6"
+    assert metadata["agentId"] == "agent-v6"
+    assert metadata["author_agent_id"] == "agent-v6"
+    assert evidence["agent_id"] == "agent-v6"
+    assert evidence["agent_version"] == "v6"
     assert payload["artifact_type"] == "alpha_memo"
 
 
@@ -3229,6 +3238,74 @@ def test_daemon_treats_submit_backoff_as_retryable(monkeypatch: pytest.MonkeyPat
     assert "submitted" not in row
     assert isinstance(row["submit_retry_after"], int)
     assert cast(dict[str, object], row["last_submit_response"])["status"] == 429
+
+
+def test_lane_backoff_blocks_fresh_submit_in_same_pass(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    class BackoffPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            del path
+            calls.append(str(payload["title"]))
+            return {"ok": False, "status": 429, "body": "{\"detail\":\"agent_backoff_intake_rejections\"}"}
+
+        def get(self, path: str) -> dict[str, object]:
+            raise AssertionError(f"submit backoff should not poll: {path}")
+
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "first",
+            "generated": True,
+            "selector_version": v6_daemon._SELECTOR_VERSION,
+            "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
+            "writer_version": v6_daemon._WRITER_VERSION,
+            "pending_payload": {
+                "artifact_type": "alpha_memo",
+                "title": "first",
+                "body_markdown": "# Alpha memo: first",
+                "source_bundle": [],
+            },
+        },
+        {
+            "topic": "second",
+            "generated": True,
+            "selector_version": v6_daemon._SELECTOR_VERSION,
+            "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
+            "writer_version": v6_daemon._WRITER_VERSION,
+            "pending_payload": {
+                "artifact_type": "alpha_memo",
+                "title": "second",
+                "body_markdown": "# Alpha memo: second",
+                "source_bundle": [],
+            },
+        },
+    ]
+    board: dict[str, object] = {"rows": rows}
+
+    v6_daemon._run_pass(tmp_path, ("first", "second"), "agent-v6", DemoClient(), BackoffPublisher(), board)  # type: ignore[arg-type]
+
+    assert calls == ["first"]
+    assert board["submit_blocked_until"] == rows[0]["submit_retry_after"]
+    assert rows[1]["blocked_stage"] == "submit_backoff"
+    assert rows[1]["submit_retry_after"] == rows[0]["submit_retry_after"]
+
+
+def test_pending_payload_blocks_unbundled_doi_before_submit() -> None:
+    class NeverPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"invalid payload should not submit: {path} {payload}")
+
+    row: dict[str, object] = {
+        "pending_payload": {
+            "body_markdown": "Uses bundled 10.1000/good and stray 10.1113/jphysiol.2012.237743.",
+            "source_bundle": [{"doi": "10.1000/good"}],
+        }
+    }
+
+    v6_daemon._submit_pending_row(NeverPublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "writer_validation_failed"
+    assert row["writer_validation_issues"] == ("unbundled_doi:10.1113/jphysiol.2012.237743",)
 
 
 def test_daemon_retries_pending_submit_without_rebuilding(
@@ -3857,8 +3934,8 @@ def test_daemon_runs_open_row_before_current_waiting_row(
             {
                 "topic": "creatine cognitive function older adults",
                 "blocked_stage": "search_cache_waiting",
-                "query_limit": 3,
-                "per_query_limit": 10,
+                "query_limit": 5,
+                "per_query_limit": 20,
                 "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
                 "selector_version": v6_daemon._SELECTOR_VERSION,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
@@ -4080,8 +4157,8 @@ def test_daemon_defaults_to_multiple_query_shapes(monkeypatch: pytest.MonkeyPatc
     with pytest.raises(NoMemoError):
         v6_daemon._run_topic(tmp_path, "omega 3 atrial fibrillation", "agent-v6", DemoClient(), object(), {})  # type: ignore[arg-type]
 
-    assert seen["query_limit"] == 3
-    assert seen["per_query_limit"] == 10
+    assert seen["query_limit"] == 5
+    assert seen["per_query_limit"] == 20
 
 
 def test_daemon_query_limits_remain_env_overridable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -4235,8 +4312,8 @@ def test_daemon_preserves_current_selector_reject_counts(tmp_path: Path) -> None
             "blocked_final": True,
             "selector_version": v6_daemon._SELECTOR_VERSION,
             "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
-            "query_limit": 3,
-            "per_query_limit": 10,
+            "query_limit": 5,
+            "per_query_limit": 20,
             "paper_count": 26,
             "pair_count": 80,
             "scored_count": 0,
@@ -4504,6 +4581,7 @@ def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.Mo
         "decision_response": {
             "json": {
                 "decision": "revise",
+                "status": "complete",
                 "resubmission": {"allowed": True},
                 "gate_failures": [],
                 "required_revisions": [],
@@ -4522,6 +4600,53 @@ def test_daemon_reopens_final_clean_revision_on_next_pass(monkeypatch: pytest.Mo
     assert "generated" not in row
     assert "submitted" not in row
     assert row["blocked_stage"] == "search_cache_waiting"
+
+
+def test_daemon_retries_terminal_reviewer_revise_with_notes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    row: dict[str, object] = {
+        "topic": "resveratrol augment exercise training protocol",
+        "generated": True,
+        "submitted": True,
+        "submission_id": "sub-revise",
+    }
+
+    class RevisePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"revise poll should not submit: {path} {payload}")
+
+        def get(self, path: str) -> dict[str, object]:
+            assert path == "/submissions/sub-revise/decision"
+            return {
+                "ok": True,
+                "json": {
+                    "status": "complete",
+                    "decision": "revise",
+                    "failure_stage": "reviewer_panel",
+                    "failed_checks": [],
+                    "gate_failures": [],
+                    "notes": ["editorial decision is terminal; external author must resubmit"],
+                    "review_summary": "Title is acceptable but rewrite the contrast more cautiously.",
+                },
+            }
+
+    v6_daemon._run_topic(tmp_path, str(row["topic"]), "agent-v6", DemoClient(), RevisePublisher(), row)  # type: ignore[arg-type]
+
+    assert row["revision_retry_count"] == 1
+    assert row["revision_of_object_id"] == "sub-revise"
+    assert "submitted" not in row
+    notes = row["revision_notes"]
+    assert isinstance(notes, tuple)
+    assert "editorial decision is terminal" in notes[0]
+
+
+def test_live_service_config_uses_wider_strict_search() -> None:
+    text = Path("deploy/v6-alpha-memo-live.service").read_text()
+
+    assert "Environment=V6_DAEMON_MIN_SCORE=85" in text
+    assert "Environment=V6_DAEMON_QUERY_LIMIT=5" in text
+    assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=20" in text
+    assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=3" in text
+    assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
 
 
 def test_daemon_reopens_legacy_clean_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
