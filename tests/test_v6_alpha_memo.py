@@ -25,7 +25,7 @@ from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import NoMemoError, build_memo
-from v6_alpha_memo.score import ScoredPair
+from v6_alpha_memo.score import ScoredPair, score_all_pairs
 from v6_alpha_memo.search import CoverageReceipt, RequestOpener, SearchResult, merge_results
 from v6_alpha_memo.write import judge_with_minimax
 
@@ -309,6 +309,31 @@ def test_rejects_supplement_abstract_doi_as_primary_alpha_receipt() -> None:
     scored = score_pairs(mine_pairs(papers), topic_terms={"resveratrol", "exercise"})
 
     assert scored == ()
+
+
+def test_rejects_repository_deposit_as_alpha_receipt() -> None:
+    papers = (
+        Paper(
+            "young-null",
+            "Creatine supplementation does not improve cognitive function in young adults",
+            "Results showed creatine supplementation did not improve cognitive function in young adults.",
+            "pubmed",
+            doi="10.1016/j.physbeh.2008.05.009",
+        ),
+        Paper(
+            "zenodo-summary",
+            "Does creatine supplementation improve cognitive function in older adults?",
+            "The evidence suggests that creatine supplementation may improve certain cognitive functions, though further research is needed.",
+            "openalex",
+            doi="10.5281/zenodo.18474832",
+            url="https://zenodo.org/records/18474832",
+        ),
+    )
+    pairs = mine_pairs(papers)
+    scored_all = score_all_pairs(pairs, topic_terms={"creatine", "cognitive", "older", "adults"})
+
+    assert any("reject:repository_receipt" in item.reasons for item in scored_all)
+    assert score_pairs(pairs, topic_terms={"creatine", "cognitive", "older", "adults"}) == ()
 
 
 def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
