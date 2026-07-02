@@ -373,9 +373,11 @@ def _stale_waiting_search_config(row: dict[str, object]) -> bool:
 
 
 def _stale_selector_version(row: dict[str, object]) -> bool:
+    selector_version = _int(row.get("selector_version"))
     return bool(
         not row.get("public")
-        and _int(row.get("selector_version")) < _SELECTOR_VERSION
+        and selector_version
+        and selector_version < _SELECTOR_VERSION
         and (
             row.get("blocked_final")
             or row.get("generated")
@@ -388,18 +390,22 @@ def _stale_selector_version(row: dict[str, object]) -> bool:
 
 
 def _stale_writer_version(row: dict[str, object]) -> bool:
+    writer_version = _int(row.get("writer_version"))
     return bool(
         row.get("generated")
         and not row.get("public")
-        and _int(row.get("writer_version")) < _WRITER_VERSION
+        and writer_version
+        and writer_version < _WRITER_VERSION
         and (row.get("blocked_final") or row.get("decision") in {"reject", "revise"})
     )
 
 
 def _stale_query_shape_version(row: dict[str, object]) -> bool:
+    query_shape_version = _int(row.get("query_shape_version"))
     return bool(
         not row.get("public")
-        and _int(row.get("query_shape_version")) < _QUERY_SHAPE_VERSION
+        and query_shape_version
+        and query_shape_version < _QUERY_SHAPE_VERSION
         and (
             not row.get("submitted")
             or row.get("blocked_final")
@@ -450,6 +456,7 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
         indexed,
         key=lambda item: (
             item[1].get("blocked_stage") == "search_cache_waiting",
+            _side_waiting_row(item[1]),
             _stale_waiting_row(item[1]),
             -_int(item[1].get("top_score")),
             not _attempt_count(item[1]),
@@ -685,7 +692,7 @@ def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, o
 
 def _retryable_revision(data: dict[str, object]) -> bool:
     return (
-        data.get("status") == "complete"
+        data.get("status") in {None, "complete"}
         and data.get("decision") == "revise"
         and not data.get("gate_failures")
         and not data.get("failed_checks")
@@ -854,6 +861,16 @@ def _blocked_stage_from_row(row: dict[str, object]) -> str:
 
 def _stale_waiting_row(row: dict[str, object]) -> bool:
     return _int(row.get("wait_stale_count")) >= _int_env("V6_DAEMON_STALE_WAIT_PASSES", 2)
+
+
+def _side_waiting_row(row: dict[str, object]) -> bool:
+    trace = row.get("trace")
+    coverage = trace.get("coverage") if isinstance(trace, dict) else None
+    if not isinstance(coverage, list):
+        return False
+    return any(_strict_coverage(item) for item in coverage if isinstance(item, dict)) and any(
+        _waitable_coverage(item) for item in coverage if isinstance(item, dict)
+    )
 
 
 def _record_wait_progress(row: dict[str, object], trace: dict[str, object]) -> None:

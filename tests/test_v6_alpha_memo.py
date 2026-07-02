@@ -4486,6 +4486,44 @@ def test_daemon_reopens_rows_from_old_selector_version(monkeypatch: pytest.Monke
     assert row["selector_version"] == v6_daemon._SELECTOR_VERSION
 
 
+def test_daemon_reopens_stale_generated_selector_payload_despite_submit_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: list[str] = []
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        del kwargs
+        seen.append(topic)
+        raise NoMemoError({"coverage": [{"error": ""}]})
+
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+    board: dict[str, object] = {
+        "rows": [{
+            "topic": "protein timing distribution muscle synthesis",
+            "generated": True,
+            "pending_payload": {"title": "stale"},
+            "blocked_stage": "submit_backoff",
+            "submit_retry_after": int(time.time()) + 3600,
+            "submit_backoff_count": 1,
+            "selector_version": 1,
+            "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
+            "writer_version": v6_daemon._WRITER_VERSION,
+            "top_score": 100,
+        }]
+    }
+
+    v6_daemon._run_pass(tmp_path, ("protein timing distribution muscle synthesis",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    row = cast(list[dict[str, object]], board["rows"])[0]
+    assert seen == ["protein timing distribution muscle synthesis"]
+    assert "pending_payload" not in row
+    assert "submit_retry_after" not in row
+    assert row["selector_version"] == v6_daemon._SELECTOR_VERSION
+    assert row["blocked_stage"] == "selector_rejected"
+
+
 def test_daemon_clears_stale_selector_rejected_scores(tmp_path: Path) -> None:
     board: dict[str, object] = {
         "rows": [{
