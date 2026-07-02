@@ -21,9 +21,9 @@ from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_
 _DEFAULT_QUERY_LIMIT = 5
 _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
-_SELECTOR_VERSION = 33
+_SELECTOR_VERSION = 34
 _QUERY_SHAPE_VERSION = 9
-_WRITER_VERSION = 9
+_WRITER_VERSION = 10
 
 
 @dataclass(frozen=True, slots=True)
