@@ -90,6 +90,13 @@ def _run_pass(
             )
         ):
             _mark_submit_backoff(row)
+        elif _stale_query_shape_version(row):
+            _reset_for_query_shape_retry(row)
+        elif _stale_writer_version(row):
+            _store_revision_notes(row)
+            _reset_for_revision_retry(row)
+        elif _stale_selector_version(row):
+            _reset_for_selector_retry(row)
         elif _submit_backoff_active(row):
             continue
         elif row.get("blocked_final") and _row_retryable_revision(row) and _needs_revision_retry(row):
@@ -98,13 +105,6 @@ def _run_pass(
         elif _waitable_submit_failure(row):
             _reset_for_submit_retry(row)
             _mark_submit_backoff(row)
-        elif _stale_query_shape_version(row):
-            _reset_for_query_shape_retry(row)
-        elif _stale_writer_version(row):
-            _store_revision_notes(row)
-            _reset_for_revision_retry(row)
-        elif _stale_selector_version(row):
-            _reset_for_selector_retry(row)
         elif (
             _stale_waiting_search_config(row)
             or (row.get("blocked_final") and _blocked_stage_from_row(row) == "search_cache_waiting")
@@ -373,7 +373,18 @@ def _stale_waiting_search_config(row: dict[str, object]) -> bool:
 
 
 def _stale_selector_version(row: dict[str, object]) -> bool:
-    return bool(row.get("blocked_final") and not row.get("public") and _int(row.get("selector_version")) < _SELECTOR_VERSION)
+    return bool(
+        not row.get("public")
+        and _int(row.get("selector_version")) < _SELECTOR_VERSION
+        and (
+            row.get("blocked_final")
+            or row.get("generated")
+            or row.get("submitted")
+            or row.get("pending_payload")
+            or row.get("decision") in {"reject", "revise"}
+            or row.get("accepted") is False
+        )
+    )
 
 
 def _stale_writer_version(row: dict[str, object]) -> bool:
@@ -748,9 +759,9 @@ def _reset_for_revision_retry(row: dict[str, object]) -> None:
 def _reset_for_selector_retry(row: dict[str, object]) -> None:
     for key in (
         "generated", "submitted", "accepted", "public", "submission_id", "decision",
-        "publication", "submit_response", "decision_response", "memo_file", "trace_file",
+        "publication", "submit_response", "decision_response", "pending_payload", "memo_file", "trace_file",
         "revision_of_object_id", "revision_retry_count", "revision_notes",
-        "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
+        "last_submit_response", "trace", "top_score", "top_shape", "paper_count", "pair_count", "scored_count",
     ):
         row.pop(key, None)
     _clear_blocker(row)
