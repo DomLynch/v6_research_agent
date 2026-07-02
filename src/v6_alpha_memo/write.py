@@ -41,11 +41,6 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         "",
         f"**Why this is surprising:** The pair has `{scored.shape}` geometry over "
         f"`{', '.join(pair.anchors[:3])}` rather than a broad literature-summary bridge.",
-        "",
-        "**Caveats/falsifiers:**",
-        "- Reject if the shared anchor is not the same construct/intervention in the full text.",
-        "- Reject if later receipts show the apparent reversal is only population, dose, or measurement noise.",
-        "- Reject if either receipt is a review, case-only report, or keyword-only match.",
     ]
     if receipt is not None:
         lines.extend([
@@ -55,6 +50,13 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
             f"sources={','.join(receipt.sources_searched) or 'unknown'}; "
             f"papers_searched={receipt.papers_searched}; partial={receipt.partial}.",
         ])
+    lines.extend([
+        "",
+        "**Caveats/falsifiers:**",
+        "- Reject if the shared anchor is not the same construct/intervention in the full text.",
+        "- Reject if later receipts show the apparent reversal is only population, dose, or measurement noise.",
+        "- Reject if either receipt is a review, case-only report, or keyword-only match.",
+    ])
     return "\n".join(lines).strip() + "\n"
 
 
@@ -92,13 +94,16 @@ def render_with_minimax(
         },
         method="POST",
     )
-    with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
-        data = json.loads(response.read().decode())
+    try:
+        with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
+            data = json.loads(response.read().decode())
+    except Exception:
+        return render_memo(top_pairs[0], receipt=receipt)
     text = _content_text(data).strip()
     if not _valid_memo(text):
         return render_memo(top_pairs[0], receipt=receipt)
     text = _normalize_title(text, top_pairs[0])
-    if not _uses_selected_receipts(text, top_pairs[0]):
+    if validate_memo_against_pair(text, top_pairs[0]):
         return render_memo(top_pairs[0], receipt=receipt)
     return text + ("\n" if text else "")
 
@@ -130,8 +135,11 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
         },
         method="POST",
     )
-    with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
-        data = json.loads(response.read().decode())
+    try:
+        with urlopen(request, timeout=float(os.environ.get("V6_MINIMAX_TIMEOUT_SECONDS", "60"))) as response:
+            data = json.loads(response.read().decode())
+    except Exception:
+        return top_pairs
     choice = _parse_choice(_content_text(data))
     if choice is None or choice < 1 or choice > len(top_pairs):
         return ()
@@ -172,8 +180,31 @@ def _uses_selected_receipts(memo: str, scored: ScoredPair) -> bool:
     return _compact(scored.pair.a.title) in text and _compact(scored.pair.b.title) in text
 
 
+def validate_memo_against_pair(memo: str, scored: ScoredPair) -> tuple[str, ...]:
+    issues: list[str] = []
+    if not _valid_memo(memo):
+        issues.append("invalid_memo_shape")
+    if not _uses_selected_receipts(memo, scored):
+        issues.append("selected_receipt_title_missing")
+    bundled = {_normalize_doi(doi) for doi in (scored.pair.a.doi, scored.pair.b.doi) if doi}
+    extra = tuple(doi for doi in _memo_dois(memo) if doi not in bundled)
+    if extra:
+        issues.append("unbundled_doi:" + ",".join(extra))
+    return tuple(issues)
+
+
 def _compact(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _memo_dois(memo: str) -> tuple[str, ...]:
+    pattern = r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b"
+    dois = (_normalize_doi(match.group(0)) for match in re.finditer(pattern, memo, flags=re.IGNORECASE))
+    return tuple(dict.fromkeys(doi for doi in dois if doi))
+
+
+def _normalize_doi(value: str) -> str:
+    return value.casefold().rstrip(".,;:)]}")
 
 
 def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ()) -> str:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import re
@@ -10,7 +11,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from v6_alpha_memo.mine import mine_pairs
-from v6_alpha_memo.score import ScoredPair, score_pairs
+from v6_alpha_memo.score import ScoredPair, score_all_pairs, score_pairs
 from v6_alpha_memo.search import (
     CoverageReceipt,
     FullrawSearchClient,
@@ -90,12 +91,15 @@ def build_memo(
     results = tuple(collected)
     papers = merge_results(results)
     pairs = mine_pairs(papers)
-    scored = tuple(pair for pair in score_pairs(pairs, topic_terms=topic_terms) if _topic_fit(pair, topic_terms))
+    scored_pairs = score_all_pairs(pairs, topic_terms=topic_terms)
+    scored = _publishable_pairs(scored_pairs, topic_terms)
     if not scored:
         raise NoMemoError(
             _trace(
                 results,
                 (),
+                rejected_pairs=scored_pairs,
+                topic_terms=topic_terms,
                 paper_count=len(papers),
                 pair_count=len(pairs),
                 scored_count=0,
@@ -116,6 +120,8 @@ def build_memo(
                 _trace(
                     results,
                     (),
+                    rejected_pairs=scored_pairs,
+                    topic_terms=topic_terms,
                     paper_count=len(papers),
                     pair_count=len(pairs),
                     scored_count=0,
@@ -165,6 +171,8 @@ def _trace(
     results: tuple[SearchResult, ...],
     top_pairs: tuple[ScoredPair, ...],
     *,
+    rejected_pairs: tuple[ScoredPair, ...] = (),
+    topic_terms: set[str] | frozenset[str] = frozenset(),
     paper_count: int,
     pair_count: int,
     scored_count: int,
@@ -200,6 +208,8 @@ def _trace(
             }
             for pair in top_pairs[:5]
         ],
+        "reject_reason_counts": _reject_reason_counts(rejected_pairs, topic_terms),
+        "zero_score_pair_examples": _zero_score_pair_examples(rejected_pairs, topic_terms),
     }
 
 
@@ -231,16 +241,57 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
     strong_terms = topic_terms - _GENERIC_TOPIC_TERMS
     if not strong_terms:
         return True
-    anchors = set(scored.pair.anchors)
-    shared = anchors & strong_terms
+    left = _topic_context_tokens(scored.pair.a)
+    right = _topic_context_tokens(scored.pair.b)
     context_terms = topic_terms & _CONTEXT_REQUIRED_TOPIC_TERMS
-    if context_terms:
-        left = _topic_context_tokens(scored.pair.a)
-        right = _topic_context_tokens(scored.pair.b)
     required_context = (topic_terms & _MODALITY_REQUIRED_TOPIC_TERMS) or context_terms
     if required_context and not ((left & right) & required_context):
         return False
-    return len(shared) >= (2 if len(strong_terms) >= 3 else 1)
+    return bool((left & strong_terms) and (right & strong_terms))
+
+
+def _publishable_pairs(scored: tuple[ScoredPair, ...], topic_terms: set[str]) -> tuple[ScoredPair, ...]:
+    kept = [pair for pair in scored if pair.score >= 55 and pair.expectation_update and _topic_fit(pair, topic_terms)]
+    kept.sort(key=lambda item: item.score, reverse=True)
+    return tuple(kept)
+
+
+def _reject_reason_counts(scored: tuple[ScoredPair, ...], topic_terms: set[str] | frozenset[str]) -> dict[str, int]:
+    counter: collections.Counter[str] = collections.Counter()
+    topic_set = set(topic_terms)
+    for pair in scored:
+        if pair.score >= 55 and pair.expectation_update and not _topic_fit(pair, topic_set):
+            counter["reject:topic_fit"] += 1
+            continue
+        if pair.score >= 55 and pair.expectation_update:
+            continue
+        for reason in pair.reasons or ("reject:unknown",):
+            counter[reason] += 1
+    return dict(counter.most_common())
+
+
+def _zero_score_pair_examples(
+    scored: tuple[ScoredPair, ...],
+    topic_terms: set[str] | frozenset[str],
+) -> tuple[dict[str, object], ...]:
+    topic_set = set(topic_terms)
+    examples: list[dict[str, object]] = []
+    for pair in scored:
+        reasons = pair.reasons
+        if pair.score >= 55 and pair.expectation_update and not _topic_fit(pair, topic_set):
+            reasons = (*reasons, "reject:topic_fit")
+        elif pair.score >= 55 and pair.expectation_update:
+            continue
+        examples.append({
+            "score": pair.score,
+            "anchors": pair.pair.anchors,
+            "receipt_1": pair.pair.a.title,
+            "receipt_2": pair.pair.b.title,
+            "reasons": reasons,
+        })
+        if len(examples) >= 5:
+            break
+    return tuple(examples)
 
 
 _CONTEXT_REQUIRED_TOPIC_TERMS = frozenset({"adaptation", "adaptations", "exercise", "performance", "resistance", "training"})

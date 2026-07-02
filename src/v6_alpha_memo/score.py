@@ -160,11 +160,19 @@ def score_pairs(
     min_score: int = 55,
     topic_terms: set[str] | frozenset[str] = frozenset(),
 ) -> tuple[ScoredPair, ...]:
-    scoped_terms = frozenset(topic_terms)
-    scored = [score_pair(pair, topic_terms=scoped_terms) for pair in pairs]
+    scored = score_all_pairs(pairs, topic_terms=topic_terms)
     kept = [item for item in scored if item.score >= min_score and item.expectation_update]
     kept.sort(key=lambda item: item.score, reverse=True)
     return tuple(kept)
+
+
+def score_all_pairs(
+    pairs: tuple[CandidatePair, ...],
+    *,
+    topic_terms: set[str] | frozenset[str] = frozenset(),
+) -> tuple[ScoredPair, ...]:
+    scoped_terms = frozenset(topic_terms)
+    return tuple(score_pair(pair, topic_terms=scoped_terms) for pair in pairs)
 
 
 def score_pair(pair: CandidatePair, *, topic_terms: frozenset[str] = frozenset()) -> ScoredPair:
@@ -339,12 +347,9 @@ def _best_anchor(a: Paper, b: Paper, anchors: tuple[str, ...] = ()) -> str:
 def _real_anchors(pair: CandidatePair, topic_terms: frozenset[str]) -> tuple[str, ...]:
     title_a = _title_terms(pair.a)
     title_b = _title_terms(pair.b)
-    topic_anchor_terms = set(topic_terms) | {word[:-1] for word in topic_terms if word.endswith("s") and len(word) > 4}
     kept = []
     for anchor in pair.anchors:
         if anchor in _BAD_ANCHOR:
-            continue
-        if topic_anchor_terms and anchor not in topic_anchor_terms:
             continue
         if anchor in title_a and anchor in title_b:
             kept.append(anchor)
@@ -381,7 +386,7 @@ def _receipt_hygiene_reject(
 def _comparator_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: frozenset[str]) -> bool:
     title = paper.title.casefold()
     for anchor in anchors:
-        if anchor in _CONTEXT_ANCHOR or (topic_terms and anchor not in topic_terms):
+        if anchor in _CONTEXT_ANCHOR:
             continue
         pattern = rf"\b(?:compared with|compared to|versus|vs\.?)\b[^.:\n]{{0,90}}\b{re.escape(anchor)}\b"
         if re.search(pattern, title) and not re.search(
@@ -395,7 +400,7 @@ def _comparator_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms:
 def _status_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: frozenset[str]) -> bool:
     title = paper.title.casefold()
     for anchor in anchors:
-        if anchor in _CONTEXT_ANCHOR or (topic_terms and anchor not in topic_terms):
+        if anchor in _CONTEXT_ANCHOR:
             continue
         status_pattern = rf"\b(?:using|receiving|taking|on|treated with)\s+{re.escape(anchor)}\b|\b{re.escape(anchor)}-treated\b"
         active_pattern = (

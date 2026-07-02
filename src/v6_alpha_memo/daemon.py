@@ -16,14 +16,14 @@ from urllib.request import Request, urlopen
 from v6_alpha_memo.run import NoMemoError, V6Run, _best_receipt, build_memo
 from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import FullrawSearchClient, Paper
-from v6_alpha_memo.write import render_memo, render_with_minimax
+from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_against_pair
 
-_DEFAULT_QUERY_LIMIT = 3
-_DEFAULT_PER_QUERY_LIMIT = 10
+_DEFAULT_QUERY_LIMIT = 5
+_DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
-_SELECTOR_VERSION = 32
+_SELECTOR_VERSION = 33
 _QUERY_SHAPE_VERSION = 9
-_WRITER_VERSION = 8
+_WRITER_VERSION = 9
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +73,7 @@ def _run_pass(
     board: dict[str, object],
 ) -> None:
     rows = _rows(board, topics)
+    _refresh_submit_blocker(board, rows, topics)
     for row in rows:
         if row.get("public"):
             _clear_blocker(row)
@@ -88,7 +89,7 @@ def _run_pass(
             )
         ):
             _mark_submit_backoff(row)
-        elif row.get("blocked_final") and _row_clean_revision(row) and _needs_revision_retry(row):
+        elif row.get("blocked_final") and _row_retryable_revision(row) and _needs_revision_retry(row):
             _store_revision_notes(row)
             _reset_for_revision_retry(row)
         elif _waitable_submit_failure(row):
@@ -124,14 +125,22 @@ def _run_pass(
         ):
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
+    _refresh_submit_blocker(board, rows, topics)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in _candidate_rows(rows, topics):
         if row.get("blocked_final"):
             continue
+        if not row.get("submitted"):
+            deadline = _refresh_submit_blocker(board, rows, topics)
+            if deadline > int(time.time()):
+                if row.get("generated") and row.get("pending_payload"):
+                    _defer_submit_backoff(row, deadline)
+                continue
         topic = str(row["topic"])
         try:
             _run_topic(run_dir, topic, agent_id, client, publisher, row)
+            _refresh_submit_blocker(board, rows, topics)
         except NoMemoError as exc:
             stage = _blocked_stage(exc.trace)
             row.update({
@@ -213,6 +222,24 @@ def _run_topic(
                 "writer_version": _WRITER_VERSION,
             })
             return
+        memo_issues = validate_memo_against_pair(run.memo, selected)
+        if memo_issues:
+            row.update({
+                "blocked_final": True,
+                "blocked_stage": "writer_validation_failed",
+                "writer_validation_issues": memo_issues,
+                "top_score": selected.score,
+                "top_shape": selected.shape,
+                "paper_count": run.paper_count,
+                "pair_count": run.pair_count,
+                "scored_count": run.scored_count,
+                "query_limit": query_limit,
+                "per_query_limit": per_query_limit,
+                "selector_version": _SELECTOR_VERSION,
+                "query_shape_version": _QUERY_SHAPE_VERSION,
+                "writer_version": _WRITER_VERSION,
+            })
+            return
         slug = _slug(topic)
         memo_path = run_dir / f"{slug}.md"
         trace_path = run_dir / f"{slug}.trace.json"
@@ -245,7 +272,7 @@ def _run_topic(
         if data.get("status") == "complete":
             publication = data.get("publication")
             publication = publication if isinstance(publication, dict) else {}
-            if _clean_revision(data) and _needs_revision_retry(row):
+            if _retryable_revision(data) and _needs_revision_retry(row):
                 row["revision_notes"] = _revision_notes(data)
                 _reset_for_revision_retry(row)
                 return
@@ -261,7 +288,10 @@ def _run_topic(
 
 
 def _clear_blocker(row: dict[str, object]) -> None:
-    for key in ("blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois", "submit_retry_after", "submit_backoff_count"):
+    for key in (
+        "blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois",
+        "writer_validation_issues", "submit_retry_after", "submit_backoff_count",
+    ):
         row.pop(key, None)
     _clear_wait_progress(row)
 
@@ -269,6 +299,14 @@ def _clear_blocker(row: dict[str, object]) -> None:
 def _submit_pending_row(publisher: Publisher, row: dict[str, object]) -> None:
     payload = row.get("pending_payload")
     if not isinstance(payload, dict):
+        return
+    payload_issues = _payload_validation_issues(payload)
+    if payload_issues:
+        row.update({
+            "blocked_stage": "writer_validation_failed",
+            "blocked_final": True,
+            "writer_validation_issues": payload_issues,
+        })
         return
     response = publisher.post("/submissions", payload)
     row["submit_response"] = response
@@ -385,14 +423,13 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     active_rows = [row for row in rows if str(row.get("topic")) in active_topics]
     submit_backoff_active = _submit_backoff_deadline(active_rows) > int(time.time())
     submitted = [row for row in rows if row.get("submitted") and not row.get("public") and not row.get("blocked_final")]
-    searchable = [
+    searchable = [] if submit_backoff_active else [
         row for row in rows
         if str(row.get("topic")) in active_topics
         and not row.get("submitted")
         and not row.get("public")
         and not row.get("blocked_final")
         and not _submit_backoff_active(row)
-        and not (submit_backoff_active and row.get("blocked_stage") == "submit_backoff")
     ]
     indexed = list(enumerate(searchable))
     ranked = sorted(
@@ -408,13 +445,42 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     return [*submitted, *(row for _, row in ranked[:active_limit])]
 
 
+def _refresh_submit_blocker(board: dict[str, object], rows: list[dict[str, object]], topics: tuple[str, ...]) -> int:
+    active_topics = set(topics)
+    active_rows = [row for row in rows if str(row.get("topic")) in active_topics]
+    deadline = _submit_backoff_deadline(active_rows)
+    if deadline > int(time.time()):
+        board["submit_blocked_until"] = deadline
+    else:
+        board.pop("submit_blocked_until", None)
+    return deadline
+
+
+def _defer_submit_backoff(row: dict[str, object], deadline: int) -> None:
+    row["blocked_stage"] = "submit_backoff"
+    row["submit_retry_after"] = deadline
+    row["submit_backoff_count"] = max(1, _int(row.get("submit_backoff_count")))
+
+
 def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: dict[str, object]) -> dict[str, object]:
     pair = selected.pair
     domain = _domain(topic)
     score = int(selected.score)
     bundle = [_source(pair.a), _source(pair.b)]
     revision_of = str(row.get("revision_of_object_id") or "").strip()
-    metadata = {"article_type": "alpha_memo", "domain_slug": domain, "topic": _slug(topic)}
+    repo_commit = os.environ.get("V6_REPO_COMMIT", "")
+    metadata = {
+        "article_type": "alpha_memo",
+        "domain_slug": domain,
+        "topic": _slug(topic),
+        "agent_id": agent_id,
+        "agentId": agent_id,
+        "author_agent_id": agent_id,
+        "agent_version": "v6",
+        "repo_commit": repo_commit,
+        "selector_version": _SELECTOR_VERSION,
+        "writer_version": _WRITER_VERSION,
+    }
     if revision_of:
         metadata["revision_of_object_id"] = revision_of
     payload: dict[str, object] = {
@@ -436,6 +502,13 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: di
         "evidence_bundle": {
             "sources": bundle,
             "direct_source_count": len(bundle),
+            "agent_id": agent_id,
+            "agentId": agent_id,
+            "author_agent_id": agent_id,
+            "agent_version": "v6",
+            "repo_commit": repo_commit,
+            "selector_version": _SELECTOR_VERSION,
+            "writer_version": _WRITER_VERSION,
             "v6_score": score,
             "v6_shape": str(selected.shape),
             "publish_verdict": {
@@ -456,6 +529,29 @@ def _payload(topic: str, agent_id: str, memo: str, selected: ScoredPair, row: di
     if revision_of:
         payload["revision_of_object_id"] = revision_of
     return payload
+
+
+def _payload_validation_issues(payload: dict[str, object]) -> tuple[str, ...]:
+    memo = str(payload.get("body_markdown") or payload.get("markdown") or "")
+    bundle = payload.get("source_bundle")
+    sources = bundle if isinstance(bundle, list) else []
+    bundled = {
+        _normalize_doi(str(source.get("doi")))
+        for source in sources
+        if isinstance(source, dict) and source.get("doi")
+    }
+    extra = tuple(doi for doi in _memo_dois(memo) if doi not in bundled)
+    return ("unbundled_doi:" + ",".join(extra),) if extra else ()
+
+
+def _memo_dois(memo: str) -> tuple[str, ...]:
+    pattern = r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b"
+    dois = (_normalize_doi(match.group(0)) for match in re.finditer(pattern, memo, flags=re.IGNORECASE))
+    return tuple(dict.fromkeys(doi for doi in dois if doi))
+
+
+def _normalize_doi(value: str) -> str:
+    return value.casefold().rstrip(".,;:)]}")
 
 
 def _source(paper: Paper) -> dict[str, object]:
@@ -555,6 +651,16 @@ def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, o
     return typed
 
 
+def _retryable_revision(data: dict[str, object]) -> bool:
+    return (
+        data.get("status") == "complete"
+        and data.get("decision") == "revise"
+        and not data.get("gate_failures")
+        and not data.get("failed_checks")
+        and data.get("failure_stage") != "intake_gate"
+    )
+
+
 def _clean_revision(data: dict[str, object]) -> bool:
     scores = data.get("rubric_scores")
     scores = scores if isinstance(scores, dict) else {}
@@ -572,10 +678,10 @@ def _clean_revision(data: dict[str, object]) -> bool:
     )
 
 
-def _row_clean_revision(row: dict[str, object]) -> bool:
+def _row_retryable_revision(row: dict[str, object]) -> bool:
     response = row.get("decision_response")
     data = response.get("json") if isinstance(response, dict) else None
-    return _clean_revision(data) if isinstance(data, dict) else False
+    return _retryable_revision(data) if isinstance(data, dict) else False
 
 
 def _needs_revision_retry(row: dict[str, object]) -> bool:
@@ -662,10 +768,13 @@ def _row_revision_notes(row: dict[str, object]) -> tuple[str, ...]:
 
 def _revision_notes(data: dict[str, object]) -> tuple[str, ...]:
     notes: list[str] = []
-    for key in ("required_revisions", "major_issues", "minor_issues"):
+    for key in ("required_revisions", "major_issues", "minor_issues", "failed_checks", "notes"):
         raw = data.get(key)
         if isinstance(raw, list):
             notes.extend(str(item).strip() for item in raw if str(item).strip())
+    summary = str(data.get("review_summary") or "").strip()
+    if data.get("decision") == "revise" and summary:
+        notes.append(summary[:900])
     return tuple(dict.fromkeys(notes))
 
 

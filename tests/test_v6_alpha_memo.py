@@ -170,6 +170,50 @@ def test_context_boundary_requires_quantified_result_evidence() -> None:
     assert scored[0].shape == "context_boundary"
 
 
+def test_nonliteral_shared_anchor_can_pass_when_receipts_match_topic_context() -> None:
+    papers = (
+        Paper(
+            "a",
+            "Cholecalciferol reduced fracture risk in older adults randomized trial",
+            "Results showed cholecalciferol reduced fracture risk in older adults by 30% in a randomized trial.",
+            "openalex",
+        ),
+        Paper(
+            "b",
+            "Cholecalciferol did not reduce fracture risk in older adults randomized trial",
+            "Results showed cholecalciferol did not reduce fracture risk in older adults (p=0.80).",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"vitamin", "fracture", "randomized", "trial", "older", "adults"})
+
+    assert scored
+    assert "cholecalciferol" in scored[0].pair.anchors
+
+
+def test_no_memo_trace_includes_rejection_histogram() -> None:
+    class ThinClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            papers = (
+                Paper("a", "Interventionx improved endpoint", "", "openalex"),
+                Paper("b", "Interventionx failed endpoint", "", "pubmed"),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("interventionx endpoint", client=ThinClient(), query_limit=1)
+
+    trace = exc.value.trace
+    counts = trace["reject_reason_counts"]
+    examples = trace["zero_score_pair_examples"]
+    assert isinstance(counts, dict)
+    assert counts["reject:title_only_receipt"] >= 1
+    assert isinstance(examples, tuple)
+    assert examples[0]["receipt_1"] == "Interventionx improved endpoint"
+
+
 def test_rejects_background_efficacy_as_promise_receipt() -> None:
     papers = (
         Paper(
