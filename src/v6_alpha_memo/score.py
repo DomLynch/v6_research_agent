@@ -145,6 +145,10 @@ _POPULATION_FAMILIES = {
     "pcos": frozenset({"pcos", "polycystic"}),
 }
 _PK_ENDPOINT = frozenset({"concentration", "dose", "dosage", "exposure", "pharmacokinetic", "pharmacokinetics", "plasma"})
+_NUTRITION_PROTEIN_PHRASES = (
+    "amino acid", "carbohydrate-protein", "leucine", "protein ingestion",
+    "protein supplement", "protein supplementation", "whey protein",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -382,6 +386,10 @@ def _receipt_hygiene_reject(
         return "reject:title_only_receipt"
     if _design_only_directional_receipt(a) or _design_only_directional_receipt(b):
         return "reject:design_only_directional_receipt"
+    if _chemical_form_drift(a, b, anchors, topic_terms):
+        return "reject:chemical_form_drift"
+    if _nutrition_protein_timing_drift(a, b, topic_terms):
+        return "reject:nutrition_protein_context_drift"
     title_a = _title_terms(a)
     title_b = _title_terms(b)
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
@@ -637,6 +645,43 @@ def _role_matches_topic(a: Paper, b: Paper, topic_terms: frozenset[str]) -> bool
 def _loose_tokens(paper: Paper) -> set[str]:
     tokens = set(re.findall(r"[a-z][a-z0-9]{2,}", paper.text.casefold()))
     return tokens | {word[:-1] for word in tokens if word.endswith("s") and len(word) > 4}
+
+
+def _chemical_form_drift(
+    a: Paper,
+    b: Paper,
+    anchors: tuple[str, ...],
+    topic_terms: frozenset[str],
+) -> bool:
+    if "nicotinamide" not in anchors and "nicotinamide" not in topic_terms:
+        return False
+    left = _nicotinamide_form(a)
+    right = _nicotinamide_form(b)
+    return bool(left and right and left != right)
+
+
+def _nicotinamide_form(paper: Paper) -> str:
+    text = paper.text.casefold()
+    if "nicotinamide riboside" in text:
+        return "nicotinamide_riboside"
+    if "nicotinamide mononucleotide" in text:
+        return "nicotinamide_mononucleotide"
+    if re.search(r"\bnampt\b", text):
+        return "nampt"
+    if re.search(r"\bnicotinamide\b|\bnam\b", text):
+        return "nicotinamide"
+    return ""
+
+
+def _nutrition_protein_timing_drift(a: Paper, b: Paper, topic_terms: frozenset[str]) -> bool:
+    if not {"protein", "timing"} <= topic_terms:
+        return False
+    return _nutrition_protein_context(a) != _nutrition_protein_context(b)
+
+
+def _nutrition_protein_context(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return any(phrase in text for phrase in _NUTRITION_PROTEIN_PHRASES)
 
 
 def _resistance_training_context(paper: Paper) -> bool:

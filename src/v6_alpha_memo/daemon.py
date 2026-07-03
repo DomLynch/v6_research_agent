@@ -21,7 +21,7 @@ from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_
 _DEFAULT_QUERY_LIMIT = 5
 _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
-_SELECTOR_VERSION = 35
+_SELECTOR_VERSION = 36
 _QUERY_SHAPE_VERSION = 9
 _WRITER_VERSION = 11
 
@@ -217,12 +217,12 @@ def _run_topic(
                 "query_shape_version": _QUERY_SHAPE_VERSION,
             })
             return
-        unresolved_dois = _unresolved_dois(selected)
-        if unresolved_dois:
+        source_doi_issues = _source_doi_issues(selected)
+        if source_doi_issues:
             row.update({
                 "blocked_final": True,
-                "blocked_stage": "source_doi_unresolved",
-                "unresolved_dois": unresolved_dois,
+                "blocked_stage": "source_doi_invalid",
+                "source_doi_issues": source_doi_issues,
                 "top_score": selected.score,
                 "top_shape": selected.shape,
                 "paper_count": run.paper_count,
@@ -338,7 +338,7 @@ def _submit_pending_row(publisher: Publisher, row: dict[str, object]) -> None:
 
 def _first_publishable_run(run: V6Run, *, writer: str, revision_notes: tuple[str, ...]) -> V6Run:
     for selected in run.top_pairs:
-        if not _unresolved_dois(selected):
+        if not _source_doi_issues(selected):
             if selected == run.top_pairs[0]:
                 return run
             receipt = _best_receipt(run.results)
@@ -589,6 +589,13 @@ def _payload_validation_issues(payload: dict[str, object]) -> tuple[str, ...]:
     bundle = payload.get("source_bundle")
     sources = bundle if isinstance(bundle, list) else []
     issues: list[str] = []
+    missing = tuple(
+        str(index)
+        for index, source in enumerate(sources)
+        if isinstance(source, dict) and not _normalize_doi(str(source.get("doi") or ""))
+    )
+    if missing:
+        issues.append("missing_source_doi:" + ",".join(missing))
     malformed = tuple(
         doi
         for doi in (
@@ -623,6 +630,20 @@ def _normalize_doi(value: str) -> str:
 
 def _valid_doi_format(value: str) -> bool:
     return bool(re.fullmatch(r"10\.\d{4,9}/[-._;()/:a-z0-9]+", value.casefold()))
+
+
+def _source_doi_issues(selected: ScoredPair) -> tuple[str, ...]:
+    issues: list[str] = []
+    for index, paper in enumerate((selected.pair.a, selected.pair.b)):
+        doi = _normalize_doi(paper.doi)
+        if not doi:
+            issues.append(f"missing_source_doi:{index}")
+        elif not _valid_doi_format(doi):
+            issues.append(f"malformed_source_doi:{index}:{doi}")
+    if not _truthy(os.environ.get("V6_DAEMON_VALIDATE_DOI", "1")):
+        return tuple(issues)
+    issues.extend(f"unresolved_source_doi:{doi}" for doi in _unresolved_dois(selected))
+    return tuple(issues)
 
 
 def _source(paper: Paper) -> dict[str, object]:
