@@ -256,6 +256,58 @@ def test_negative_title_does_not_become_promise_from_background_language() -> No
     assert scored == ()
 
 
+def test_rejects_nicotinamide_form_drift() -> None:
+    papers = (
+        Paper(
+            "nr",
+            "Nicotinamide riboside supplementation dysregulates redox and energy metabolism in rats",
+            "Results showed nicotinamide riboside decreased exercise performance in rats.",
+            "pubmed",
+            2018,
+            "10.1113/ep086964",
+        ),
+        Paper(
+            "nam",
+            "Active components nicotinamide and guanosine improve exercise performance in mice",
+            "Results showed nicotinamide and guanosine increased exercise performance in mice.",
+            "openalex",
+            2019,
+            "10.1111/jfbc.13004",
+        ),
+    )
+
+    scored_all = score_all_pairs(mine_pairs(papers), topic_terms={"nicotinamide", "exercise", "performance"})
+
+    assert any("reject:chemical_form_drift" in item.reasons for item in scored_all)
+    assert score_pairs(mine_pairs(papers), topic_terms={"nicotinamide", "exercise", "performance"}) == ()
+
+
+def test_rejects_protein_timing_without_nutrition_protein_context() -> None:
+    papers = (
+        Paper(
+            "whey",
+            "Whey protein timing improves muscle protein synthesis after eccentric exercise",
+            "Results showed whey protein timing improved muscle protein synthesis after eccentric exercise in humans.",
+            "pubmed",
+            2017,
+            "10.1000/whey",
+        ),
+        Paper(
+            "bmal",
+            "Exercise timing reduced BMAL1 protein synthesis and antioxidant responses in skeletal muscle of mice",
+            "Results showed aerobic exercise timing reduced BMAL1 protein synthesis and antioxidant responses in mice.",
+            "openalex",
+            2024,
+            "10.1000/bmal",
+        ),
+    )
+
+    scored_all = score_all_pairs(mine_pairs(papers), topic_terms={"protein", "timing", "muscle", "synthesis"})
+
+    assert any("reject:nutrition_protein_context_drift" in item.reasons for item in scored_all)
+    assert score_pairs(mine_pairs(papers), topic_terms={"protein", "timing", "muscle", "synthesis"}) == ()
+
+
 def test_rejects_human_update_receipt_that_only_states_background_and_methods() -> None:
     papers = (
         Paper(
@@ -3594,6 +3646,24 @@ def test_pending_payload_blocks_malformed_doi_before_submit() -> None:
     assert row["writer_validation_issues"] == ("malformed_doi:10.demo/not-a-real-prefix",)
 
 
+def test_pending_payload_blocks_missing_source_doi_before_submit() -> None:
+    class NeverPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"invalid payload should not submit: {path} {payload}")
+
+    row: dict[str, object] = {
+        "pending_payload": {
+            "body_markdown": "No DOI leak.",
+            "source_bundle": [{"doi": "10.1000/good"}, {"title": "Missing DOI receipt", "doi": ""}],
+        }
+    }
+
+    v6_daemon._submit_pending_row(NeverPublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "writer_validation_failed"
+    assert row["writer_validation_issues"] == ("missing_source_doi:1",)
+
+
 def test_daemon_retries_pending_submit_without_rebuilding(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -3793,7 +3863,7 @@ def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPa
             "Interventionx improves measured endpoint",
             "Results showed interventionx improved endpoint.",
             "openalex",
-            doi="10.bad/missing",
+            doi="10.1000/missing",
         ),
         b=Paper(
             "b",
@@ -3825,9 +3895,9 @@ def test_daemon_blocks_unresolved_doi_before_submit(monkeypatch: pytest.MonkeyPa
 
     v6_daemon._run_topic(tmp_path, "interventionx endpoint", "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
 
-    assert row["blocked_stage"] == "source_doi_unresolved"
+    assert row["blocked_stage"] == "source_doi_invalid"
     assert row["blocked_final"] is True
-    assert row["unresolved_dois"] == ("10.bad/missing",)
+    assert row["source_doi_issues"] == ("missing_source_doi:1", "unresolved_source_doi:10.1000/missing")
     assert "submitted" not in row
 
 
@@ -3878,6 +3948,54 @@ def test_daemon_skips_invalid_doi_pair_when_later_pair_is_publishable(
     assert [source["doi"] for source in sources] == ["10.1000/good-a", "10.1000/good-b"]
     assert row["submitted"] is True
     assert "unresolved_dois" not in row
+
+
+def test_daemon_skips_missing_doi_pair_when_later_pair_is_publishable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    bad_pair = CandidatePair(
+        a=Paper("a", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex"),
+        b=Paper("b", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed"),
+        anchors=("interventionx",),
+    )
+    good_pair = CandidatePair(
+        a=Paper("c", "Interventionx promise", "Results showed interventionx improved endpoint.", "openalex", doi="10.1000/good-a"),
+        b=Paper("d", "Interventionx null endpoint", "Results showed interventionx failed endpoint.", "pubmed", doi="10.1000/good-b"),
+        anchors=("interventionx",),
+    )
+    run = v6_run.V6Run(
+        "stale memo",
+        (
+            ScoredPair(bad_pair, 95, "promise_reversal", "bad update", ("shared_anchor:interventionx",)),
+            ScoredPair(good_pair, 90, "promise_reversal", "good update", ("shared_anchor:interventionx",)),
+        ),
+        (),
+        paper_count=4,
+        pair_count=2,
+        scored_count=2,
+    )
+    seen: dict[str, object] = {}
+
+    class FakePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            seen["payload"] = payload
+            return {"ok": True, "json": {"submission": {"id": "sub-2"}}}
+
+        def get(self, path: str) -> dict[str, object]:
+            return {"ok": True, "json": {"status": "pending"}}
+
+    monkeypatch.setenv("V6_DAEMON_WRITER", "template")
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    monkeypatch.setattr(v6_daemon, "_doi_resolves", lambda doi: True)
+    row: dict[str, object] = {"topic": "interventionx endpoint"}
+
+    v6_daemon._run_topic(tmp_path, "interventionx endpoint", "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
+
+    payload = cast(dict[str, object], seen["payload"])
+    sources = cast(list[dict[str, object]], payload["source_bundle"])
+    assert [source["doi"] for source in sources] == ["10.1000/good-a", "10.1000/good-b"]
+    assert row["submitted"] is True
 
 
 def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
