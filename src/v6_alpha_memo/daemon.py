@@ -23,7 +23,7 @@ _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 37
 _QUERY_SHAPE_VERSION = 9
-_WRITER_VERSION = 12
+_WRITER_VERSION = 13
 
 
 @dataclass(frozen=True, slots=True)
@@ -405,7 +405,7 @@ def _stale_selector_version(row: dict[str, object]) -> bool:
 def _stale_writer_version(row: dict[str, object]) -> bool:
     writer_version = _int(row.get("writer_version"))
     return bool(
-        row.get("generated")
+        (row.get("generated") or row.get("blocked_stage") == "writer_validation_failed")
         and not row.get("public")
         and writer_version
         and writer_version < _WRITER_VERSION

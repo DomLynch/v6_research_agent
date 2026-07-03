@@ -709,6 +709,8 @@ def _inverted_abstract(value: object) -> str:
 
 def _clean(value: object, *, limit: int = 500) -> str:
     text = " ".join(str(value or "").split())
+    if len(text) >= max(1, limit - 5) and re.search(r"\b(?:he|she|it|they)$", text, flags=re.IGNORECASE):
+        text = text.rsplit(" ", 1)[0].rstrip(".,;:-")
     if len(text) <= limit:
         return text
     clipped = text[:limit].rsplit(" ", 1)[0].rstrip(".,;:-")

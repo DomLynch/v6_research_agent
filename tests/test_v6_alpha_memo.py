@@ -1903,6 +1903,12 @@ def test_clean_truncates_on_word_boundary() -> None:
     assert v6_search._clean(text, limit=27) == "GlyNAC improves brain"
 
 
+def test_clean_removes_near_limit_trailing_pronoun_fragment() -> None:
+    text = "x" * 496 + " He"
+
+    assert v6_search._clean(text, limit=500) == "x" * 496
+
+
 def test_fullraw_client_backfills_completed_cache_title_only_hit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -5297,6 +5303,44 @@ def test_daemon_rebuilds_old_writer_reject_with_revision_notes(
     assert "generated" not in row
     assert "submitted" not in row
     assert row["blocked_stage"] == "search_cache_waiting"
+
+
+def test_daemon_reopens_old_writer_validation_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_build_memo(topic: str, **kwargs: object) -> object:
+        seen["topic"] = topic
+        seen["revision_notes"] = kwargs.get("revision_notes")
+        raise NoMemoError({"coverage": [{"error": "async_sweep_queued"}]})
+
+    row: dict[str, object] = {
+        "topic": "glynac glutathione",
+        "blocked_stage": "writer_validation_failed",
+        "blocked_final": True,
+        "writer_validation_issues": ["grammar_fragment"],
+        "selector_version": v6_daemon._SELECTOR_VERSION,
+        "writer_version": v6_daemon._WRITER_VERSION - 1,
+        "top_score": 85,
+    }
+    monkeypatch.setattr(v6_daemon, "build_memo", fake_build_memo)
+
+    v6_daemon._run_pass(
+        tmp_path,
+        ("glynac glutathione",),
+        "agent-v6",
+        cast(FullrawSearchClient, DemoClient()),
+        cast(v6_daemon.Publisher, object()),
+        {"rows": [row]},
+    )
+
+    assert seen["topic"] == "glynac glutathione"
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert "writer_validation_issues" not in row
+    assert "generated" not in row
+    assert "submitted" not in row
 
 
 def test_build_memo_rejects_topic_irrelevant_search_noise() -> None:
