@@ -5261,8 +5261,9 @@ def test_live_service_config_uses_wider_strict_search() -> None:
     assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=12" in text
     assert "Environment=V6_DAEMON_MAX_WAITING=12" in text
     assert "Environment=V6_DAEMON_QUERY_LIMIT=2" in text
-    assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=20" in text
+    assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
+    assert "Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=25" in text
     assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=0" in text
     assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
 
