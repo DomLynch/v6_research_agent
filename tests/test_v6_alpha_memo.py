@@ -4203,6 +4203,23 @@ def test_daemon_classifies_no_hit_sweep_stop_as_selector_rejected() -> None:
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
+def test_daemon_waits_for_partial_no_hit_sweep_stop() -> None:
+    trace: dict[str, object] = {
+        "coverage": [
+            {
+                "error": "async_sweep_stopped_no_hits",
+                "partial": True,
+                "shards_searched": 1263,
+                "shards_total": 1525,
+                "source_count_searched": 5,
+                "sweep_failed_shards": 0,
+            }
+        ]
+    }
+
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+
+
 def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     trace: dict[str, object] = {
         "coverage": [

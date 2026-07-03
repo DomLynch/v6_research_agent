@@ -898,7 +898,7 @@ def _blocked_stage(trace: dict[str, object]) -> str:
             return "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
-        if error_text == "async_sweep_stopped_no_hits":
+        if error_text == "async_sweep_stopped_no_hits" and not _waitable_coverage(coverage[-1]):
             return "selector_rejected"
         if (
             error_text.startswith("async_sweep_")
@@ -967,7 +967,9 @@ def _waitable_coverage(value: object) -> bool:
         return False
     error_text = str(value.get("error") or "")
     if error_text == "async_sweep_stopped_no_hits":
-        return False
+        shards = _int(value.get("shards_searched"))
+        total = _int(value.get("shards_total"))
+        return bool(value.get("partial") or (total and shards < total))
     return (
         error_text.startswith("async_sweep_")
         or error_text.startswith("fullraw_incomplete")
