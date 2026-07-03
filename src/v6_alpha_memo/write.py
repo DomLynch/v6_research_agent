@@ -49,14 +49,6 @@ def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -
         f"**Why this is surprising:** The pair has `{scored.shape}` geometry over "
         f"`{', '.join(pair.anchors[:3])}` rather than a broad literature-summary bridge.",
     ]
-    if receipt is not None:
-        lines.extend([
-            "",
-            "**Search receipt:** "
-            f"hits={receipt.hits}; shards={receipt.shards_searched}/{receipt.shards_total}; "
-            f"sources={','.join(receipt.sources_searched) or 'unknown'}; "
-            f"papers_searched={receipt.papers_searched}; partial={receipt.partial}.",
-        ])
     lines.extend([
         "",
         "**Caveats/falsifiers:**",

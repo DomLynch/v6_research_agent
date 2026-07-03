@@ -1277,11 +1277,12 @@ def test_demo_run_outputs_required_memo_and_trace() -> None:
     assert run.memo.startswith("# Alpha memo:")
     assert "**One-sentence alpha:**" in run.memo
     assert "**Receipt 1:**" in run.memo
+    assert "**Search receipt:**" not in run.memo
     assert run.top_pairs[0].score >= 85
     assert run.trace["top_pairs"]
 
 
-def test_scores_translation_boundary_without_reversal() -> None:
+def test_positive_translation_boundary_stays_below_publish_threshold() -> None:
     papers = (
         Paper(
             "a",
@@ -1305,7 +1306,7 @@ def test_scores_translation_boundary_without_reversal() -> None:
 
     assert scored
     assert scored[0].shape == "translation_boundary"
-    assert scored[0].score >= 70
+    assert scored[0].score < 85
     assert "bounded by population or endpoint" in scored[0].expectation_update
 
 
