@@ -304,32 +304,32 @@ def _expectation_sentence(a: Paper, b: Paper, shape: str, anchors: tuple[str, ..
     anchor = _short(_best_anchor(a, b, anchors))
     if shape == "translation_boundary":
         return (
-            f"{a.title} made us expect {anchor} had biology-level promise; "
-            f"{b.title} forces the update that the human evidence is bounded by population or endpoint."
+            f"Receipt 1 made us expect {anchor} had biology-level promise; "
+            "Receipt 2 forces the update that the human evidence is bounded by population or endpoint."
         )
     if shape == "subgroup_endpoint_split":
         return (
-            f"{a.title} made us expect {anchor} would generalize across the target population; "
-            f"{b.title} forces the update that the response may be baseline-, subgroup-, or endpoint-gated."
+            f"Receipt 1 made us expect {anchor} would generalize across the target population; "
+            "Receipt 2 forces the update that the response may be baseline-, subgroup-, or endpoint-gated."
         )
     if shape == "modality_boundary":
         return (
-            f"{a.title} made us expect {anchor} would help recovery or performance; "
-            f"{b.title} forces the update that the same intervention may be bounded by training modality or adaptation endpoint."
+            f"Receipt 1 made us expect {anchor} would help recovery or performance; "
+            "Receipt 2 forces the update that the same intervention may be bounded by training modality or adaptation endpoint."
         )
     if shape == "context_boundary":
         return (
-            f"{a.title} made us expect {anchor} could work in one clinical context; "
-            f"{b.title} forces the update that the same intervention may fail or null out in another context."
+            f"Receipt 1 made us expect {anchor} could work in one clinical context; "
+            "Receipt 2 forces the update that the same intervention may fail or null out in another context."
         )
     if shape == "protocol_result_mismatch":
         return (
-            f"{a.title} made {anchor} worth testing as a positive signal; "
-            f"{b.title} forces the update that the same anchor can fail, reverse, or split by context."
+            f"Receipt 1 made {anchor} worth testing as a positive signal; "
+            "Receipt 2 forces the update that the same anchor can fail, reverse, or split by context."
         )
     return (
-        f"{a.title} made us expect {anchor} would travel cleanly as a positive signal; "
-        f"{b.title} forces the update that the same anchor can fail, reverse, or split by context."
+        f"Receipt 1 made us expect {anchor} would travel cleanly as a positive signal; "
+        "Receipt 2 forces the update that the same anchor can fail, reverse, or split by context."
     )
 
 

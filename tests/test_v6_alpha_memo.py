@@ -22,6 +22,7 @@ from v6_alpha_memo import (
 )
 from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import run as v6_run
+from v6_alpha_memo import score as v6_score
 from v6_alpha_memo import search as v6_search
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
@@ -3150,6 +3151,28 @@ def test_memo_validator_blocks_overclaim_title_and_grammar_fragment() -> None:
 
     assert "title_overclaim" in issues
     assert "grammar_fragment" in issues
+
+
+def test_expectation_sentence_uses_receipt_labels_not_raw_titles() -> None:
+    a = Paper(
+        "a",
+        "GlyNAC improves brain He",
+        "Results showed glynac improved brain glutathione in old mice.",
+        "openalex",
+        doi="10.1000/glynac-mouse",
+    )
+    b = Paper(
+        "b",
+        "GlyNAC improves glutathione in older adults",
+        "Results showed glynac improved glutathione in a bounded older-adult pilot trial.",
+        "pubmed",
+        doi="10.1000/glynac-human",
+    )
+
+    text = v6_score._expectation_sentence(a, b, "translation_boundary", ("glynac",))
+
+    assert text.startswith("Receipt 1 made us expect")
+    assert "Brain He made us expect" not in text
 
 
 def test_mechanism_to_human_title_uses_cross_context_signal() -> None:
