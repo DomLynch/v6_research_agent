@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from v6_alpha_memo.mine import mine_pairs
-from v6_alpha_memo.score import ScoredPair, score_all_pairs, score_pairs
+from v6_alpha_memo.score import ScoredPair, score_all_pairs
 from v6_alpha_memo.search import (
     CoverageReceipt,
     FullrawSearchClient,
@@ -71,7 +71,10 @@ def build_memo(
     for query in query_shapes(topic, limit=query_limit):
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
-        preview = score_pairs(mine_pairs(merge_results(tuple(collected))), topic_terms=topic_terms)
+        preview = _publishable_pairs(
+            score_all_pairs(mine_pairs(merge_results(tuple(collected))), topic_terms=topic_terms),
+            topic_terms,
+        )
         if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85 and len(collected) >= min_stop_queries:
             break
         if result.receipt.error == "async_sweep_queue_full":
@@ -251,7 +254,14 @@ def _topic_fit(scored: ScoredPair, topic_terms: set[str]) -> bool:
 
 
 def _publishable_pairs(scored: tuple[ScoredPair, ...], topic_terms: set[str]) -> tuple[ScoredPair, ...]:
-    kept = [pair for pair in scored if pair.score >= 55 and pair.expectation_update and _topic_fit(pair, topic_terms)]
+    kept = [
+        pair
+        for pair in scored
+        if pair.score >= 55
+        and pair.expectation_update
+        and _topic_fit(pair, topic_terms)
+        and not _source_doi_reject(pair)
+    ]
     kept.sort(key=lambda item: item.score, reverse=True)
     return tuple(kept)
 
@@ -260,6 +270,10 @@ def _reject_reason_counts(scored: tuple[ScoredPair, ...], topic_terms: set[str] 
     counter: collections.Counter[str] = collections.Counter()
     topic_set = set(topic_terms)
     for pair in scored:
+        source_reject = _source_doi_reject(pair) if pair.score >= 55 and pair.expectation_update else ""
+        if source_reject:
+            counter[source_reject] += 1
+            continue
         if pair.score >= 55 and pair.expectation_update and not _topic_fit(pair, topic_set):
             counter["reject:topic_fit"] += 1
             continue
@@ -278,7 +292,10 @@ def _zero_score_pair_examples(
     examples: list[dict[str, object]] = []
     for pair in scored:
         reasons = pair.reasons
-        if pair.score >= 55 and pair.expectation_update and not _topic_fit(pair, topic_set):
+        source_reject = _source_doi_reject(pair) if pair.score >= 55 and pair.expectation_update else ""
+        if source_reject:
+            reasons = (*reasons, source_reject)
+        elif pair.score >= 55 and pair.expectation_update and not _topic_fit(pair, topic_set):
             reasons = (*reasons, "reject:topic_fit")
         elif pair.score >= 55 and pair.expectation_update:
             continue
@@ -292,6 +309,20 @@ def _zero_score_pair_examples(
         if len(examples) >= 5:
             break
     return tuple(examples)
+
+
+def _source_doi_reject(scored: ScoredPair) -> str:
+    for paper in (scored.pair.a, scored.pair.b):
+        doi = _normalize_doi(paper.doi)
+        if not doi:
+            return "reject:missing_source_doi"
+        if not re.fullmatch(r"10\.\d{4,9}/[-._;()/:a-z0-9]+", doi):
+            return "reject:malformed_source_doi"
+    return ""
+
+
+def _normalize_doi(value: str) -> str:
+    return value.casefold().rstrip(".,;:)]}")
 
 
 _CONTEXT_REQUIRED_TOPIC_TERMS = frozenset({"adaptation", "adaptations", "exercise", "performance", "resistance", "training"})

@@ -2684,12 +2684,14 @@ def test_build_memo_can_continue_past_waitable_fullraw_shape_with_override(monke
                     "Tool X improves benchmark accuracy in a mechanistic model",
                     "The model showed tool x enhanced accuracy and improved performance.",
                     "openalex",
+                    doi="10.1000/waiting-hit-a",
                 ),
                 Paper(
                     "b",
                     "Tool X failed to improve human analyst decisions in a randomized field trial",
                     "Human analysts using tool x had null results and reduced decision quality.",
                     "semantic_scholar",
+                    doi="10.1000/waiting-hit-b",
                 ),
             )
             return SearchResult(
@@ -2775,8 +2777,8 @@ def test_build_memo_stops_side_searches_after_second_elite_query_shape() -> None
             del limit
             self.queries.append(query)
             papers = (
-                Paper("a", "Tool X improves benchmark accuracy in a mechanistic model", "The model showed tool x enhanced accuracy and improved performance.", "openalex"),
-                Paper("b", "Tool X failed to improve human analyst decisions in a randomized field trial", "Human analysts using tool x had null results and reduced decision quality.", "semantic_scholar"),
+                Paper("a", "Tool X improves benchmark accuracy in a mechanistic model", "The model showed tool x enhanced accuracy and improved performance.", "openalex", doi="10.1000/elite-a"),
+                Paper("b", "Tool X failed to improve human analyst decisions in a randomized field trial", "Human analysts using tool x had null results and reduced decision quality.", "semantic_scholar", doi="10.1000/elite-b"),
             )
             return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
 
@@ -2785,6 +2787,70 @@ def test_build_memo_stops_side_searches_after_second_elite_query_shape() -> None
 
     assert len(client.queries) == 2
     assert run.top_pairs[0].score >= 85
+
+
+def test_build_memo_rejects_doi_missing_elite_pairs() -> None:
+    class MissingDoiClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            papers = (
+                Paper(
+                    "a",
+                    "Tool X improves benchmark accuracy in a mechanistic model",
+                    "The model showed tool x enhanced accuracy and improved performance.",
+                    "openalex",
+                ),
+                Paper(
+                    "b",
+                    "Tool X failed to improve human analyst decisions in a randomized field trial",
+                    "Human analysts using tool x had null results and reduced decision quality.",
+                    "semantic_scholar",
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
+
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("tool x", client=MissingDoiClient(), query_limit=2)
+
+    assert exc.value.trace["reject_reason_counts"] == {"reject:missing_source_doi": 1}
+    examples = cast(tuple[dict[str, object], ...], exc.value.trace["zero_score_pair_examples"])
+    reasons = cast(tuple[str, ...], examples[0]["reasons"])
+    assert "reject:missing_source_doi" in reasons
+
+
+def test_build_memo_continues_past_doi_missing_elite_preview() -> None:
+    class MissingThenValidDoiClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            doi_a = "10.1000/valid-a" if len(self.queries) == 3 else ""
+            doi_b = "10.1000/valid-b" if len(self.queries) == 3 else ""
+            papers = (
+                Paper(
+                    "a",
+                    "Tool X improves benchmark accuracy in a mechanistic model",
+                    "The model showed tool x enhanced accuracy and improved performance.",
+                    "openalex",
+                    doi=doi_a,
+                ),
+                Paper(
+                    "b",
+                    "Tool X failed to improve human analyst decisions in a randomized field trial",
+                    "Human analysts using tool x had null results and reduced decision quality.",
+                    "semantic_scholar",
+                    doi=doi_b,
+                ),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
+
+    client = MissingThenValidDoiClient()
+    run = build_memo("tool x", client=client, query_limit=3)
+
+    assert len(client.queries) == 3
+    assert [run.top_pairs[0].pair.a.doi, run.top_pairs[0].pair.b.doi] == ["10.1000/valid-a", "10.1000/valid-b"]
 
 
 def test_build_memo_continues_after_no_hit_sweep_stop() -> None:
@@ -3241,24 +3307,28 @@ def test_build_memo_returns_minimax_selected_pair_for_submission_bundle(monkeypa
                     "Dashboard improves forecast accuracy in a pilot",
                     "The dashboard improved forecast accuracy and analyst confidence in a pilot.",
                     "openalex",
+                    doi="10.1000/dashboard-a",
                 ),
                 Paper(
                     "b",
                     "Dashboard failed to improve forecast accuracy in a randomized field trial",
                     "The dashboard produced null forecast accuracy gains and reduced analyst quality in a human field trial.",
                     "pubmed",
+                    doi="10.1000/dashboard-b",
                 ),
                 Paper(
                     "c",
                     "Dashboard forecast accuracy tool improves human decisions in a benchmark",
                     "The dashboard forecast accuracy tool improved human decision performance and accuracy in a benchmark.",
                     "openalex",
+                    doi="10.1000/dashboard-c",
                 ),
                 Paper(
                     "d",
                     "Dashboard forecast accuracy tool failed in a randomized human trial",
                     "The dashboard forecast accuracy tool had null effects and reduced decision quality in a randomized human trial.",
                     "semantic_scholar",
+                    doi="10.1000/dashboard-d",
                 ),
             )
             return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
@@ -3299,24 +3369,28 @@ def test_build_memo_does_not_let_minimax_downgrade_a_grade_pair(monkeypatch: pyt
                     "Tool X improves benchmark accuracy in a mechanistic model",
                     "The model showed tool x enhanced accuracy and improved performance.",
                     "openalex",
+                    doi="10.1000/tool-a",
                 ),
                 Paper(
                     "b",
                     "Tool X failed to improve human analyst decisions in a randomized field trial",
                     "Human analysts using tool x had null results and reduced decision quality.",
                     "semantic_scholar",
+                    doi="10.1000/tool-b",
                 ),
                 Paper(
                     "c",
                     "Tool X in mice increases length of life and corrects mitochondrial dysfunction",
                     "A mouse model showed tool x improved glutathione and mitochondrial function.",
                     "openalex",
+                    doi="10.1000/tool-c",
                 ),
                 Paper(
                     "d",
                     "Tool X improves biomarker deficiency in aging HIV patients in an open-label clinical trial",
                     "The human patient trial improved biomarker endpoints in a bounded disease population.",
                     "pubmed",
+                    doi="10.1000/tool-d",
                 ),
             )
             return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
@@ -3345,12 +3419,14 @@ def test_build_memo_uses_a_grade_pair_when_minimax_rejects_all(monkeypatch: pyte
                     "Tool X improves benchmark accuracy in a mechanistic model",
                     "The model showed tool x enhanced accuracy and improved performance.",
                     "openalex",
+                    doi="10.1000/grade-a",
                 ),
                 Paper(
                     "b",
                     "Tool X failed to improve human analyst decisions in a randomized field trial",
                     "Human analysts using tool x had null results and reduced decision quality.",
                     "semantic_scholar",
+                    doi="10.1000/grade-b",
                 ),
             )
             return SearchResult(query, papers, CoverageReceipt(hits=len(papers)))
