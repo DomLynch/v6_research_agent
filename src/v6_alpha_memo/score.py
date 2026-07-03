@@ -430,7 +430,10 @@ def _status_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: fro
 
 def _nonprimary(paper: Paper) -> bool:
     text = paper.text.casefold()
-    return any(phrase in text for phrase in _NONPRIMARY_PHRASES)
+    title = paper.title.casefold()
+    return any(phrase in text for phrase in _NONPRIMARY_PHRASES) or bool(
+        re.search(r"\b(?:a|an|narrative|scoping|systematic|umbrella)\s+review\b|\breview of\b", title)
+    )
 
 
 def _supplement_receipt(paper: Paper) -> bool:

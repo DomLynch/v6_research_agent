@@ -1243,6 +1243,32 @@ def test_rejects_review_keyword_overlap_before_writing() -> None:
     assert mine_pairs(papers) == ()
 
 
+def test_rejects_primary_trial_plus_narrative_review_pair() -> None:
+    papers = (
+        Paper(
+            "trial",
+            "Dose-response of creatine supplementation on cognitive function in healthy young adults",
+            "Results showed creatine supplementation had null cognitive dose-response effects in healthy young adults.",
+            "pubmed",
+            2023,
+            "10.3390/brainsci13091276",
+        ),
+        Paper(
+            "review",
+            "Creatine Supplementation - therapeutic use and benefits for athletes: A Review",
+            "A review reports that creatine supplementation can increase lean body mass and high-intensity performance.",
+            "openalex",
+            2021,
+            "10.1000/creatine-review",
+        ),
+    )
+
+    scored_all = score_all_pairs(mine_pairs(papers), topic_terms={"creatine", "cognitive", "function"})
+
+    assert any("reject:non_primary_receipt" in item.reasons for item in scored_all)
+    assert score_pairs(mine_pairs(papers), topic_terms={"creatine", "cognitive", "function"}) == ()
+
+
 def test_demo_run_outputs_required_memo_and_trace() -> None:
     run = build_memo("longevity exercise adaptation", client=DemoClient())
 
