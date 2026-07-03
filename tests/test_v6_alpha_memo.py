@@ -5239,10 +5239,24 @@ def test_live_service_config_uses_wider_strict_search() -> None:
     text = Path("deploy/v6-alpha-memo-live.service").read_text()
 
     assert "Environment=V6_DAEMON_MIN_SCORE=85" in text
-    assert "Environment=V6_DAEMON_QUERY_LIMIT=5" in text
+    assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=12" in text
+    assert "Environment=V6_DAEMON_MAX_WAITING=12" in text
+    assert "Environment=V6_DAEMON_QUERY_LIMIT=3" in text
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=20" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=3" in text
+    assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=0" in text
     assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
+
+
+def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
+    service = Path("deploy/v6-fullraw-search.service").read_text()
+    dropin = Path("deploy/v6-fullraw-throughput.conf").read_text()
+
+    for text in (service, dropin):
+        assert "Environment=RESEARKA_FULLRAW_SWEEP_WORKERS=4" in text
+        assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=32" in text
+        assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=4" in text
+        assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=72" in text
 
 
 def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
