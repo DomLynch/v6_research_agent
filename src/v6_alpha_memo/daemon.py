@@ -75,6 +75,8 @@ def _run_pass(
     rows = _rows(board, topics)
     _sync_submit_blocker(board, rows, topics)
     for row in rows:
+        if row.get("blocked_stage") != "source_doi_invalid":
+            row.pop("source_doi_issues", None)
         if row.get("public"):
             _clear_blocker(row)
         elif (
@@ -304,6 +306,7 @@ def _clear_blocker(row: dict[str, object]) -> None:
     for key in (
         "blocked_stage", "blocked_final", "error", "traceback", "unresolved_dois",
         "writer_validation_issues", "submit_retry_after", "submit_backoff_count",
+        "source_doi_issues",
     ):
         row.pop(key, None)
     _clear_wait_progress(row)

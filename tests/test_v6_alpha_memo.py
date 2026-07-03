@@ -4120,6 +4120,21 @@ def test_daemon_cleans_already_public_rows(tmp_path: Path) -> None:
     assert "traceback" not in row
 
 
+def test_daemon_clears_stale_source_doi_details_from_other_blockers(tmp_path: Path) -> None:
+    row: dict[str, object] = {
+        "topic": "creatine cognitive function older adults",
+        "blocked_stage": "selector_rejected",
+        "blocked_final": True,
+        "source_doi_issues": ["missing_source_doi:1"],
+    }
+    board: dict[str, object] = {"rows": [row]}
+
+    v6_daemon._run_pass(tmp_path, ("creatine cognitive function older adults",), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "selector_rejected"
+    assert "source_doi_issues" not in row
+
+
 def test_daemon_classifies_transport_errors_as_waiting() -> None:
     trace: dict[str, object] = {"coverage": [{"error": "URLError: <urlopen error [Errno 111] Connection refused>"}]}
 
