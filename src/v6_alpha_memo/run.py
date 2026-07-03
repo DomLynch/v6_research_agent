@@ -234,7 +234,11 @@ def _int_env(name: str, default: int) -> int:
 
 
 def _topic_terms(topic: str) -> set[str]:
-    drop = {"alpha", "memo", "research", "study", "effect", "effects", "evidence"}
+    drop = {
+        "acclaim", "accord", "aim", "alpha", "ascend", "caret", "cast", "choir",
+        "effect", "effects", "evidence", "expedition", "high", "illuminate",
+        "memo", "pallas", "record", "research", "select", "study", "whi",
+    }
     return {word for word in re.findall(r"[a-z][a-z0-9]{2,}", topic.casefold()) if word not in drop}
 
 

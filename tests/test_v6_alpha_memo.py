@@ -113,6 +113,23 @@ def test_query_shapes_do_not_split_multiword_construct_before_falsifier_terms() 
     assert all("time null failed" not in query for query in queries)
 
 
+def test_topic_terms_ignore_trial_acronyms_without_dropping_construct() -> None:
+    assert v6_run._topic_terms("ILLUMINATE torcetrapib mortality cardiovascular outcomes") == {
+        "torcetrapib",
+        "mortality",
+        "cardiovascular",
+        "outcomes",
+    }
+    assert v6_run._topic_terms("ACCORD intensive glucose control mortality type 2 diabetes") == {
+        "intensive",
+        "glucose",
+        "control",
+        "mortality",
+        "type",
+        "diabetes",
+    }
+
+
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
     papers = (
         Paper(
