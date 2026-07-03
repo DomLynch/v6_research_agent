@@ -78,8 +78,10 @@ def test_query_shapes_are_targeted_but_not_topic_whitelisted() -> None:
 
     assert len(queries) >= 6
     assert queries[0] == "marketing attribution incrementality"
+    assert queries[1] == "marketing attribution incrementality null failed primary endpoint"
     assert all({"marketing", "attribution", "incrementality"} <= set(query.split()) for query in queries)
     assert aging_queries[0] == "everolimus aging immune function"
+    assert aging_queries[1] == "everolimus aging immune function null failed primary endpoint"
     assert all("glynac" not in query and "glutathione" not in query for query in aging_queries)
     assert any(query == "marketing attribution incrementality null failed primary endpoint" for query in queries)
     assert any("baseline subgroup high low response" in query for query in queries)
@@ -92,22 +94,22 @@ def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
     queries = query_shapes("cold water immersion resistance training", limit=3)
 
     assert queries[0] == "cold water immersion resistance training"
-    assert queries[1] == "cold water immersion resistance training mechanism model human failed translation"
-    assert queries[2] == "cold water immersion resistance training null failed primary endpoint"
+    assert queries[1] == "cold water immersion resistance training null failed primary endpoint"
+    assert queries[2] == "cold water immersion resistance training mechanism model human failed translation"
 
 
 def test_query_shapes_keep_short_compound_head_together() -> None:
     queries = query_shapes("omega 3 atrial fibrillation cardiovascular prevention", limit=3)
     vitamin_queries = query_shapes("vitamin D fracture randomized trial", limit=3)
 
-    assert queries[2] == "omega 3 atrial fibrillation cardiovascular prevention null failed primary endpoint"
-    assert vitamin_queries[2] == "vitamin D fracture randomized trial null failed primary endpoint"
+    assert queries[1] == "omega 3 atrial fibrillation cardiovascular prevention null failed primary endpoint"
+    assert vitamin_queries[1] == "vitamin D fracture randomized trial null failed primary endpoint"
 
 
 def test_query_shapes_do_not_split_multiword_construct_before_falsifier_terms() -> None:
     queries = query_shapes("time restricted eating resistance training lean mass", limit=3)
 
-    assert queries[2] == "time restricted eating resistance training lean mass null failed primary endpoint"
+    assert queries[1] == "time restricted eating resistance training lean mass null failed primary endpoint"
     assert all("time null failed" not in query for query in queries)
 
 
