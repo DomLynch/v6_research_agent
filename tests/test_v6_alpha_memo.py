@@ -22,6 +22,7 @@ from v6_alpha_memo import (
 )
 from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import run as v6_run
+from v6_alpha_memo import search as v6_search
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import NoMemoError, build_memo
@@ -1894,6 +1895,12 @@ def test_fullraw_client_uses_completed_sweep_cache_before_remote(
     assert len(result.papers) == 1
     assert result.receipt.shards_searched == 1525
     assert result.receipt.source_count_searched == 5
+
+
+def test_clean_truncates_on_word_boundary() -> None:
+    text = "GlyNAC improves brain Health in aging"
+
+    assert v6_search._clean(text, limit=27) == "GlyNAC improves brain"
 
 
 def test_fullraw_client_backfills_completed_cache_title_only_hit(

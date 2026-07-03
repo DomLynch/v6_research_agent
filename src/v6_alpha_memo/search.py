@@ -708,7 +708,11 @@ def _inverted_abstract(value: object) -> str:
 
 
 def _clean(value: object, *, limit: int = 500) -> str:
-    return " ".join(str(value or "").split())[:limit]
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    clipped = text[:limit].rsplit(" ", 1)[0].rstrip(".,;:-")
+    return clipped or text[:limit].strip()
 
 
 def _doi(value: object) -> str:
