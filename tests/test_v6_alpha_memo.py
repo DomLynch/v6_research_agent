@@ -1757,6 +1757,90 @@ def test_fullraw_client_keeps_relevant_partial_sweep_waitable() -> None:
     assert result.papers == ()
 
 
+def test_fullraw_client_accepts_source_diverse_no_hit_stop() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "stopped_no_hits"},
+            "shard_receipt": {
+                "shards_searched": 1005,
+                "shards_total": 1525,
+                "source_count_searched": 5,
+                "sources_searched": {
+                    "openalex": 1,
+                    "pubmed": 1,
+                    "semantic_scholar": 1,
+                    "semantic_scholar_abstracts": 1,
+                    "biorxiv": 1,
+                },
+                "partial_shard_search": True,
+                "sweep_failed_shards": 0,
+            },
+        },
+        "results": [
+            {
+                "title": "ACCORD intensive glucose control diabetes trial reduced macrovascular outcomes",
+                "abstract": "The ACCORD intensive glucose control diabetes trial tested cardiovascular outcomes.",
+                "source": "openalex",
+                "doi": "10.1000/accord-a",
+            },
+            {
+                "title": "ACCORD intensive glucose control diabetes trial stopped for mortality",
+                "abstract": "The ACCORD diabetes trial found higher mortality under intensive glucose control.",
+                "source": "pubmed",
+                "doi": "10.1000/accord-b",
+            },
+        ],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "ACCORD intensive glucose control diabetes trial",
+        limit=3,
+    )
+
+    assert result.receipt.error == ""
+    assert result.receipt.async_status == "stopped_no_hits"
+    assert result.receipt.partial is True
+    assert result.receipt.source_count_searched == 5
+    assert len(result.papers) == 2
+
+
+def test_fullraw_client_rejects_low_source_no_hit_stop() -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "async_sweep": {"status": "stopped_no_hits"},
+            "shard_receipt": {
+                "shards_searched": 1005,
+                "shards_total": 1525,
+                "source_count_searched": 4,
+                "sources_searched": {"openalex": 1, "pubmed": 1, "semantic_scholar": 1, "biorxiv": 1},
+                "partial_shard_search": True,
+                "sweep_failed_shards": 0,
+            },
+        },
+        "results": [
+            {
+                "title": "ACCORD intensive glucose control diabetes trial macrovascular outcomes",
+                "abstract": "The ACCORD intensive glucose control diabetes trial tested cardiovascular outcomes.",
+                "source": "openalex",
+            },
+            {
+                "title": "ACCORD intensive glucose control diabetes trial mortality",
+                "abstract": "The ACCORD diabetes trial found higher mortality under intensive control.",
+                "source": "pubmed",
+            },
+        ],
+    }
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "ACCORD intensive glucose control diabetes trial",
+        limit=3,
+    )
+
+    assert result.receipt.error == "async_sweep_stopped_no_hits"
+    assert result.receipt.source_count_searched == 4
+    assert result.papers == ()
+
+
 def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.MonkeyPatch) -> None:
     def opener(request: Request, timeout: float) -> _Response:
         del timeout
@@ -4344,7 +4428,7 @@ def test_daemon_classifies_no_hit_sweep_stop_as_selector_rejected() -> None:
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
-def test_daemon_waits_for_partial_no_hit_sweep_stop() -> None:
+def test_daemon_rejects_unusable_partial_no_hit_sweep_stop() -> None:
     trace: dict[str, object] = {
         "coverage": [
             {
@@ -4358,7 +4442,23 @@ def test_daemon_waits_for_partial_no_hit_sweep_stop() -> None:
         ]
     }
 
-    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
+    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
+
+
+def test_daemon_treats_useful_no_hit_sweep_stop_as_strict_coverage() -> None:
+    item: dict[str, object] = {
+        "hits": 2,
+        "async_status": "stopped_no_hits",
+        "error": "",
+        "partial": True,
+        "shards_searched": 1263,
+        "shards_total": 1525,
+        "source_count_searched": 5,
+        "sweep_failed_shards": 0,
+    }
+
+    assert v6_daemon._strict_coverage(item) is True
+    assert v6_daemon._waitable_coverage(item) is False
 
 
 def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
