@@ -595,6 +595,50 @@ def test_rejects_same_trial_cross_organ_endpoint_split() -> None:
     assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
 
 
+def test_rejects_same_trial_risk_modifier_as_intervention_split() -> None:
+    papers = (
+        Paper(
+            "select-null",
+            "Selenium and Prostate Cancer Prevention: Insights from the Selenium and Vitamin E Cancer Prevention Trial (SELECT)",
+            "The SELECT trial found that neither selenium nor vitamin E reduced prostate cancer incidence.",
+            "openalex",
+        ),
+        Paper(
+            "select-risk",
+            "Difference in Association of Obesity With Prostate Cancer Risk Between US African American and Non-Hispanic White Men in the Selenium and Vitamin E Cancer Prevention Trial (SELECT)",
+            "Obesity was more strongly associated with prostate cancer risk among African American men in SELECT.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"})
+
+    assert any("reject:same_trial_risk_modifier_drift" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
+
+
+def test_rejects_question_title_without_observed_result() -> None:
+    papers = (
+        Paper(
+            "question",
+            "Does intensive glucose control cancel out benefits of systolic blood pressure target in ACCORD?",
+            "This commentary asks whether intensive glucose control changes blood pressure target interpretation.",
+            "openalex",
+        ),
+        Paper(
+            "result",
+            "Sex-related disparities in triglyceride-glucose index and renal function decline in ACCORD",
+            "Results showed sex-related disparities in renal function decline among patients with type 2 diabetes.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"})
+
+    assert any("reject:question_title_without_result" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"}) == ()
+
+
 def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     papers = (
         Paper(
