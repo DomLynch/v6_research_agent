@@ -409,6 +409,40 @@ def test_rejects_repository_deposit_as_alpha_receipt() -> None:
     assert score_pairs(pairs, topic_terms={"creatine", "cognitive", "older", "adults"}) == ()
 
 
+def test_rejects_unrequested_training_cointervention_drift() -> None:
+    papers = (
+        Paper(
+            "young-null",
+            "Dose-response Of Creatine Supplementation On Cognitive Function In Healthy Young Adults",
+            "Results showed creatine supplementation had no significant effect on cognitive performance in healthy young adults.",
+            "openalex",
+            2023,
+            "10.1249/01.mss.0000985456.88027.52",
+        ),
+        Paper(
+            "training-combo",
+            (
+                "Effects of high-load, velocity-intentional variable resistance training combined with creatine "
+                "supplementation on neuroplasticity, oxidative stress, inflammation, physical function, cognitive "
+                "performance and quality of life in older adults"
+            ),
+            (
+                "A randomized trial compared resistance training programs combined with creatine or placebo "
+                "supplementation in older adults and reported physical function, cognitive performance, and quality "
+                "of life outcomes."
+            ),
+            "semantic_scholar",
+            2026,
+            "10.1016/j.exger.2026.113122",
+        ),
+    )
+    pairs = mine_pairs(papers)
+    scored_all = score_all_pairs(pairs, topic_terms={"creatine", "cognitive", "function", "older", "adults"})
+
+    assert any("reject:unrequested_training_cointervention" in item.reasons for item in scored_all)
+    assert score_pairs(pairs, topic_terms={"creatine", "cognitive", "function", "older", "adults"}) == ()
+
+
 def test_rejects_preprint_repository_receipts_as_alpha_evidence() -> None:
     papers = (
         Paper(
