@@ -1841,6 +1841,61 @@ def test_fullraw_client_rejects_low_source_no_hit_stop() -> None:
     assert result.papers == ()
 
 
+def test_fullraw_client_uses_source_diverse_partial_cache(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cache_dir = tmp_path / "cache"
+    extra_dir = tmp_path / "extra"
+    cache_dir.mkdir()
+    extra_dir.mkdir()
+    query = "ACCORD intensive glucose control mortality type 2 diabetes"
+    (cache_dir / "accord.json").write_text(json.dumps({
+        "hits": [
+            {
+                "title": "ACCORD intensive glucose control diabetes trial mortality signal",
+                "abstract": "The ACCORD intensive glucose control diabetes trial reported mortality outcomes.",
+                "source": "openalex",
+                "doi": "10.1000/accord-cache-a",
+            },
+            {
+                "title": "ACCORD intensive glucose control type 2 diabetes cardiovascular outcomes",
+                "abstract": "The ACCORD trial tested intensive glucose control in type 2 diabetes.",
+                "source": "pubmed",
+                "doi": "10.1000/accord-cache-b",
+            },
+        ],
+        "receipt": {
+            "sweep_original_query": query,
+            "shards_searched": 1005,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sources_searched": {
+                "openalex": 1,
+                "pubmed": 1,
+                "semantic_scholar": 1,
+                "semantic_scholar_abstracts": 1,
+                "biorxiv": 1,
+            },
+            "partial_shard_search": True,
+            "sweep_failed_shards": 0,
+            "sweep_result_limit": 25,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra_dir))
+
+    def opener(request: Request, timeout: float) -> _Response:
+        del request, timeout
+        raise AssertionError("source-diverse cache should satisfy the search before endpoint fetch")
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=opener).search(query, limit=25)
+
+    assert result.receipt.error == ""
+    assert result.receipt.partial is True
+    assert result.receipt.source_count_searched == 5
+    assert len(result.papers) == 2
+
+
 def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.MonkeyPatch) -> None:
     def opener(request: Request, timeout: float) -> _Response:
         del timeout

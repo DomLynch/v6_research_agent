@@ -72,6 +72,19 @@ class SearchResult:
     receipt: CoverageReceipt
 
 
+def strict_source_diverse_partial_coverage(value: object) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
+    return (
+        bool(value.get("partial"))
+        and (_int(value.get("shards_searched")) or 0) >= threshold
+        and (_int(value.get("sweep_failed_shards")) or 0) == 0
+        and (_int(value.get("source_count_searched")) or 0) >= 5
+        and (_int(value.get("hits")) or 0) >= 2
+    )
+
+
 def strict_no_hit_stop_coverage(value: object) -> bool:
     if not isinstance(value, Mapping):
         return False
@@ -79,13 +92,7 @@ def strict_no_hit_stop_coverage(value: object) -> bool:
     async_status = str(value.get("async_status") or "")
     if error_text != "async_sweep_stopped_no_hits" and async_status != "stopped_no_hits":
         return False
-    threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
-    return (
-        (_int(value.get("shards_searched")) or 0) >= threshold
-        and (_int(value.get("sweep_failed_shards")) or 0) == 0
-        and (_int(value.get("source_count_searched")) or 0) >= 5
-        and (_int(value.get("hits")) or 0) >= 2
-    )
+    return strict_source_diverse_partial_coverage(value)
 
 
 class FullrawSearchClient:
@@ -394,10 +401,10 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             if cached_limit is not None and cached_limit < min_cached_limit:
                 continue
             payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
-            if _coverage_error(payload):
-                continue
             parsed = [paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None]
             papers = _filter_query_papers(parsed, query)
+            if _coverage_error(payload) and not _strict_source_diverse_partial_result(payload, len(papers)):
+                continue
             result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
             if papers and (match_kind == "exact" or _result_matches_query(result, query)):
                 candidates.append(result)
@@ -523,6 +530,18 @@ def _strict_no_hit_stop_result(data: object, hits: int) -> bool:
         "hits": receipt.hits,
         "async_status": receipt.async_status,
         "error": receipt.error,
+        "partial": receipt.partial,
+        "shards_searched": receipt.shards_searched,
+        "source_count_searched": receipt.source_count_searched,
+        "sweep_failed_shards": receipt.sweep_failed_shards,
+    })
+
+
+def _strict_source_diverse_partial_result(data: object, hits: int) -> bool:
+    receipt = _receipt(data, hits=hits)
+    return strict_source_diverse_partial_coverage({
+        "hits": receipt.hits,
+        "partial": receipt.partial,
         "shards_searched": receipt.shards_searched,
         "source_count_searched": receipt.source_count_searched,
         "sweep_failed_shards": receipt.sweep_failed_shards,

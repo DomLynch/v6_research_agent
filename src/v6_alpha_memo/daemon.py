@@ -19,7 +19,7 @@ from v6_alpha_memo.search import (
     FullrawSearchClient,
     Paper,
     completed_cached_result,
-    strict_no_hit_stop_coverage,
+    strict_source_diverse_partial_coverage,
 )
 from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_against_pair
 
@@ -1071,7 +1071,7 @@ def _waitable_coverage(value: object) -> bool:
 def _strict_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
-    if strict_no_hit_stop_coverage(value):
+    if strict_source_diverse_partial_coverage(value):
         return True
     return (
         not value.get("error")
