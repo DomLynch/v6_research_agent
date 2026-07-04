@@ -15,7 +15,12 @@ from urllib.request import Request, urlopen
 
 from v6_alpha_memo.run import NoMemoError, V6Run, _best_receipt, build_memo
 from v6_alpha_memo.score import ScoredPair
-from v6_alpha_memo.search import FullrawSearchClient, Paper, completed_cached_result
+from v6_alpha_memo.search import (
+    FullrawSearchClient,
+    Paper,
+    completed_cached_result,
+    strict_no_hit_stop_coverage,
+)
 from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_against_pair
 
 _DEFAULT_QUERY_LIMIT = 5
@@ -1054,9 +1059,7 @@ def _waitable_coverage(value: object) -> bool:
         return False
     error_text = str(value.get("error") or "")
     if error_text == "async_sweep_stopped_no_hits":
-        shards = _int(value.get("shards_searched"))
-        total = _int(value.get("shards_total"))
-        return bool(value.get("partial") or (total and shards < total))
+        return False
     return (
         error_text.startswith("async_sweep_")
         or error_text.startswith("fullraw_incomplete")
@@ -1068,6 +1071,8 @@ def _waitable_coverage(value: object) -> bool:
 def _strict_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
+    if strict_no_hit_stop_coverage(value):
+        return True
     return (
         not value.get("error")
         and _int(value.get("shards_searched")) >= 1525

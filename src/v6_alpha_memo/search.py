@@ -72,6 +72,22 @@ class SearchResult:
     receipt: CoverageReceipt
 
 
+def strict_no_hit_stop_coverage(value: object) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    error_text = str(value.get("error") or "")
+    async_status = str(value.get("async_status") or "")
+    if error_text != "async_sweep_stopped_no_hits" and async_status != "stopped_no_hits":
+        return False
+    threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
+    return (
+        (_int(value.get("shards_searched")) or 0) >= threshold
+        and (_int(value.get("sweep_failed_shards")) or 0) == 0
+        and (_int(value.get("source_count_searched")) or 0) >= 5
+        and (_int(value.get("hits")) or 0) >= 2
+    )
+
+
 class FullrawSearchClient:
     """Tiny POST client for the 5TB-backed fullraw search endpoint."""
 
@@ -165,6 +181,8 @@ class FullrawSearchClient:
             coverage_error = _coverage_error(data)
         parsed = _parsed_papers(data)
         papers = _filter_query_papers(parsed, query)
+        if coverage_error and _strict_no_hit_stop_result(data, len(papers)):
+            coverage_error = ""
         if coverage_error:
             if _empty_partial_stop(data, papers):
                 coverage_error = "async_sweep_stopped_no_hits"
@@ -497,6 +515,18 @@ def _empty_partial_stop(data: object, papers: tuple[Paper, ...]) -> bool:
     receipt = _receipt(data, hits=0)
     threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
     return bool(receipt.partial and receipt.shards_searched >= threshold and receipt.source_count_searched >= 4)
+
+
+def _strict_no_hit_stop_result(data: object, hits: int) -> bool:
+    receipt = _receipt(data, hits=hits, error="async_sweep_stopped_no_hits")
+    return strict_no_hit_stop_coverage({
+        "hits": receipt.hits,
+        "async_status": receipt.async_status,
+        "error": receipt.error,
+        "shards_searched": receipt.shards_searched,
+        "source_count_searched": receipt.source_count_searched,
+        "sweep_failed_shards": receipt.sweep_failed_shards,
+    })
 
 
 def _parse_paper(item: object) -> Paper | None:
