@@ -149,6 +149,7 @@ _NUTRITION_PROTEIN_PHRASES = (
     "amino acid", "carbohydrate-protein", "leucine", "protein ingestion",
     "protein supplement", "protein supplementation", "whey protein",
 )
+_TRAINING_TOPIC_TERMS = frozenset({"adaptation", "exercise", "physical", "resistance", "strength", "training"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,6 +391,8 @@ def _receipt_hygiene_reject(
         return "reject:chemical_form_drift"
     if _nutrition_protein_timing_drift(a, b, topic_terms):
         return "reject:nutrition_protein_context_drift"
+    if _unrequested_training_cointervention_drift(a, b, topic_terms):
+        return "reject:unrequested_training_cointervention"
     title_a = _title_terms(a)
     title_b = _title_terms(b)
     if not any(anchor not in _CONTEXT_ANCHOR and anchor in title_a and anchor in title_b for anchor in anchors):
@@ -689,6 +692,21 @@ def _nutrition_protein_context(paper: Paper) -> bool:
 
 def _resistance_training_context(paper: Paper) -> bool:
     return bool(re.search(r"\b(?:progressive\s+resistance|resistance\s+(?:exercise|training)|strength\s+training)\b", paper.text.casefold()))
+
+
+def _unrequested_training_cointervention_drift(a: Paper, b: Paper, topic_terms: frozenset[str]) -> bool:
+    if topic_terms & _TRAINING_TOPIC_TERMS:
+        return False
+    return _training_cointervention_context(a) != _training_cointervention_context(b)
+
+
+def _training_cointervention_context(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return bool(
+        re.search(r"\b(?:exercise|resistance|strength|training)\s+(?:program|programs|trial|intervention|sessions?)\b", text)
+        or re.search(r"\b(?:combined with|plus|with or without)\b.{0,100}\b(?:exercise|resistance|training)\b", text)
+        or re.search(r"\b(?:exercise|resistance|training)\b.{0,100}\b(?:combined with|creatine|placebo|supplementation)\b", text)
+    )
 
 
 def _has(tokens: set[str], needles: frozenset[str]) -> bool:
