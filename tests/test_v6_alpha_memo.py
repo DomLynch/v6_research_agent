@@ -4894,6 +4894,63 @@ def test_daemon_refreshes_wait_progress_from_primary_cache(
     assert [row["topic"] for row in selected] == ["ACCORD intensive glucose control mortality type 2 diabetes"]
 
 
+def test_daemon_prioritizes_completed_cache_topic_over_partial_waiter(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "creatine.json").write_text(json.dumps({
+        "hits": [
+            {
+                "title": "Creatine improves cognitive function in older adults",
+                "abstract": "Creatine cognitive function trial evidence in older adults.",
+                "source": "pubmed",
+                "year": 2024,
+                "doi": "10.1000/creatine-a",
+            },
+            {
+                "title": "Creatine cognitive function shows mixed older adult response",
+                "abstract": "Creatine cognitive function receipt with boundary response.",
+                "source": "pubmed",
+                "year": 2023,
+                "doi": "10.1000/creatine-b",
+            },
+        ],
+        "receipt": {
+            "sweep_original_query": "creatine cognitive function older adults",
+            "sweep_query": "creatine cognitive function older adults",
+            "sweep_result_limit": 2,
+            "shards_searched": 1525,
+            "shards_total": 1525,
+            "source_count_searched": 5,
+            "sweep_failed_shards": 0,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    monkeypatch.setenv("V6_DAEMON_PER_QUERY_LIMIT", "2")
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "ACCORD intensive glucose control mortality type 2 diabetes",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 931,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 931}]},
+        },
+        {"topic": "creatine cognitive function older adults"},
+    ]
+
+    selected = v6_daemon._candidate_rows(
+        rows,
+        (
+            "ACCORD intensive glucose control mortality type 2 diabetes",
+            "creatine cognitive function older adults",
+        ),
+    )
+
+    assert [row["topic"] for row in selected] == ["creatine cognitive function older adults"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 
@@ -5522,7 +5579,8 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
     assert "Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=25" in text
-    assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=0" in text
+    assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=1" in text
+    assert "Environment=V6_DAEMON_MAX_CACHE_TOPICS=8" in text
     assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
 
 
