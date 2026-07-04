@@ -4597,7 +4597,10 @@ def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     cache_dir.mkdir()
     extra_dir.mkdir()
     (cache_dir / "done.json").write_text(json.dumps({
-        "hits": [{"title": "A"}, {"title": "B"}],
+        "hits": [
+            {"title": "Resveratrol blunts exercise training adaptation", "abstract": "Resveratrol exercise training response."},
+            {"title": "Resveratrol exercise adaptation boundary", "abstract": "Resveratrol blunts adaptation after training."},
+        ],
         "receipt": {
             "sweep_original_query": "resveratrol blunts exercise training",
             "shards_searched": 1525,
@@ -4607,7 +4610,10 @@ def test_daemon_cache_topics_reads_strict_completed_primary_cache(
         },
     }))
     (extra_dir / "extra.json").write_text(json.dumps({
-        "hits": [{"title": "A"}, {"title": "B"}],
+        "hits": [
+            {"title": "Nicotinamide exercise performance in humans", "abstract": "Nicotinamide exercise performance response."},
+            {"title": "Nicotinamide performance adaptation", "abstract": "Exercise performance boundary receipt."},
+        ],
         "receipt": {
             "sweep_original_query": "nicotinamide exercise performance",
             "shards_searched": 1525,

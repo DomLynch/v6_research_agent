@@ -784,6 +784,7 @@ def _topics() -> tuple[str, ...]:
 
 def _cache_topics() -> tuple[str, ...]:
     limit = max(0, _int_env("V6_DAEMON_MAX_CACHE_TOPICS", 25))
+    result_limit = _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
     topics: list[str] = []
     for cache_dir in _cache_dirs():
         for path in Path(cache_dir).glob("*.json"):
@@ -800,7 +801,9 @@ def _cache_topics() -> tuple[str, ...]:
                 and _int(receipt.get("sweep_failed_shards")) == 0
                 and _int(receipt.get("source_count_searched")) >= 5
             ):
-                topics.append(str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip())
+                topic = str(receipt.get("sweep_original_query") or receipt.get("sweep_query") or "").strip()
+                if topic and completed_cached_result(topic, limit=result_limit) is not None:
+                    topics.append(topic)
     return tuple(dict.fromkeys(topic for topic in topics if topic))[:limit]
 
 
