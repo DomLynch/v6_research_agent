@@ -130,7 +130,9 @@ _ENDPOINT_FAMILIES = {
 }
 _TISSUE_FAMILIES = {
     "gut": frozenset({"colon", "gastrointestinal", "gut", "intestinal", "intestine"}),
+    "colorectal": frozenset({"adenoma", "adenomas", "colorectal"}),
     "muscle": frozenset({"muscle", "myotube", "skeletal"}),
+    "prostate": frozenset({"prostate"}),
     "vascular": frozenset({"arterial", "artery", "blood", "cardiovascular", "heart", "vascular"}),
     "brain": frozenset({"brain", "cognition", "cognitive", "neural", "neuronal"}),
     "liver": frozenset({"hepatic", "liver"}),
@@ -382,6 +384,8 @@ def _receipt_hygiene_reject(
         return "reject:concordant_null_pair"
     if _same_trial_no_contrast_pair(a, b):
         return "reject:same_trial_no_contrast"
+    if _same_trial_endpoint_drift_pair(a, b):
+        return "reject:same_trial_endpoint_drift"
     if _repository_receipt(a) or _repository_receipt(b):
         return "reject:repository_receipt"
     if _nonprimary(a) or _nonprimary(b):
@@ -475,6 +479,13 @@ def _same_trial_no_contrast_pair(a: Paper, b: Paper) -> bool:
     if terms & _TRIAL_CONTRAST_TERMS:
         return False
     return _trial_null_result(a) and _trial_null_result(b)
+
+
+def _same_trial_endpoint_drift_pair(a: Paper, b: Paper) -> bool:
+    shared = _trial_acronyms(a) & _trial_acronyms(b)
+    left = _tissue_families(a)
+    right = _tissue_families(b)
+    return bool(shared and _mentions_trial(a) and _mentions_trial(b) and left and right and left != right)
 
 
 def _trial_acronyms(paper: Paper) -> set[str]:

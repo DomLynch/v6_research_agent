@@ -569,6 +569,32 @@ def test_rejects_same_trial_null_receipts_without_actual_contrast() -> None:
     assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
 
 
+def test_rejects_same_trial_cross_organ_endpoint_split() -> None:
+    papers = (
+        Paper(
+            "select-prostate",
+            "Difference in Association of Obesity With Prostate Cancer Risk Between US African American and Non-Hispanic White Men in the Selenium and Vitamin E Cancer Prevention Trial (SELECT)",
+            "Obesity was more strongly associated with prostate cancer risk among African American men in SELECT.",
+            "openalex",
+            2015,
+            "10.1001/jamaoncol.2015.0513",
+        ),
+        Paper(
+            "select-colorectal",
+            "Colorectal Adenomas in Participants of the SELECT Randomized Trial of Selenium and Vitamin E for Prostate Cancer Prevention.",
+            "Adenomas occurred at similar rates in participants whose intervention included or did not include selenium.",
+            "pubmed",
+            2017,
+            "10.1158/1940-6207.capr-16-0104",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"})
+
+    assert any("reject:same_trial_endpoint_drift" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
+
+
 def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     papers = (
         Paper(
