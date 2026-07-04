@@ -2941,6 +2941,45 @@ def test_writer_stays_receipt_owned() -> None:
     assert "finding:" in memo
 
 
+def test_template_writer_names_actual_results_not_shape_label() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper(
+                "a",
+                "Dose-Response of Creatine Supplementation on Cognitive Function in Healthy Young Adults",
+                "Results showed creatine supplementation did not improve cognitive function in healthy young adults.",
+                "openalex",
+                2023,
+                "10.3390/brainsci13091276",
+            ),
+            Paper(
+                "b",
+                "Creatine and resistance training in older adults",
+                "The trial reported improved strength outcomes in older adults when creatine was combined with resistance training.",
+                "pubmed",
+                2022,
+                "10.1000/creatine-older",
+            ),
+            ("creatine", "cognitive", "function"),
+            (),
+        ),
+        100,
+        "subgroup_endpoint_split",
+        "Receipt 1 made us expect creatine would generalize across the target population.",
+        (),
+    )
+
+    memo = render_memo(scored)
+    alpha = next(line for line in memo.splitlines() if line.startswith("**One-sentence alpha:**"))
+
+    assert "healthy young adults" in alpha
+    assert "older adults" in alpha
+    assert "population/endpoint split" in memo
+    assert "subgroup_endpoint_split" not in memo
+    assert "Receipt 1 made us expect" not in memo
+    assert "Do not generalize beyond the receipt populations" in memo
+
+
 def test_score_rejects_title_only_receipts() -> None:
     papers = (
         Paper(
@@ -3171,6 +3210,50 @@ def test_memo_validator_blocks_overclaim_title_and_grammar_fragment() -> None:
 
     assert "title_overclaim" in issues
     assert "grammar_fragment" in issues
+
+
+def test_memo_validator_blocks_generic_shape_alpha() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper(
+                "a",
+                "Creatine improves cognition in adults",
+                "Results showed creatine improved one cognitive endpoint in adults.",
+                "openalex",
+                doi="10.demo/creatine-a",
+            ),
+            Paper(
+                "b",
+                "Creatine did not improve cognition in older adults",
+                "Results showed creatine did not improve the primary cognition endpoint in older adults.",
+                "pubmed",
+                doi="10.demo/creatine-b",
+            ),
+            ("creatine", "cognition"),
+            (),
+        ),
+        100,
+        "subgroup_endpoint_split",
+        "update",
+        (),
+    )
+    memo = """# Alpha memo: creatine cognition endpoint split
+
+**One-sentence alpha:** Receipt 1 made us expect creatine would generalize; Receipt 2 forces the update that the response may be baseline-, subgroup-, or endpoint-gated.
+
+**Receipt 1:** Creatine improves cognition in adults | finding: Results showed creatine improved one cognitive endpoint in adults.
+
+**Receipt 2:** Creatine did not improve cognition in older adults | finding: Results showed creatine did not improve the primary cognition endpoint in older adults.
+
+**Why this is surprising:** The receipts differ.
+
+**Caveats/falsifiers:**
+- Reject if later trials isolate a direct benefit.
+"""
+
+    issues = v6_write.validate_memo_against_pair(memo, scored)
+
+    assert "generic_alpha" in issues
 
 
 def test_expectation_sentence_uses_receipt_labels_not_raw_titles() -> None:
@@ -5269,6 +5352,53 @@ def test_daemon_retries_terminal_reviewer_revise_with_notes(monkeypatch: pytest.
     notes = row["revision_notes"]
     assert isinstance(notes, tuple)
     assert "editorial decision is terminal" in notes[0]
+
+
+def test_daemon_retries_reviewer_reject_when_resubmission_allowed(tmp_path: Path) -> None:
+    row: dict[str, object] = {
+        "generated": True,
+        "submitted": True,
+        "submission_id": "sub-reject",
+    }
+
+    class RejectPublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError(f"reject poll should not submit: {path} {payload}")
+
+        def get(self, path: str) -> dict[str, object]:
+            assert path == "/submissions/sub-reject/decision"
+            return {
+                "ok": True,
+                "json": {
+                    "status": "complete",
+                    "decision": "reject",
+                    "failure_stage": "reviewer_panel",
+                    "gate_failures": [],
+                    "failed_checks": [],
+                    "required_revisions": ["State the actual research signal."],
+                    "major_issues": ["The one-sentence alpha is meta-commentary."],
+                    "resubmission": {"allowed": True, "parent_submission_id": "sub-reject"},
+                },
+            }
+
+    v6_daemon._run_topic(
+        tmp_path,
+        "creatine cognitive function older adults",
+        "agent-v6",
+        cast(FullrawSearchClient, DemoClient()),
+        cast(v6_daemon.Publisher, RejectPublisher()),
+        row,
+    )
+
+    assert row["revision_retry_count"] == 1
+    assert row["revision_of_object_id"] == "sub-reject"
+    assert row["revision_notes"] == (
+        "State the actual research signal.",
+        "The one-sentence alpha is meta-commentary.",
+    )
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert "blocked_final" not in row
 
 
 def test_live_service_config_uses_wider_strict_search() -> None:

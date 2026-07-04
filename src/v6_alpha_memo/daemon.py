@@ -23,7 +23,7 @@ _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 38
 _QUERY_SHAPE_VERSION = 10
-_WRITER_VERSION = 14
+_WRITER_VERSION = 15
 
 
 @dataclass(frozen=True, slots=True)
@@ -747,9 +747,24 @@ def _rows(board: dict[str, object], topics: tuple[str, ...]) -> list[dict[str, o
 
 
 def _retryable_revision(data: dict[str, object]) -> bool:
+    decision = data.get("decision")
+    resubmission = data.get("resubmission")
+    resubmission_allowed = isinstance(resubmission, dict) and resubmission.get("allowed") is True
+    has_revision_notes = any(
+        isinstance(data.get(key), list) and bool(data.get(key))
+        for key in ("required_revisions", "major_issues", "minor_issues", "notes")
+    )
     return (
         data.get("status") in {None, "complete"}
-        and data.get("decision") == "revise"
+        and (
+            decision == "revise"
+            or (
+                decision == "reject"
+                and resubmission_allowed
+                and has_revision_notes
+                and data.get("failure_stage") == "reviewer_panel"
+            )
+        )
         and not data.get("gate_failures")
         and not data.get("failed_checks")
         and data.get("failure_stage") != "intake_gate"
