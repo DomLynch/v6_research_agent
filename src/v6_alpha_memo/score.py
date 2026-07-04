@@ -386,8 +386,12 @@ def _receipt_hygiene_reject(
         return "reject:same_trial_no_contrast"
     if _same_trial_endpoint_drift_pair(a, b):
         return "reject:same_trial_endpoint_drift"
+    if _same_trial_risk_modifier_drift_pair(a, b):
+        return "reject:same_trial_risk_modifier_drift"
     if _repository_receipt(a) or _repository_receipt(b):
         return "reject:repository_receipt"
+    if _question_title_without_result(a) or _question_title_without_result(b):
+        return "reject:question_title_without_result"
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
     if _comparator_only_anchor(a, anchors, topic_terms) or _comparator_only_anchor(b, anchors, topic_terms):
@@ -450,6 +454,10 @@ def _nonprimary(paper: Paper) -> bool:
     )
 
 
+def _question_title_without_result(paper: Paper) -> bool:
+    return paper.title.strip().endswith("?") and not _abstract_reports_result(paper)
+
+
 def _supplement_receipt(paper: Paper) -> bool:
     text = paper.text.casefold().replace("-", "_")
     doi = paper.doi.casefold()
@@ -486,6 +494,25 @@ def _same_trial_endpoint_drift_pair(a: Paper, b: Paper) -> bool:
     left = _tissue_families(a)
     right = _tissue_families(b)
     return bool(shared and _mentions_trial(a) and _mentions_trial(b) and left and right and left != right)
+
+
+def _same_trial_risk_modifier_drift_pair(a: Paper, b: Paper) -> bool:
+    shared = _trial_acronyms(a) & _trial_acronyms(b)
+    return bool(
+        shared
+        and _mentions_trial(a)
+        and _mentions_trial(b)
+        and (_risk_modifier_receipt(a) != _risk_modifier_receipt(b))
+    )
+
+
+def _risk_modifier_receipt(paper: Paper) -> bool:
+    title = paper.title.casefold()
+    return bool(
+        re.search(r"\bassociation of\b.{0,80}\brisk\b", title)
+        or re.search(r"\brisk between\b", title)
+        or re.search(r"\b(?:modifier|modifies|stratified by|interaction)\b", title)
+    )
 
 
 def _trial_acronyms(paper: Paper) -> set[str]:
