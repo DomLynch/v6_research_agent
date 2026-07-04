@@ -129,6 +129,7 @@ _ENDPOINT_FAMILIES = {
     "inflammation": frozenset({"inflammation", "inflammatory", "oxidative", "stress"}),
 }
 _TISSUE_FAMILIES = {
+    "bladder": frozenset({"bladder", "urothelial"}),
     "gut": frozenset({"colon", "gastrointestinal", "gut", "intestinal", "intestine"}),
     "colorectal": frozenset({"adenoma", "adenomas", "colorectal"}),
     "muscle": frozenset({"muscle", "myotube", "skeletal"}),
@@ -384,6 +385,8 @@ def _receipt_hygiene_reject(
         return "reject:concordant_null_pair"
     if _same_trial_no_contrast_pair(a, b):
         return "reject:same_trial_no_contrast"
+    if _same_trial_biomarker_intervention_drift_pair(a, b):
+        return "reject:same_trial_biomarker_intervention_drift"
     if _same_trial_endpoint_drift_pair(a, b):
         return "reject:same_trial_endpoint_drift"
     if _same_trial_risk_modifier_drift_pair(a, b):
@@ -489,6 +492,19 @@ def _same_trial_no_contrast_pair(a: Paper, b: Paper) -> bool:
     return _trial_null_result(a) and _trial_null_result(b)
 
 
+def _same_trial_biomarker_intervention_drift_pair(a: Paper, b: Paper) -> bool:
+    shared = _trial_acronyms(a) & _trial_acronyms(b)
+    left_biomarker = _biomarker_association_receipt(a)
+    right_biomarker = _biomarker_association_receipt(b)
+    return bool(
+        shared
+        and _mentions_trial(a)
+        and _mentions_trial(b)
+        and left_biomarker != right_biomarker
+        and (_intervention_arm_receipt(a) or _intervention_arm_receipt(b))
+    )
+
+
 def _same_trial_endpoint_drift_pair(a: Paper, b: Paper) -> bool:
     shared = _trial_acronyms(a) & _trial_acronyms(b)
     left = _tissue_families(a)
@@ -512,6 +528,25 @@ def _risk_modifier_receipt(paper: Paper) -> bool:
         re.search(r"\bassociation of\b.{0,80}\brisk\b", title)
         or re.search(r"\brisk between\b", title)
         or re.search(r"\b(?:modifier|modifies|stratified by|interaction)\b", title)
+    )
+
+
+def _biomarker_association_receipt(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    has_biomarker = bool(_title_terms(paper) & (_PK_ENDPOINT | {"biomarker", "biomarkers", "serum"}))
+    has_association = bool(
+        re.search(r"\b(?:association|associated|case[- ]cohort|cohort|hazard ratio|risk)\b", text)
+    )
+    return has_biomarker and has_association
+
+
+def _intervention_arm_receipt(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return bool(
+        re.search(
+            r"\b(?:arm|arms|placebo|randomi[sz]ed|supplementation|treatment|intervention)\b",
+            text,
+        )
     )
 
 

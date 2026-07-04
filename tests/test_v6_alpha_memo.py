@@ -617,6 +617,34 @@ def test_rejects_same_trial_risk_modifier_as_intervention_split() -> None:
     assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
 
 
+def test_rejects_same_trial_biomarker_vs_intervention_endpoint_split() -> None:
+    papers = (
+        Paper(
+            "select-biomarker",
+            "Plasma Tocopherols and Risk of Prostate Cancer in the Selenium and Vitamin E Cancer Prevention Trial (SELECT)",
+            (
+                "The SELECT case-cohort analysis examined presupplementation plasma tocopherol "
+                "concentrations and prostate cancer risk by hazard ratio."
+            ),
+            "openalex",
+        ),
+        Paper(
+            "select-arm",
+            "Evaluation of vitamin E and selenium supplementation for the prevention of bladder cancer in SWOG coordinated SELECT",
+            (
+                "The SELECT randomized trial compared placebo, vitamin E, selenium, and combination "
+                "arms for bladder cancer incidence."
+            ),
+            "pubmed",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "cancer"})
+
+    assert any("reject:same_trial_biomarker_intervention_drift" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "cancer"}) == ()
+
+
 def test_rejects_question_title_without_observed_result() -> None:
     papers = (
         Paper(
