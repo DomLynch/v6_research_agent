@@ -151,8 +151,9 @@ _NUTRITION_PROTEIN_PHRASES = (
 )
 _TRAINING_TOPIC_TERMS = frozenset({"adaptation", "exercise", "physical", "resistance", "strength", "training"})
 _TRIAL_CONTRAST_TERMS = frozenset({
-    "biomarker", "cognitive", "endpoint", "genetic", "genotype", "modifier",
-    "renal", "secondary", "stratified", "subgroup", "variant",
+    "african", "biomarker", "cognitive", "endpoint", "ethnic", "ethnicity",
+    "genetic", "genotype", "modifier", "obesity", "race", "racial", "renal",
+    "secondary", "stratified", "subgroup", "variant", "white",
 })
 
 
@@ -470,7 +471,7 @@ def _same_trial_no_contrast_pair(a: Paper, b: Paper) -> bool:
         return False
     if not (_mentions_trial(a) and _mentions_trial(b)):
         return False
-    terms = _tokens(a) ^ _tokens(b)
+    terms = _title_terms(a) ^ _title_terms(b)
     if terms & _TRIAL_CONTRAST_TERMS:
         return False
     return _trial_null_result(a) and _trial_null_result(b)
