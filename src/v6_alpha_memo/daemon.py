@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from v6_alpha_memo.run import NoMemoError, V6Run, _best_receipt, build_memo
 from v6_alpha_memo.score import ScoredPair
-from v6_alpha_memo.search import FullrawSearchClient, Paper
+from v6_alpha_memo.search import FullrawSearchClient, Paper, completed_cached_result
 from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_against_pair
 
 _DEFAULT_QUERY_LIMIT = 5
@@ -469,10 +469,12 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
             and (row.get("generated") or row.get("pending_payload") or row.get("blocked_stage") == "submit_backoff")
         )
     ]
+    cache_ready = _cache_ready_topics(searchable)
     indexed = list(enumerate(searchable))
     ranked = sorted(
         indexed,
         key=lambda item: (
+            str(item[1].get("topic")) not in cache_ready,
             _waiting_rank(item[1]),
             _side_waiting_row(item[1]),
             -_int(item[1].get("wait_shards")),
@@ -482,6 +484,16 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
         ),
     )
     return [*submitted, *(row for _, row in ranked[:active_limit])]
+
+
+def _cache_ready_topics(rows: list[dict[str, object]]) -> set[str]:
+    limit = _int_env("V6_DAEMON_PER_QUERY_LIMIT", _DEFAULT_PER_QUERY_LIMIT)
+    ready: set[str] = set()
+    for row in rows:
+        topic = str(row.get("topic") or "")
+        if topic and completed_cached_result(topic, limit=limit) is not None:
+            ready.add(topic)
+    return ready
 
 
 def _waiting_rank(row: dict[str, object]) -> int:

@@ -390,6 +390,10 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
     return SearchResult(query=query, papers=papers, receipt=ranked[0].receipt)
 
 
+def completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
+    return _completed_cached_result(query, limit=limit)
+
+
 def _result_rank(result: SearchResult) -> tuple[int, int]:
     return (len(result.papers), sum(_paper_rank(paper) for paper in result.papers))
 
