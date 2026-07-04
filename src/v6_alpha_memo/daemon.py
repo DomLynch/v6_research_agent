@@ -472,15 +472,21 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
     ranked = sorted(
         indexed,
         key=lambda item: (
-            item[1].get("blocked_stage") == "search_cache_waiting",
+            _waiting_rank(item[1]),
             _side_waiting_row(item[1]),
-            _stale_waiting_row(item[1]),
+            -_int(item[1].get("wait_shards")),
             -_int(item[1].get("top_score")),
             not _attempt_count(item[1]),
             item[0],
         ),
     )
     return [*submitted, *(row for _, row in ranked[:active_limit])]
+
+
+def _waiting_rank(row: dict[str, object]) -> int:
+    if row.get("blocked_stage") != "search_cache_waiting":
+        return 1
+    return 2 if _stale_waiting_row(row) else 0
 
 
 def _refresh_submit_blocker(board: dict[str, object], rows: list[dict[str, object]], topics: tuple[str, ...]) -> int:

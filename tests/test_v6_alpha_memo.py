@@ -4627,7 +4627,7 @@ def test_daemon_cache_topics_reads_strict_completed_primary_cache(
     assert v6_daemon._cache_topics() == ("resveratrol blunts exercise training", "nicotinamide exercise performance")
 
 
-def test_daemon_runs_open_row_before_current_waiting_row(
+def test_daemon_continues_current_waiting_row_before_open_row(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     seen: list[str] = []
@@ -4649,6 +4649,8 @@ def test_daemon_runs_open_row_before_current_waiting_row(
                 "per_query_limit": 20,
                 "query_shape_version": v6_daemon._QUERY_SHAPE_VERSION,
                 "selector_version": v6_daemon._SELECTOR_VERSION,
+                "wait_shards": 1200,
+                "wait_stale_count": 0,
                 "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 1200}]},
             },
             {
@@ -4662,7 +4664,7 @@ def test_daemon_runs_open_row_before_current_waiting_row(
 
     v6_daemon._run_pass(tmp_path, ("creatine cognitive function older adults", "vitamin d fracture randomized trial older adults"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
 
-    assert seen == ["vitamin d fracture randomized trial older adults"]
+    assert seen == ["creatine cognitive function older adults"]
 
 
 def test_daemon_rotates_side_waiting_high_score_behind_regular_waiting_row(
