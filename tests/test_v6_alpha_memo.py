@@ -5512,12 +5512,12 @@ def test_daemon_retries_reviewer_reject_when_resubmission_allowed(tmp_path: Path
     assert "blocked_final" not in row
 
 
-def test_live_service_config_uses_wider_strict_search() -> None:
+def test_live_service_config_uses_focused_strict_search() -> None:
     text = Path("deploy/v6-alpha-memo-live.service").read_text()
 
     assert "Environment=V6_DAEMON_MIN_SCORE=85" in text
-    assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=12" in text
-    assert "Environment=V6_DAEMON_MAX_WAITING=12" in text
+    assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=2" in text
+    assert "Environment=V6_DAEMON_MAX_WAITING=2" in text
     assert "Environment=V6_DAEMON_QUERY_LIMIT=2" in text
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
@@ -5535,6 +5535,7 @@ def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
         assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=128" in text
         assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=4" in text
         assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=72" in text
+    assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=180" in service
 
 
 def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

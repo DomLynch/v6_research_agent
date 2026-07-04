@@ -306,27 +306,27 @@ ssh -i ~/.ssh/binance_futures_tool root@100.96.74.1 'python3 -m json.tool /var/l
 ```bash
 cd /Users/domininclynch/Desktop/Business/v6_research_agent
 git status --short
-git push origin codex/019ef325/main
+git push origin HEAD:v6-live
 
 ssh -i ~/.ssh/binance_futures_tool root@100.96.74.1 '
   set -e
   cd /opt/v6-research-agent
-  git fetch origin codex/019ef325/main
-  git checkout codex/019ef325/main
-  git reset --hard FETCH_HEAD
+  git fetch origin v6-live
+  git checkout v6-live
+  git pull --ff-only origin v6-live
   python3 -m pytest tests/test_v6_alpha_memo.py -q
   .venv/bin/ruff check src tests
   .venv/bin/mypy src tests/test_v6_alpha_memo.py
   install -m 0644 deploy/v6-alpha-memo-live.service /etc/systemd/system/v6-alpha-memo-live.service
-  install -m 0644 deploy/v6-fullraw-search.service /etc/systemd/system/v6-fullraw-search.service
   systemctl daemon-reload
-  systemctl restart v6-fullraw-search.service
   systemctl restart v6-alpha-memo-live.service
-  systemctl is-active v6-fullraw-search.service
   systemctl is-active v6-alpha-memo-live.service
+  systemctl is-active v6-fullraw-search.service
 '
 ```
 
+Do not restart `v6-fullraw-search.service` during normal V6 code deploys; its strict sweeps need uninterrupted runtime.
+Only install/restart `deploy/v6-fullraw-search.service` during an explicit fullraw config deploy window.
 Do not restart or edit V3/V4/V5 services as part of V6 work.
 
 ## Recommended GPT Pro Audit Prompt
