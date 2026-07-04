@@ -4849,6 +4849,51 @@ def test_daemon_keeps_low_progress_stale_wait_before_queued_waiter(
     assert [row["topic"] for row in selected] == ["ILLUMINATE torcetrapib mortality cardiovascular outcomes"]
 
 
+def test_daemon_refreshes_wait_progress_from_primary_cache(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "accord.json").write_text(json.dumps({
+        "hits": [{"title": "A"}],
+        "receipt": {
+            "sweep_original_query": "ACCORD intensive glucose control mortality type 2 diabetes",
+            "sweep_query": "ACCORD intensive glucose control mortality type 2 diabetes",
+            "shards_searched": 512,
+            "shards_total": 1525,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "CARET beta carotene lung cancer smokers prevention trial",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 217,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 217}]},
+        },
+        {
+            "topic": "ACCORD intensive glucose control mortality type 2 diabetes",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 128,
+            "wait_stale_count": 5,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 128}]},
+        },
+    ]
+    topics = (
+        "CARET beta carotene lung cancer smokers prevention trial",
+        "ACCORD intensive glucose control mortality type 2 diabetes",
+    )
+
+    v6_daemon._refresh_wait_progress_from_cache(rows, topics)
+    selected = v6_daemon._candidate_rows(rows, topics)
+
+    assert rows[1]["wait_shards"] == 512
+    assert rows[1]["wait_stale_count"] == 0
+    assert [row["topic"] for row in selected] == ["ACCORD intensive glucose control mortality type 2 diabetes"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 

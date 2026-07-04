@@ -131,6 +131,7 @@ def _run_pass(
             for key in ("top_score", "top_shape", "paper_count", "pair_count", "scored_count"):
                 row.pop(key, None)
     _sync_submit_blocker(board, rows, topics)
+    _refresh_wait_progress_from_cache(rows, topics)
     waiting = 0
     max_waiting = int(os.environ.get("V6_DAEMON_MAX_WAITING", "3"))
     for row in _candidate_rows(rows, topics):
@@ -489,6 +490,60 @@ def _waiting_rank(row: dict[str, object]) -> int:
     if _stale_waiting_row(row) and _int(row.get("wait_shards")) >= _int_env("V6_DAEMON_STALE_WAIT_ROTATE_MIN_SHARDS", 1000):
         return 3
     return 0 if _int(row.get("wait_shards")) else 1
+
+
+def _refresh_wait_progress_from_cache(rows: list[dict[str, object]], topics: tuple[str, ...]) -> None:
+    progress = _cache_wait_progress(topics)
+    for row in rows:
+        if row.get("blocked_stage") != "search_cache_waiting":
+            continue
+        shards = progress.get(str(row.get("topic")))
+        if shards and shards > _int(row.get("wait_shards")):
+            row["wait_shards"] = shards
+            row["wait_stale_count"] = 0
+
+
+def _cache_wait_progress(topics: tuple[str, ...]) -> dict[str, int]:
+    active_topics = set(topics)
+    progress: dict[str, int] = {}
+    for cache_dir in _progress_cache_dirs():
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            receipt = data.get("receipt") if isinstance(data, dict) else {}
+            receipt = receipt if isinstance(receipt, dict) else {}
+            shards = _int(receipt.get("shards_searched"))
+            if not shards:
+                continue
+            for query in _receipt_queries(receipt):
+                for topic in active_topics:
+                    if _cache_query_matches_topic(query, topic):
+                        progress[topic] = max(progress.get(topic, 0), shards)
+    return progress
+
+
+def _progress_cache_dirs() -> tuple[str, ...]:
+    raw = ",".join((
+        os.environ.get("V6_FULLRAW_SWEEP_CACHE_DIR", ""),
+        os.environ.get("RESEARKA_FULLRAW_SWEEP_CACHE_DIR", ""),
+    ))
+    return tuple(dict.fromkeys(path.strip() for path in re.split(r"[:,]", raw) if path.strip()))
+
+
+def _receipt_queries(receipt: dict[str, object]) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            str(receipt.get(key) or "").strip()
+            for key in ("sweep_original_query", "sweep_query")
+            if str(receipt.get(key) or "").strip()
+        )
+    )
+
+
+def _cache_query_matches_topic(query: str, topic: str) -> bool:
+    return query == topic or query.startswith(f"{topic} ")
 
 
 def _refresh_submit_blocker(board: dict[str, object], rows: list[dict[str, object]], topics: tuple[str, ...]) -> int:
