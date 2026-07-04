@@ -37,24 +37,30 @@ _GRAMMAR_FRAGMENT = re.compile(r"\b(?:he|she|it|they)\s+made\s+us\s+expect\b", f
 def render_memo(scored: ScoredPair, *, receipt: CoverageReceipt | None = None) -> str:
     pair = scored.pair
     title = _title(scored)
+    relation = _public_relation(scored.shape)
+    alpha = _alpha_sentence(scored)
+    why = (
+        f"Receipt 1 reports {_brief_finding(pair.a, 220)}; Receipt 2 reports "
+        f"{_brief_finding(pair.b, 220)}. The bounded signal is a {relation} "
+        f"over `{', '.join(pair.anchors[:3])}`; it is not a broad efficacy claim."
+    )
     lines = [
         f"# {title}",
         "",
-        f"**One-sentence alpha:** {scored.expectation_update}",
+        f"**One-sentence alpha:** {alpha}",
         "",
         f"**Receipt 1:** {_receipt_line(pair.a)}",
         "",
         f"**Receipt 2:** {_receipt_line(pair.b)}",
         "",
-        f"**Why this is surprising:** The pair has `{scored.shape}` geometry over "
-        f"`{', '.join(pair.anchors[:3])}` rather than a broad literature-summary bridge.",
+        f"**Why this is surprising:** {why}",
     ]
     lines.extend([
         "",
         "**Caveats/falsifiers:**",
-        "- Reject if the shared anchor is not the same construct/intervention in the full text.",
-        "- Reject if later receipts show the apparent reversal is only population, dose, or measurement noise.",
-        "- Reject if either receipt is a review, case-only report, or keyword-only match.",
+        "- Do not generalize beyond the receipt populations, doses, durations, and endpoint definitions.",
+        "- Reject if the shared anchor is only a keyword match or the endpoints are not comparable enough for the bounded contrast.",
+        "- Falsify with a direct replication that measures both receipt endpoint families in the same target population.",
     ])
     return "\n".join(lines).strip() + "\n"
 
@@ -174,6 +180,42 @@ def _receipt_line(paper: Paper) -> str:
     return " | ".join(bits)
 
 
+def _alpha_sentence(scored: ScoredPair) -> str:
+    pair = scored.pair
+    return (
+        f"Receipt 1 reports {_brief_finding(pair.a, 150)}; Receipt 2 reports "
+        f"{_brief_finding(pair.b, 150)}, so the claim is a bounded "
+        f"{_public_relation(scored.shape)} rather than a general effect claim."
+    )
+
+
+def _public_relation(shape: str) -> str:
+    return {
+        "mechanism_to_human_failure": "cross-context evidence signal",
+        "modality_boundary": "modality boundary",
+        "promise_reversal": "context boundary",
+        "protocol_result_mismatch": "protocol-to-result boundary",
+        "subgroup_endpoint_split": "population/endpoint split",
+        "translation_boundary": "cross-context signal",
+    }.get(shape, "evidence boundary")
+
+
+def _brief_finding(paper: Paper, max_chars: int) -> str:
+    abstract = " ".join(paper.abstract.split())
+    if not abstract:
+        return f"the title-level signal in {paper.title}"
+    sentences = re.split(r"(?<=[.!?])\s+", abstract)
+    markers = (
+        "demonstrated", "did not", "failed", "found", "no significant",
+        "observed", "reported", "resulted", "showed", "significant",
+    )
+    chosen = next((sentence for sentence in sentences if any(marker in sentence.casefold() for marker in markers)), sentences[0])
+    if len(chosen) <= max_chars:
+        return chosen.rstrip(".")
+    trimmed = chosen[: max_chars + 1].rsplit(" ", 1)[0].rstrip(" ,;:.")
+    return trimmed + "..."
+
+
 def _uses_selected_receipts(memo: str, scored: ScoredPair) -> bool:
     text = _compact(memo)
     return _compact(scored.pair.a.title) in text and _compact(scored.pair.b.title) in text
@@ -188,6 +230,8 @@ def validate_memo_against_pair(memo: str, scored: ScoredPair) -> tuple[str, ...]
         issues.append("title_overclaim")
     if _grammar_fragment(memo):
         issues.append("grammar_fragment")
+    if _generic_alpha(memo):
+        issues.append("generic_alpha")
     if not _uses_selected_receipts(memo, scored):
         issues.append("selected_receipt_title_missing")
     bundled = {_normalize_doi(doi) for doi in (scored.pair.a.doi, scored.pair.b.doi) if doi}
@@ -210,6 +254,23 @@ def _title_overclaims(title: str) -> bool:
 
 def _grammar_fragment(memo: str) -> bool:
     return bool(_GRAMMAR_FRAGMENT.search(memo))
+
+
+def _generic_alpha(memo: str) -> bool:
+    alpha = ""
+    for line in memo.splitlines():
+        if line.startswith("**One-sentence alpha:**"):
+            alpha = line.split(":**", 1)[-1].strip().casefold()
+            break
+    return bool(
+        alpha
+        and (
+            "receipt 1 made us expect" in alpha
+            or "response may be baseline-, subgroup-, or endpoint-gated" in alpha
+            or "same anchor can fail, reverse, or split by context" in alpha
+            or "would travel cleanly as a positive signal" in alpha
+        )
+    )
 
 
 def _compact(value: str) -> str:
@@ -287,7 +348,9 @@ def _prompt(pairs: tuple[ScoredPair, ...], revision_notes: tuple[str, ...] = ())
         "Title must combine the shared "
         "receipt anchor with a relationship noun such as boundary or split; do not use internal "
         "scorer labels such as protocol mismatch, and do not use "
-        "a bare topic title. Mention small sample sizes "
+        "a bare topic title. The one-sentence alpha must name the concrete result from both "
+        "receipts; do not write a meta sentence saying the response may be gated unless the "
+        "population, endpoint, and direction are named from the supplied abstracts. Mention small sample sizes "
         "Do not call receipts matched unless the supplied title or abstract uses matched. "
         "when the supplied receipt gives them. Prefer context-dependent to age-moderated or "
         "deficiency-moderated unless the receipts directly isolate that moderator. "
