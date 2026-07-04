@@ -4819,6 +4819,36 @@ def test_daemon_stale_wait_deprioritizes_waiting_candidate(
     assert [row["topic"] for row in selected] == ["vitamin d fracture randomized trial older adults"]
 
 
+def test_daemon_keeps_low_progress_stale_wait_before_queued_waiter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "ILLUMINATE torcetrapib mortality cardiovascular outcomes",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 128,
+            "wait_stale_count": 2,
+            "trace": {"coverage": [{"error": "async_sweep_running", "shards_searched": 128}]},
+        },
+        {
+            "topic": "CHOIR erythropoietin hemoglobin target chronic kidney disease cardiovascular events",
+            "blocked_stage": "search_cache_waiting",
+            "trace": {"coverage": [{"error": "async_sweep_queued"}]},
+        },
+    ]
+
+    selected = v6_daemon._candidate_rows(
+        rows,
+        (
+            "ILLUMINATE torcetrapib mortality cardiovascular outcomes",
+            "CHOIR erythropoietin hemoglobin target chronic kidney disease cardiovascular events",
+        ),
+    )
+
+    assert [row["topic"] for row in selected] == ["ILLUMINATE torcetrapib mortality cardiovascular outcomes"]
+
+
 def test_daemon_reopens_stale_final_side_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
 

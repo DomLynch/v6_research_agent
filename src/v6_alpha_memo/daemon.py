@@ -485,8 +485,10 @@ def _candidate_rows(rows: list[dict[str, object]], topics: tuple[str, ...]) -> l
 
 def _waiting_rank(row: dict[str, object]) -> int:
     if row.get("blocked_stage") != "search_cache_waiting":
-        return 1
-    return 2 if _stale_waiting_row(row) else 0
+        return 2
+    if _stale_waiting_row(row) and _int(row.get("wait_shards")) >= _int_env("V6_DAEMON_STALE_WAIT_ROTATE_MIN_SHARDS", 1000):
+        return 3
+    return 0 if _int(row.get("wait_shards")) else 1
 
 
 def _refresh_submit_blocker(board: dict[str, object], rows: list[dict[str, object]], topics: tuple[str, ...]) -> int:
