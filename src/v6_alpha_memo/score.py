@@ -150,6 +150,10 @@ _NUTRITION_PROTEIN_PHRASES = (
     "protein supplement", "protein supplementation", "whey protein",
 )
 _TRAINING_TOPIC_TERMS = frozenset({"adaptation", "exercise", "physical", "resistance", "strength", "training"})
+_TRIAL_CONTRAST_TERMS = frozenset({
+    "biomarker", "cognitive", "endpoint", "genetic", "genotype", "modifier",
+    "renal", "secondary", "stratified", "subgroup", "variant",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -375,6 +379,8 @@ def _receipt_hygiene_reject(
         return "reject:weak_statistical_signal"
     if _concordant_null_pair(a, b, anchors):
         return "reject:concordant_null_pair"
+    if _same_trial_no_contrast_pair(a, b):
+        return "reject:same_trial_no_contrast"
     if _repository_receipt(a) or _repository_receipt(b):
         return "reject:repository_receipt"
     if _nonprimary(a) or _nonprimary(b):
@@ -456,6 +462,38 @@ def _weak_stat_receipt(paper: Paper) -> bool:
 
 def _concordant_null_pair(a: Paper, b: Paper, anchors: tuple[str, ...]) -> bool:
     return _null_update_receipt(a, anchors) and _null_update_receipt(b, anchors)
+
+
+def _same_trial_no_contrast_pair(a: Paper, b: Paper) -> bool:
+    shared = _trial_acronyms(a) & _trial_acronyms(b)
+    if not shared:
+        return False
+    if not (_mentions_trial(a) and _mentions_trial(b)):
+        return False
+    terms = _tokens(a) ^ _tokens(b)
+    if terms & _TRIAL_CONTRAST_TERMS:
+        return False
+    return _trial_null_result(a) and _trial_null_result(b)
+
+
+def _trial_acronyms(paper: Paper) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"\b[A-Z][A-Z0-9-]{2,}\b", paper.text)
+        if token not in {"DOI", "HTTP", "HTTPS", "PMID"}
+    }
+
+
+def _mentions_trial(paper: Paper) -> bool:
+    return bool(re.search(r"\b(?:trial|study)\b", paper.text.casefold()))
+
+
+def _trial_null_result(paper: Paper) -> bool:
+    text = paper.text.casefold()
+    return _negative_result(paper) or any(
+        phrase in text
+        for phrase in ("neither", "no decline", "no reduction", "not reduce", "not reduced")
+    )
 
 
 def _null_update_receipt(paper: Paper, anchors: tuple[str, ...]) -> bool:

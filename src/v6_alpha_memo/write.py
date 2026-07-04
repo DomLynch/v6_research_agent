@@ -201,6 +201,10 @@ def _public_relation(shape: str) -> str:
 
 
 def _brief_finding(paper: Paper, max_chars: int) -> str:
+    return _finding_text(paper, max_chars)
+
+
+def _finding_text(paper: Paper, max_chars: int) -> str:
     abstract = " ".join(paper.abstract.split())
     if not abstract:
         return f"the title-level signal in {paper.title}"
@@ -209,11 +213,13 @@ def _brief_finding(paper: Paper, max_chars: int) -> str:
         "demonstrated", "did not", "failed", "found", "no significant",
         "observed", "reported", "resulted", "showed", "significant",
     )
-    chosen = next((sentence for sentence in sentences if any(marker in sentence.casefold() for marker in markers)), sentences[0])
+    marked = [sentence for sentence in sentences if any(marker in sentence.casefold() for marker in markers)]
+    candidates = [*marked, *sentences]
+    chosen = next((sentence for sentence in candidates if len(sentence) <= max_chars), candidates[0])
     if len(chosen) <= max_chars:
         return chosen.rstrip(".")
     trimmed = chosen[: max_chars + 1].rsplit(" ", 1)[0].rstrip(" ,;:.")
-    return trimmed + "..."
+    return f"{trimmed}."
 
 
 def _uses_selected_receipts(memo: str, scored: ScoredPair) -> bool:
@@ -407,7 +413,7 @@ def _paper_json(paper: Paper) -> dict[str, object]:
 
 
 def _finding(paper: Paper) -> str:
-    return " ".join(paper.abstract.split())[:700]
+    return _finding_text(paper, 700)
 
 
 def _valid_memo(text: str) -> bool:

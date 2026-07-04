@@ -537,6 +537,38 @@ def test_rejects_commentary_style_receipts_as_alpha_evidence() -> None:
     assert scored == ()
 
 
+def test_rejects_same_trial_null_receipts_without_actual_contrast() -> None:
+    papers = (
+        Paper(
+            "select-a",
+            "Selenium and Prostate Cancer Prevention: Insights from the Selenium and Vitamin E Cancer Prevention Trial (SELECT)",
+            (
+                "The Selenium and Vitamin E Cancer Prevention Trial (SELECT) found that neither selenium "
+                "nor vitamin E reduced prostate cancer incidence."
+            ),
+            "openalex",
+            2013,
+            "10.3390/nu5041122",
+        ),
+        Paper(
+            "select-b",
+            "The Outcome of Selenium and Vitamin E Cancer Prevention Trial (SELECT) reveals the need for better understanding of selenium biology.",
+            (
+                "The SELECT trial assessed selenium and vitamin E in prostate cancer prevention, "
+                "but SELECT found no decline in prostate cancer."
+            ),
+            "pubmed",
+            2009,
+            "10.1124/mi.9.1.6",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"})
+
+    assert any("reject:same_trial_no_contrast" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"select", "selenium", "vitamin", "prostate", "cancer"}) == ()
+
+
 def test_rejects_topic_drift_when_only_generic_title_anchor_matches() -> None:
     papers = (
         Paper(
@@ -3280,6 +3312,25 @@ def test_minimax_prompt_requires_receipt_findings() -> None:
     assert "Do not mention dose-equivalent scaling" in prompt
     assert "After Caveats/falsifiers, stop" in prompt
     assert '"finding"' in prompt
+
+
+def test_writer_finding_prefers_complete_result_sentence() -> None:
+    paper = Paper(
+        "long",
+        "Long receipt",
+        (
+            "This very long background sentence describes the trial rationale, enrolled population, intervention context, "
+            "endpoint hierarchy, baseline status, dosing assumptions, mechanistic expectations, and prior evidence in "
+            "enough detail that a short finding would otherwise be cut mid sentence. Results showed no significant "
+            "endpoint difference."
+        ),
+        "openalex",
+    )
+
+    finding = v6_write._brief_finding(paper, 120)
+
+    assert finding == "Results showed no significant endpoint difference"
+    assert "..." not in finding
 
 
 def test_minimax_memo_rejects_extra_paragraph_after_caveats() -> None:
