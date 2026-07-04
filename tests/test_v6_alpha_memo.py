@@ -2857,6 +2857,30 @@ def test_build_memo_stops_side_searches_after_second_elite_query_shape() -> None
     assert run.top_pairs[0].score >= 85
 
 
+def test_build_memo_can_stop_after_first_elite_query_shape(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class EliteFirstClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            papers = (
+                Paper("a", "Tool X improves benchmark accuracy in a mechanistic model", "The model showed tool x enhanced accuracy and improved performance.", "openalex", doi="10.1000/elite-a"),
+                Paper("b", "Tool X failed to improve human analyst decisions in a randomized field trial", "Human analysts using tool x had null results and reduced decision quality.", "semantic_scholar", doi="10.1000/elite-b"),
+            )
+            return SearchResult(query, papers, CoverageReceipt(hits=2, shards_searched=1525, shards_total=1525, source_count_searched=5))
+
+    client = EliteFirstClient()
+    monkeypatch.setenv("V6_MIN_QUERY_SHAPES_BEFORE_STOP", "1")
+    run = build_memo("tool x", client=client, query_limit=3)
+
+    assert client.queries == ["tool x"]
+    assert run.top_pairs[0].score >= 85
+
+
 def test_build_memo_rejects_doi_missing_elite_pairs() -> None:
     class MissingDoiClient:
         def search(self, query: str, *, limit: int = 25) -> SearchResult:
@@ -5584,6 +5608,7 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     assert "Environment=V6_DAEMON_QUERY_LIMIT=2" in text
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
+    assert "Environment=V6_MIN_QUERY_SHAPES_BEFORE_STOP=1" in text
     assert "Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=25" in text
     assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=1" in text
     assert "Environment=V6_DAEMON_MAX_CACHE_TOPICS=8" in text
