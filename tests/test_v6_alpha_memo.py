@@ -3332,6 +3332,22 @@ def test_writer_finding_prefers_complete_result_sentence() -> None:
     assert finding == "Results showed no significant endpoint difference"
     assert "..." not in finding
 
+    long_clause = Paper(
+        "clause",
+        "Long clause receipt",
+        (
+            "Obesity is more strongly associated with increased prostate cancer risk among African American "
+            "than non-Hispanic white men and reducing obesity among African American men could reduce the "
+            "racial disparity in cancer incidence."
+        ),
+        "openalex",
+    )
+
+    clipped = v6_write._brief_finding(long_clause, 150)
+
+    assert clipped.endswith("white men")
+    assert not clipped.endswith("among.")
+
 
 def test_minimax_memo_rejects_extra_paragraph_after_caveats() -> None:
     text = """# Alpha memo: resveratrol exercise training translation boundary

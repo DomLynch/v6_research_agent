@@ -218,7 +218,16 @@ def _finding_text(paper: Paper, max_chars: int) -> str:
     chosen = next((sentence for sentence in candidates if len(sentence) <= max_chars), candidates[0])
     if len(chosen) <= max_chars:
         return chosen.rstrip(".")
-    trimmed = chosen[: max_chars + 1].rsplit(" ", 1)[0].rstrip(" ,;:.")
+    prefix = chosen[: max_chars + 1]
+    for separator in ("; ", ", and ", " and "):
+        if separator not in prefix:
+            continue
+        clause = prefix.rsplit(separator, 1)[0].rstrip(" ,;:.")
+        if len(clause) >= 60:
+            return clause
+    trimmed = prefix.rsplit(" ", 1)[0].rstrip(" ,;:.")
+    while trimmed.split() and trimmed.split()[-1].casefold() in {"among", "and", "for", "in", "of", "the", "to", "with"}:
+        trimmed = " ".join(trimmed.split()[:-1]).rstrip(" ,;:.")
     return f"{trimmed}."
 
 
