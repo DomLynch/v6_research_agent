@@ -499,8 +499,6 @@ def _cache_ready_topics(rows: list[dict[str, object]]) -> set[str]:
 def _waiting_rank(row: dict[str, object]) -> int:
     if row.get("blocked_stage") != "search_cache_waiting":
         return 2
-    if _stale_waiting_row(row) and _int(row.get("wait_shards")) >= _int_env("V6_DAEMON_STALE_WAIT_ROTATE_MIN_SHARDS", 1000):
-        return 3
     return 0 if _int(row.get("wait_shards")) else 1
 
 
@@ -1006,10 +1004,6 @@ def _blocked_stage(trace: dict[str, object]) -> str:
 def _blocked_stage_from_row(row: dict[str, object]) -> str:
     trace = row.get("trace")
     return _blocked_stage(trace) if isinstance(trace, dict) else ""
-
-
-def _stale_waiting_row(row: dict[str, object]) -> bool:
-    return _int(row.get("wait_stale_count")) >= _int_env("V6_DAEMON_STALE_WAIT_PASSES", 2)
 
 
 def _side_waiting_row(row: dict[str, object]) -> bool:

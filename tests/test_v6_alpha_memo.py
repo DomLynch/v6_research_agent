@@ -4761,7 +4761,7 @@ def test_daemon_tracks_waitable_side_search_progress_not_completed_receipt() -> 
     assert row.get("wait_stale_count") == 0
 
 
-def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_daemon_keeps_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     seen: list[str] = []
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -4804,10 +4804,10 @@ def test_daemon_rotates_stale_high_progress_waiter(monkeypatch: pytest.MonkeyPat
 
     v6_daemon._run_pass(tmp_path, ("time restricted eating resistance training lean mass", "collagen tendon pain exercise"), "agent-v6", DemoClient(), object(), board)  # type: ignore[arg-type]
 
-    assert seen == ["collagen tendon pain exercise"]
+    assert seen == ["time restricted eating resistance training lean mass"]
 
 
-def test_daemon_stale_wait_deprioritizes_waiting_candidate(
+def test_daemon_keeps_high_progress_stale_waiting_candidate(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -4846,7 +4846,7 @@ def test_daemon_stale_wait_deprioritizes_waiting_candidate(
         ("creatine cognitive function older adults", "vitamin d fracture randomized trial older adults"),
     )
 
-    assert [row["topic"] for row in selected] == ["vitamin d fracture randomized trial older adults"]
+    assert [row["topic"] for row in selected] == ["creatine cognitive function older adults"]
 
 
 def test_daemon_keeps_low_progress_stale_wait_before_queued_waiter(
