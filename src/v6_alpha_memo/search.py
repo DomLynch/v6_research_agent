@@ -78,11 +78,12 @@ def strict_source_diverse_partial_coverage(value: object) -> bool:
     if not isinstance(value, Mapping):
         return False
     threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
+    min_sources = _fullraw_min_sources_searched()
     return (
         bool(value.get("partial"))
         and (_int(value.get("shards_searched")) or 0) >= threshold
         and (_int(value.get("sweep_failed_shards")) or 0) == 0
-        and (_int(value.get("source_count_searched")) or 0) >= 5
+        and (_int(value.get("source_count_searched")) or 0) >= min_sources
         and (_int(value.get("hits")) or 0) >= 2
     )
 
@@ -298,17 +299,61 @@ def _coverage_error(data: object) -> str:
         return f"async_sweep_{status or 'missing'}"
     shards = _int(shard.get("shards_searched")) or 0
     total = _int(shard.get("shards_total")) or 0
-    if shards < 1525 or total < 1525 or shards != total:
+    min_shards = _fullraw_min_shards_searched()
+    require_complete = _fullraw_require_complete_search()
+    if shards < min_shards or (require_complete and (total < min_shards or shards != total)):
         return f"fullraw_incomplete:{shards}/{total}"
-    if bool(shard.get("partial_shard_search") or meta.get("partial")):
+    if require_complete and bool(shard.get("partial_shard_search") or meta.get("partial")):
         return "fullraw_partial"
     failed = _int(shard.get("sweep_failed_shards")) or 0
     if failed:
         return f"fullraw_failed_shards:{failed}"
     source_count = _int(shard.get("source_count_searched")) or len(_sources(shard.get("sources_searched")))
-    if source_count < 5:
+    if source_count < _fullraw_min_sources_searched():
         return f"fullraw_low_source_count:{source_count}"
     return ""
+
+
+def _fullraw_min_shards_searched() -> int:
+    return _positive_env_int(
+        (
+            "V6_FULLRAW_MIN_SHARDS_SEARCHED",
+            "RESEARKA_FULLRAW_MIN_SHARDS_SEARCHED",
+            "V5_MEMO_FULL_RAW_MIN_SHARDS_SEARCHED",
+        ),
+        default=1525,
+    )
+
+
+def _fullraw_min_sources_searched() -> int:
+    return _positive_env_int(
+        (
+            "V6_FULLRAW_MIN_SOURCES_SEARCHED",
+            "RESEARKA_FULLRAW_MIN_SOURCES_SEARCHED",
+            "V5_MEMO_FULL_RAW_MIN_SOURCES_SEARCHED",
+        ),
+        default=5,
+    )
+
+
+def _fullraw_require_complete_search() -> bool:
+    for name in (
+        "V6_FULLRAW_REQUIRE_COMPLETE",
+        "RESEARKA_FULLRAW_REQUIRE_COMPLETE_SEARCH",
+        "V5_MEMO_FULL_RAW_REQUIRE_COMPLETE_SEARCH",
+    ):
+        value = os.environ.get(name)
+        if value is not None and value.strip():
+            return _truthy(value)
+    return True
+
+
+def _positive_env_int(names: tuple[str, ...], *, default: int) -> int:
+    for name in names:
+        value = _int(os.environ.get(name))
+        if value and value > 0:
+            return value
+    return default
 
 
 def _waitable_coverage_error(error: str) -> bool:
