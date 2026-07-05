@@ -3644,6 +3644,50 @@ def test_memo_validator_blocks_generic_shape_alpha() -> None:
     assert "generic_alpha" in issues
 
 
+def test_memo_validator_blocks_mechanical_shape_title() -> None:
+    scored = ScoredPair(
+        CandidatePair(
+            Paper(
+                "editorial",
+                "Does Intensive Glucose Control Cancel Out Benefits of Systolic Blood Pressure Target <120 mm Hg in Patients With Diabetes Mellitus Participating in ACCORD?",
+                "This editorial asks whether ACCORD results change interpretation of blood pressure targeting.",
+                "openalex",
+                doi="10.demo/accord-editorial",
+            ),
+            Paper(
+                "data",
+                "The impact of sex-related disparities on the association between triglyceride-glucose index and renal function decline in patients with type 2 diabetes: Insights from the ACCORD trial.",
+                "Results showed the TyG index was associated with CKD in women (HR 1.46, p-interaction 0.03).",
+                "pubmed",
+                doi="10.demo/accord-data",
+            ),
+            ("glucose", "diabetes", "accord"),
+            (),
+        ),
+        100,
+        "subgroup_endpoint_split",
+        "update",
+        (),
+    )
+    memo = """# Alpha memo: glucose patients diabetes accord endpoint split
+
+**One-sentence alpha:** Receipt 1 reports context; Receipt 2 reports a sex-specific TyG-CKD association.
+
+**Receipt 1:** Does Intensive Glucose Control Cancel Out Benefits of Systolic Blood Pressure Target <120 mm Hg in Patients With Diabetes Mellitus Participating in ACCORD? | finding: context.
+
+**Receipt 2:** The impact of sex-related disparities on the association between triglyceride-glucose index and renal function decline in patients with type 2 diabetes: Insights from the ACCORD trial. | finding: Results showed the TyG index was associated with CKD in women.
+
+**Why this is surprising:** The receipts differ.
+
+**Caveats/falsifiers:**
+- Reject if a direct ACCORD analysis does not replicate the sex-specific CKD association.
+"""
+
+    issues = v6_write.validate_memo_against_pair(memo, scored)
+
+    assert "mechanical_shape_title" in issues
+
+
 def test_expectation_sentence_uses_receipt_labels_not_raw_titles() -> None:
     a = Paper(
         "a",
@@ -5751,6 +5795,7 @@ def test_domain_classifier_does_not_match_ai_inside_training() -> None:
     assert v6_daemon._domain("resveratrol mimics exercise training") == "longevity_research"
     assert v6_daemon._domain("retrieval augmented generation benchmark") == "ai_research"
     assert v6_daemon._domain("marketing attribution incrementality") == "management_research"
+    assert v6_daemon._domain("ACCORD intensive glucose control mortality type 2 diabetes") == "cardiometabolic_research"
 
 
 def test_daemon_retries_reviewer_revision_without_manual_edit(tmp_path: Path) -> None:
