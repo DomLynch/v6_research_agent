@@ -8,5 +8,5 @@ hydroxyethyl starch sepsis renal failure mortality VISEP 6S CHEST
 oxygen therapy myocardial infarction mortality AVOID DETO2X-AMI
 intraaortic balloon pump cardiogenic shock mortality IABP-SHOCK II CRISP AMI
 stable coronary disease PCI outcomes COURAGE ORBITA ISCHEMIA
-antiarrhythmic suppression mortality CAST SWORD
-CETP inhibitor cardiovascular outcomes ILLUMINATE dal-OUTCOMES ACCELERATE
+antibiotics appendicitis surgery outcomes APPAC CODA
+prone positioning ARDS mortality PROSEVA COVID-PRONE

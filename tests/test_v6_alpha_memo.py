@@ -6055,7 +6055,13 @@ def test_live_topics_file_uses_multi_trial_reversal_topics() -> None:
     assert any("NICE-SUGAR" in topic for topic in topics)
     assert any("PROWESS" in topic for topic in topics)
     assert not any(topic in {"creatine cognitive function older adults", "time failed"} for topic in topics)
-    assert not any("ACCORD ADVANCE VADT" in topic or "WHI HERS" in topic for topic in topics)
+    assert not any(
+        "ACCORD ADVANCE VADT" in topic
+        or "WHI HERS" in topic
+        or "CAST SWORD" in topic
+        or "ILLUMINATE" in topic
+        for topic in topics
+    )
 
 
 def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
