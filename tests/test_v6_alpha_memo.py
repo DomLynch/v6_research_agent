@@ -130,6 +130,10 @@ def test_topic_terms_ignore_trial_acronyms_without_dropping_construct() -> None:
     }
 
 
+def test_search_clean_decodes_html_entities_and_normalizes_unicode() -> None:
+    assert v6_search._clean("TyG m&amp;#178; endpoint") == "TyG m2 endpoint"
+
+
 def test_scores_elite_reversal_geometry_without_topic_hardcoding() -> None:
     papers = (
         Paper(
@@ -664,6 +668,28 @@ def test_rejects_question_title_without_observed_result() -> None:
     scored = score_all_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"})
 
     assert any("reject:question_title_without_result" in item.reasons for item in scored)
+    assert score_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"}) == ()
+
+
+def test_rejects_question_editorial_without_quantified_result() -> None:
+    papers = (
+        Paper(
+            "editorial",
+            "Does Intensive Glucose Control Cancel Out Benefits of Systolic Blood Pressure Target <120 mm Hg in Patients With Diabetes Mellitus Participating in ACCORD?",
+            "This editorial asks whether ACCORD results change interpretation of blood pressure targeting.",
+            "openalex",
+        ),
+        Paper(
+            "data",
+            "The impact of sex-related disparities on the association between triglyceride-glucose index and renal function decline in patients with type 2 diabetes: Insights from the ACCORD trial.",
+            "Results showed the TyG index was associated with CKD in women (HR 1.46, p-interaction 0.03).",
+            "pubmed",
+        ),
+    )
+
+    scored = score_all_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"})
+
+    assert any("reject:hypothesis_without_quantified_result" in item.reasons for item in scored)
     assert score_pairs(mine_pairs(papers), topic_terms={"accord", "glucose", "diabetes"}) == ()
 
 

@@ -27,7 +27,7 @@ _DEFAULT_QUERY_LIMIT = 5
 _DEFAULT_PER_QUERY_LIMIT = 20
 _DEFAULT_ACTIVE_TOPIC_LIMIT = 3
 _SELECTOR_VERSION = 39
-_QUERY_SHAPE_VERSION = 16
+_QUERY_SHAPE_VERSION = 17
 _WRITER_VERSION = 15
 
 
@@ -1089,6 +1089,19 @@ def _domain(topic: str) -> str:
         return "ai_research"
     if terms & {"business", "firm", "firms", "management", "marketing", "finance", "employee", "employees"}:
         return "management_research"
+    if terms & {
+        "cardiovascular",
+        "ckd",
+        "diabetes",
+        "diabetic",
+        "glucose",
+        "glycemic",
+        "kidney",
+        "mortality",
+        "renal",
+        "t2d",
+    }:
+        return "cardiometabolic_research"
     return "longevity_research"
 
 

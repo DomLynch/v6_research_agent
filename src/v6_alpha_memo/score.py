@@ -393,10 +393,10 @@ def _receipt_hygiene_reject(
         return "reject:same_trial_risk_modifier_drift"
     if _repository_receipt(a) or _repository_receipt(b):
         return "reject:repository_receipt"
-    if _hypothesis_without_quantified_result(a) or _hypothesis_without_quantified_result(b):
-        return "reject:hypothesis_without_quantified_result"
     if _question_title_without_result(a) or _question_title_without_result(b):
         return "reject:question_title_without_result"
+    if _hypothesis_without_quantified_result(a) or _hypothesis_without_quantified_result(b):
+        return "reject:hypothesis_without_quantified_result"
     if _nonprimary(a) or _nonprimary(b):
         return "reject:non_primary_receipt"
     if _comparator_only_anchor(a, anchors, topic_terms) or _comparator_only_anchor(b, anchors, topic_terms):
@@ -465,10 +465,14 @@ def _question_title_without_result(paper: Paper) -> bool:
 
 def _hypothesis_without_quantified_result(paper: Paper) -> bool:
     title = paper.title.strip().casefold()
+    text = paper.text.casefold()
     starts_like_question = bool(
         re.match(r"(?:are|can|could|does|do|how|is|should|what|when|why|will|would)\b", title)
     )
-    return (title.endswith("?") or starts_like_question) and not _quantified_result(paper)
+    hypothesis_context = bool(
+        re.search(r"\b(?:asks?|commentary|editorial|hypothesis|question|whether)\b", text)
+    )
+    return (title.endswith("?") or starts_like_question) and hypothesis_context and not _quantified_result(paper)
 
 
 def _supplement_receipt(paper: Paper) -> bool:

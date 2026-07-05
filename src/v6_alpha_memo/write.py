@@ -243,6 +243,8 @@ def validate_memo_against_pair(memo: str, scored: ScoredPair) -> tuple[str, ...]
     title = _memo_title(memo)
     if title and _title_overclaims(title):
         issues.append("title_overclaim")
+    if title and _mechanical_shape_title(title, scored):
+        issues.append("mechanical_shape_title")
     if _grammar_fragment(memo):
         issues.append("grammar_fragment")
     if _generic_alpha(memo):
@@ -265,6 +267,18 @@ def _memo_title(memo: str) -> str:
 
 def _title_overclaims(title: str) -> bool:
     return bool(_TITLE_OVERCLAIM.search(title))
+
+
+def _mechanical_shape_title(title: str, scored: ScoredPair) -> bool:
+    text = title.removeprefix("#").strip().casefold()
+    prefix = "alpha memo:"
+    if text.startswith(prefix):
+        text = text[len(prefix):].strip()
+    shape = _SHAPE_TITLE.get(scored.shape, "evidence boundary")
+    if not text.endswith(shape):
+        return False
+    title_terms = tuple(word for word in _words(text) if word not in _words(shape))
+    return len(title_terms) >= 4 and set(title_terms).issubset(set(_title_terms(scored)))
 
 
 def _grammar_fragment(memo: str) -> bool:
