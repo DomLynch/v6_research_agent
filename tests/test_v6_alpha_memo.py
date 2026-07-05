@@ -2885,6 +2885,43 @@ def test_fullraw_client_reports_partial_receipt_without_async_status() -> None:
     assert result.receipt.error == "fullraw_incomplete:415/1525"
 
 
+def test_fullraw_client_uses_configured_coverage_requirements(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload: dict[str, object] = {
+        "meta": {
+            "shard_receipt": {
+                "shards_searched": 415,
+                "shards_total": 1525,
+                "source_count_searched": 4,
+                "sweep_failed_shards": 0,
+                "sources_searched": {"openalex": 168, "pubmed": 243, "semantic_scholar": 2, "crossref": 2},
+                "partial_shard_search": False,
+            }
+        },
+        "results": [
+            {
+                "id": "whi-hers",
+                "title": "Hormone therapy cardiovascular risk WHI HERS trial result",
+                "abstract": "WHI and HERS reported cardiovascular risk results for hormone therapy.",
+                "source": "openalex",
+                "year": 2002,
+                "doi": "10.test/whi-hers",
+            }
+        ],
+    }
+    monkeypatch.setenv("V6_FULLRAW_MIN_SHARDS_SEARCHED", "400")
+    monkeypatch.setenv("V6_FULLRAW_MIN_SOURCES_SEARCHED", "4")
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=_fake_opener(payload)).search(
+        "hormone therapy cardiovascular risk WHI HERS"
+    )
+
+    assert result.receipt.error == ""
+    assert result.receipt.shards_searched == 415
+    assert result.receipt.source_count_searched == 4
+    assert result.papers[0].doi == "10.test/whi-hers"
+
+
 def test_fullraw_client_reports_queue_full_when_query_not_admitted() -> None:
     payload: dict[str, object] = {
         "meta": {
