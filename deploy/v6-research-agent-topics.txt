@@ -1,10 +1,12 @@
-intensive glucose control cardiovascular mortality ACCORD ADVANCE VADT
-hormone therapy cardiovascular risk WHI HERS
-erythropoietin hemoglobin target chronic kidney disease CHOIR CREATE TREAT
-niacin HDL cardiovascular outcomes AIM-HIGH HPS2-THRIVE
-dronedarone atrial fibrillation mortality ATHENA ANDROMEDA PALLAS
-CETP inhibitor cardiovascular mortality ILLUMINATE dal-OUTCOMES ACCELERATE
-nesiritide acute heart failure outcomes ASCEND-HF VMAC
+intensive insulin therapy mortality critical illness Leuven NICE-SUGAR
+activated protein C severe sepsis mortality PROWESS PROWESS-SHOCK
+early goal directed therapy sepsis mortality Rivers ProCESS ARISE ProMISe
+therapeutic hypothermia cardiac arrest neurologic outcome HACA TTM TTM2
+renal denervation resistant hypertension blood pressure SYMPLICITY HTN-3 SPYRAL
+vertebroplasty osteoporotic fracture pain sham INVEST VERTOS VAPOUR
+hydroxyethyl starch sepsis renal failure mortality VISEP 6S CHEST
+oxygen therapy myocardial infarction mortality AVOID DETO2X-AMI
+intraaortic balloon pump cardiogenic shock mortality IABP-SHOCK II CRISP AMI
+stable coronary disease PCI outcomes COURAGE ORBITA ISCHEMIA
 antiarrhythmic suppression mortality CAST SWORD
-rosiglitazone cardiovascular risk RECORD DREAM ADOPT
-amyloid antibody cognition Alzheimer EXPEDITION bapineuzumab solanezumab
+CETP inhibitor cardiovascular outcomes ILLUMINATE dal-OUTCOMES ACCELERATE

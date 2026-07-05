@@ -6033,7 +6033,7 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     assert "Environment=V6_DAEMON_MIN_SCORE=85" in text
     assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=1" in text
     assert "Environment=V6_DAEMON_MAX_WAITING=1" in text
-    assert "Environment=V6_DAEMON_QUERY_LIMIT=2" in text
+    assert "Environment=V6_DAEMON_QUERY_LIMIT=4" in text
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
     assert "Environment=V6_MIN_QUERY_SHAPES_BEFORE_STOP=1" in text
@@ -6052,8 +6052,10 @@ def test_live_topics_file_uses_multi_trial_reversal_topics() -> None:
 
     assert len(topics) >= 8
     assert all(len(topic.split()) >= 5 for topic in topics)
-    assert any("ACCORD ADVANCE VADT" in topic for topic in topics)
+    assert any("NICE-SUGAR" in topic for topic in topics)
+    assert any("PROWESS" in topic for topic in topics)
     assert not any(topic in {"creatine cognitive function older adults", "time failed"} for topic in topics)
+    assert not any("ACCORD ADVANCE VADT" in topic or "WHI HERS" in topic for topic in topics)
 
 
 def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
