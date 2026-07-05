@@ -6001,9 +6001,22 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
     assert "Environment=V6_MIN_QUERY_SHAPES_BEFORE_STOP=1" in text
     assert "Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=25" in text
-    assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=1" in text
-    assert "Environment=V6_DAEMON_MAX_CACHE_TOPICS=8" in text
+    assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=0" in text
+    assert "Environment=V6_DAEMON_MAX_CACHE_TOPICS=0" in text
     assert "Environment=V6_FULLRAW_REQUIRE_COMPLETE=1" in text
+
+
+def test_live_topics_file_uses_multi_trial_reversal_topics() -> None:
+    topics = [
+        line.strip()
+        for line in Path("deploy/v6-research-agent-topics.txt").read_text().splitlines()
+        if line.strip() and not line.startswith("#")
+    ]
+
+    assert len(topics) >= 8
+    assert all(len(topic.split()) >= 5 for topic in topics)
+    assert any("ACCORD ADVANCE VADT" in topic for topic in topics)
+    assert not any(topic in {"creatine cognitive function older adults", "time failed"} for topic in topics)
 
 
 def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
