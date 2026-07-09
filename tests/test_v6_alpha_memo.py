@@ -6186,12 +6186,13 @@ def test_live_topics_file_uses_multi_trial_reversal_topics() -> None:
 def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
     service = Path("deploy/v6-fullraw-search.service").read_text()
 
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_WORKERS=4" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=128" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=4" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=1" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=72" in service
-    assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=180" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_WORKERS=8" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=32" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=2" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=0" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=4" in service
+    assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=900" in service
+    assert "RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20" in service
 
 
 def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
