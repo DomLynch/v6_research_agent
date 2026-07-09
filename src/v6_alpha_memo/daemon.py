@@ -1100,6 +1100,8 @@ def _complete_required_but_incomplete(value: dict[str, object]) -> bool:
     if not (shards or total):
         return False
     min_shards = _fullraw_min_shards_searched()
+    if total and total < min_shards:
+        return False
     return bool(value.get("partial")) or shards < min_shards or total < min_shards or shards != total
 
 
