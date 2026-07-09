@@ -18,6 +18,9 @@ from v6_alpha_memo.score import ScoredPair
 from v6_alpha_memo.search import (
     FullrawSearchClient,
     Paper,
+    _fullraw_min_shards_searched,
+    _fullraw_min_sources_searched,
+    _fullraw_require_complete_search,
     completed_cached_result,
     strict_source_diverse_partial_coverage,
 )
@@ -994,6 +997,8 @@ def _blocked_stage(trace: dict[str, object]) -> str:
             return "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
+        if any(_waitable_coverage(item) for item in coverage if isinstance(item, dict)):
+            return "search_cache_waiting"
         if error_text == "async_sweep_stopped_no_hits" and not _waitable_coverage(coverage[-1]):
             return "selector_rejected"
         if (
@@ -1058,6 +1063,8 @@ def _waitable_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     error_text = str(value.get("error") or "")
+    if _complete_required_but_incomplete(value):
+        return True
     if error_text == "async_sweep_stopped_no_hits":
         return False
     return (
@@ -1071,16 +1078,31 @@ def _waitable_coverage(value: object) -> bool:
 def _strict_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
-    if strict_source_diverse_partial_coverage(value):
+    if not _fullraw_require_complete_search() and strict_source_diverse_partial_coverage(value):
         return True
     return (
         not value.get("error")
-        and _int(value.get("shards_searched")) >= 1525
-        and _int(value.get("shards_total")) >= 1525
+        and _int(value.get("shards_searched")) >= _fullraw_min_shards_searched()
+        and _int(value.get("shards_total")) >= _fullraw_min_shards_searched()
         and not value.get("partial")
         and _int(value.get("sweep_failed_shards")) == 0
-        and _int(value.get("source_count_searched")) >= 5
+        and _int(value.get("source_count_searched")) >= _fullraw_min_sources_searched()
     )
+
+
+def _complete_required_but_incomplete(value: dict[str, object]) -> bool:
+    if not _fullraw_require_complete_search() or value.get("error"):
+        return False
+    if _int(value.get("sweep_failed_shards")):
+        return False
+    shards = _int(value.get("shards_searched"))
+    total = _int(value.get("shards_total"))
+    if not (shards or total):
+        return False
+    min_shards = _fullraw_min_shards_searched()
+    if total and total < min_shards:
+        return False
+    return bool(value.get("partial")) or shards < min_shards or total < min_shards or shards != total
 
 
 def _domain(topic: str) -> str:

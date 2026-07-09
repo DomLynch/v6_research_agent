@@ -4772,7 +4772,8 @@ def test_daemon_rejects_unusable_partial_no_hit_sweep_stop() -> None:
     assert v6_daemon._blocked_stage(trace) == "selector_rejected"
 
 
-def test_daemon_treats_useful_no_hit_sweep_stop_as_strict_coverage() -> None:
+def test_daemon_treats_useful_no_hit_sweep_stop_as_strict_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
     item: dict[str, object] = {
         "hits": 2,
         "async_status": "stopped_no_hits",
@@ -4786,6 +4787,30 @@ def test_daemon_treats_useful_no_hit_sweep_stop_as_strict_coverage() -> None:
 
     assert v6_daemon._strict_coverage(item) is True
     assert v6_daemon._waitable_coverage(item) is False
+
+
+def test_daemon_waits_on_partial_hit_coverage_when_complete_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+    item: dict[str, object] = {
+        "hits": 25,
+        "async_status": "hit",
+        "error": "",
+        "partial": True,
+        "shards_searched": 586,
+        "shards_total": 1525,
+        "source_count_searched": 5,
+        "sweep_failed_shards": 0,
+    }
+    trace: dict[str, object] = {
+        "paper_count": 49,
+        "pair_count": 80,
+        "scored_count": 0,
+        "coverage": [item, item],
+    }
+
+    assert v6_daemon._strict_coverage(item) is False
+    assert v6_daemon._waitable_coverage(item) is True
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
 def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
