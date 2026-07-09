@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import UTC, datetime
 from email.message import Message
 from io import BytesIO
 from pathlib import Path
@@ -24,6 +25,7 @@ from v6_alpha_memo import daemon as v6_daemon
 from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import score as v6_score
 from v6_alpha_memo import search as v6_search
+from v6_alpha_memo import watchdog as v6_watchdog
 from v6_alpha_memo import write as v6_write
 from v6_alpha_memo.mine import CandidatePair
 from v6_alpha_memo.run import NoMemoError, build_memo
@@ -6426,3 +6428,89 @@ def _strict_meta(sources: dict[str, int]) -> dict[str, object]:
             "partial_shard_search": False,
         },
     }
+
+
+def test_watchdog_flags_stale_public_v6_output() -> None:
+    latest = v6_watchdog.PublicItem(
+        title="Alpha memo: taurine supplementation",
+        agent_id="agent-v6-alpha-eval",
+        created_at=datetime(2026, 6, 30, tzinfo=UTC),
+        doi="10.17605/OSF.IO/KH4Z7",
+    )
+    board: dict[str, object] = {
+        "updated_at": "2026-07-09T12:00:00Z",
+        "generated": 1,
+        "submitted": 1,
+        "accepted": 1,
+        "public": 1,
+        "rows": [{"blocked_stage": "search_cache_waiting"}, {"topic": "ready"}],
+    }
+
+    status = v6_watchdog.evaluate_status(
+        (latest,),
+        board=board,
+        now=datetime(2026, 7, 9, tzinfo=UTC),
+        max_public_lag_hours=24,
+    )
+
+    assert status["ok"] is False
+    assert status["reason"] == "public_v6_lag_exceeded"
+    assert status["latest_public_lag_hours"] == 216.0
+    assert status["board_counts"] == {"generated": 1, "submitted": 1, "accepted": 1, "public": 1}
+    assert status["board_stage_counts"] == {"ready_or_idle": 1, "search_cache_waiting": 1}
+
+
+def test_watchdog_accepts_recent_public_v6_output() -> None:
+    latest = v6_watchdog.PublicItem(
+        title="Fresh V6 memo",
+        agent_id="agent-v6-alpha-eval",
+        created_at=datetime(2026, 7, 9, 11, tzinfo=UTC),
+        doi="10.17605/OSF.IO/FRESH",
+    )
+
+    status = v6_watchdog.evaluate_status(
+        (latest,),
+        board={"rows": []},
+        now=datetime(2026, 7, 9, 12, tzinfo=UTC),
+        max_public_lag_hours=24,
+    )
+
+    assert status["ok"] is True
+    assert status["reason"] == "recent_public_v6"
+
+
+def test_watchdog_parses_next_data_v6_rows() -> None:
+    payload = {
+        "props": {
+            "pageProps": {
+                "items": [
+                    {
+                        "title": "Fresh V6 memo",
+                        "agentId": "agent-v6-alpha-eval",
+                        "createdAt": "2026-07-09T11:00:00+00:00",
+                        "doi": "10.17605/OSF.IO/FRESH",
+                    },
+                    {
+                        "title": "Other lane",
+                        "agentId": "agent-v4-alpha-longevity-research",
+                        "createdAt": "2026-07-09T12:00:00+00:00",
+                    },
+                ]
+            }
+        }
+    }
+    page = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script>'
+
+    rows = v6_watchdog.public_items_from_html(page)
+
+    assert [row.title for row in rows] == ["Fresh V6 memo"]
+
+
+def test_watchdog_systemd_timer_is_wired() -> None:
+    service = Path("deploy/v6-publish-watchdog.service").read_text()
+    timer = Path("deploy/v6-publish-watchdog.timer").read_text()
+
+    assert "V6_WATCHDOG_MAX_PUBLIC_LAG_HOURS=24" in service
+    assert "scripts/v6_publish_watchdog.py" in service
+    assert "OnUnitActiveSec=1h" in timer
+    assert "v6-publish-watchdog.service" in timer

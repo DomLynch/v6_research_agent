@@ -1,0 +1,12 @@
+[Unit]
+Description=V6 public publish watchdog
+After=network-online.target v6-alpha-memo-live.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/v6-research-agent
+Environment=PYTHONPATH=/opt/v6-research-agent/src
+Environment=V6_RUN_DIR=/var/lib/v6-research-agent/daemon
+Environment=V6_WATCHDOG_MAX_PUBLIC_LAG_HOURS=24
+ExecStart=/opt/v6-research-agent/.venv/bin/python /opt/v6-research-agent/scripts/v6_publish_watchdog.py
