@@ -6156,6 +6156,7 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
     assert "Environment=V6_MIN_QUERY_SHAPES_BEFORE_STOP=1" in text
+    assert "Environment=V6_MAX_EMPTY_WAITABLE_QUERIES=1" in text
     assert "Environment=V6_FULLRAW_COMPLETED_CACHE_MIN_LIMIT=25" in text
     assert "Environment=V6_DAEMON_INCLUDE_CACHE_TOPICS=0" in text
     assert "Environment=V6_DAEMON_MAX_CACHE_TOPICS=0" in text
