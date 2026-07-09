@@ -3150,6 +3150,45 @@ def test_build_memo_caps_empty_waitable_fanout() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queued"]
 
 
+def test_build_memo_stops_nonempty_incomplete_required_fanout(monkeypatch: pytest.MonkeyPatch) -> None:
+    class PartialHitClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            paper = Paper(
+                "partial-1",
+                "Early result-bearing receipt",
+                "The partial sweep has papers, but strict fullraw coverage is not complete.",
+                "openalex",
+                doi="10.1000/partial-1",
+            )
+            return SearchResult(
+                query,
+                (paper,),
+                CoverageReceipt(
+                    hits=1,
+                    async_status="hit",
+                    shards_searched=1247,
+                    shards_total=1525,
+                    source_count_searched=5,
+                    partial=True,
+                ),
+            )
+
+    client = PartialHitClient()
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+    with pytest.raises(NoMemoError) as exc:
+        build_memo("early goal directed therapy sepsis mortality", client=client, query_limit=4)
+
+    coverage = cast(list[dict[str, object]], exc.value.trace["coverage"])
+    assert client.queries == ["early goal directed therapy sepsis mortality"]
+    assert coverage[0]["shards_searched"] == 1247
+    assert coverage[0]["partial"] is True
+
+
 def test_build_memo_empty_waitable_fanout_has_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     class WaitingClient:
         def __init__(self) -> None:
