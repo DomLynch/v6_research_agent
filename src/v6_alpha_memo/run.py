@@ -17,6 +17,8 @@ from v6_alpha_memo.search import (
     FullrawSearchClient,
     Paper,
     SearchResult,
+    _fullraw_min_shards_searched,
+    _fullraw_require_complete_search,
     merge_results,
     query_shapes,
 )
@@ -76,6 +78,8 @@ def build_memo(
             topic_terms,
         )
         if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85 and len(collected) >= min_stop_queries:
+            break
+        if len(collected) >= min_stop_queries and _complete_required_but_incomplete(result.receipt):
             break
         if result.receipt.error == "async_sweep_queue_full":
             break
@@ -218,6 +222,20 @@ def _trace(
 
 def _waitable_search_error(error: str) -> bool:
     return error.startswith(("async_sweep_", "fullraw_incomplete:", "fullraw_low_source_count:")) or error == "fullraw_partial"
+
+
+def _complete_required_but_incomplete(receipt: CoverageReceipt) -> bool:
+    if not _fullraw_require_complete_search() or receipt.error:
+        return False
+    if not (receipt.partial or receipt.shards_searched or receipt.shards_total):
+        return False
+    min_shards = _fullraw_min_shards_searched()
+    return (
+        bool(receipt.partial)
+        or receipt.shards_searched < min_shards
+        or receipt.shards_total < min_shards
+        or receipt.shards_searched != receipt.shards_total
+    )
 
 
 def _best_receipt(results: tuple[SearchResult, ...]) -> CoverageReceipt:
