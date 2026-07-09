@@ -4813,6 +4813,59 @@ def test_daemon_waits_on_partial_hit_coverage_when_complete_required(monkeypatch
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
+def test_daemon_does_not_submit_publishable_pair_from_incomplete_required_coverage(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+    pair = CandidatePair(
+        a=Paper("a", "Interventionx improved mortality", "Results showed interventionx improved mortality.", "openalex", doi="10.1000/a"),
+        b=Paper("b", "Interventionx failed mortality", "Results showed interventionx failed mortality.", "pubmed", doi="10.1000/b"),
+        anchors=("interventionx",),
+    )
+    selected = ScoredPair(
+        pair,
+        100,
+        "promise_reversal",
+        "A showed benefit; B forced reversal.",
+        ("shared_anchor:interventionx",),
+    )
+    receipt = CoverageReceipt(
+        hits=25,
+        async_status="hit",
+        shards_searched=586,
+        shards_total=1525,
+        source_count_searched=5,
+        partial=True,
+    )
+    run = v6_run.V6Run(
+        "memo",
+        (selected,),
+        (SearchResult("interventionx mortality", (pair.a, pair.b), receipt),),
+        paper_count=2,
+        pair_count=1,
+        scored_count=1,
+    )
+
+    class FakePublisher:
+        def post(self, path: str, payload: dict[str, object]) -> dict[str, object]:
+            raise AssertionError("partial required-coverage candidate must not submit")
+
+        def get(self, path: str) -> dict[str, object]:
+            raise AssertionError("partial required-coverage candidate must not poll")
+
+    monkeypatch.setattr(v6_daemon, "build_memo", lambda *args, **kwargs: run)
+    row: dict[str, object] = {"topic": "interventionx mortality"}
+
+    v6_daemon._run_topic(tmp_path, "interventionx mortality", "agent-v6", DemoClient(), FakePublisher(), row)  # type: ignore[arg-type]
+
+    assert row["blocked_stage"] == "search_cache_waiting"
+    assert row["wait_shards"] == 586
+    assert "generated" not in row
+    assert "submitted" not in row
+    assert "pending_payload" not in row
+
+
 def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     trace: dict[str, object] = {
         "coverage": [

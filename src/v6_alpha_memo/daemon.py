@@ -214,6 +214,20 @@ def _run_topic(
             writer=writer,
             revision_notes=_row_revision_notes(row),
         )
+        if _blocked_stage(run.trace) == "search_cache_waiting":
+            row.update({
+                "blocked_stage": "search_cache_waiting",
+                "trace": run.trace,
+                "paper_count": run.paper_count,
+                "pair_count": run.pair_count,
+                "scored_count": run.scored_count,
+                "query_limit": query_limit,
+                "per_query_limit": per_query_limit,
+                "selector_version": _SELECTOR_VERSION,
+                "query_shape_version": _QUERY_SHAPE_VERSION,
+            })
+            _record_wait_progress(row, run.trace)
+            return
         run = _first_publishable_run(run, writer=writer, revision_notes=_row_revision_notes(row))
         selected = run.top_pairs[0]
         min_score = int(os.environ.get("V6_DAEMON_MIN_SCORE", "85"))
