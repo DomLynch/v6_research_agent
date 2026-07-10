@@ -179,12 +179,11 @@ class FullrawSearchClient:
             data = self._post(search_url, payload, headers)
         except HTTPError as exc:
             data = _http_error_json(exc)
-            if not _is_incomplete_coverage(data) or not self.sweep_wait_seconds:
+            if not _is_incomplete_coverage(data):
                 raise
-            cached = self._wait_for_sweep_hit(search_url, payload, headers)
-            if cached is None:
-                raise
-            data = cached
+            data = _normalized_incomplete_coverage(data)
+            if self.sweep_wait_seconds:
+                data = self._wait_for_sweep_hit(search_url, payload, headers) or data
         coverage_error = _coverage_error(data)
         if coverage_error and self.sweep_wait_seconds and _waitable_coverage_error(coverage_error):
             data = self._wait_for_sweep_hit(search_url, payload, headers) or data
@@ -275,7 +274,15 @@ def _http_error_json(exc: HTTPError) -> object:
 
 
 def _is_incomplete_coverage(data: object) -> bool:
-    return isinstance(data, dict) and data.get("error") == "shard coverage incomplete"
+    return isinstance(data, dict) and data.get("error") in {"coverage_too_narrow", "shard coverage incomplete"}
+
+
+def _normalized_incomplete_coverage(data: object) -> object:
+    if not isinstance(data, dict) or not isinstance(data.get("shard_receipt"), dict):
+        return data
+    receipt = data["shard_receipt"]
+    status = "stopped_no_hits" if receipt.get("sweep_stopped_no_hits") else "running"
+    return {"meta": {"async_sweep": {"status": status}, "shard_receipt": receipt}, "results": data.get("results", [])}
 
 
 def _async_status(data: object) -> str:

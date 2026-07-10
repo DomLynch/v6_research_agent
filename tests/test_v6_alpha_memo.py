@@ -2910,6 +2910,36 @@ def test_fullraw_client_waits_for_async_sweep_after_incomplete_coverage() -> Non
     assert result.papers[0].title.startswith("Calcium alpha ketoglutarate")
 
 
+def test_fullraw_client_preserves_current_backend_no_hit_coverage_response() -> None:
+    calls = 0
+
+    def opener(request: Request, timeout: float) -> _Response:
+        nonlocal calls
+        del timeout
+        calls += 1
+        body = json.dumps({
+            "error": "coverage_too_narrow",
+            "shard_receipt": {
+                "shards_searched": 128,
+                "shards_total": 1525,
+                "source_count_searched": 4,
+                "sources_searched": {"openalex": 64, "pubmed": 59, "semantic_scholar": 1, "semantic_scholar_abstracts": 4},
+                "partial_shard_search": True,
+                "sweep_failed_shards": 0,
+                "sweep_stopped_no_hits": True,
+            },
+        }).encode()
+        raise HTTPError(request.full_url, 422, "Unprocessable Entity", Message(), BytesIO(body))
+
+    result = FullrawSearchClient(search_url="http://fullraw/search", opener=opener).search("HACA TTM TTM2")
+
+    assert calls == 1
+    assert result.receipt.error == "async_sweep_stopped_no_hits"
+    assert result.receipt.shards_searched == 128
+    assert result.receipt.source_count_searched == 4
+    assert result.papers == ()
+
+
 def test_fullraw_client_preserves_busy_exact_query_before_compact_variant() -> None:
     calls: list[str] = []
 
