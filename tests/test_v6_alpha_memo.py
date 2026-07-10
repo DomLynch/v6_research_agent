@@ -1229,6 +1229,27 @@ def test_design_only_abstract_does_not_make_directional_title_elite() -> None:
     assert scored == ()
 
 
+def test_aim_only_comparison_is_not_a_result_receipt() -> None:
+    papers = (
+        Paper(
+            "result",
+            "Therapeutic hypothermia outcome after cardiac arrest",
+            "Results showed no independent rewarming association after adjustment.",
+            "pubmed",
+        ),
+        Paper(
+            "aim",
+            "Comparison of neurological outcome after in-hospital and out-of-hospital cardiac arrest",
+            "The aim is to compare 1-year neurological outcomes after therapeutic hypothermia.",
+            "openalex",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"therapeutic", "hypothermia", "cardiac", "arrest"})
+
+    assert scored == ()
+
+
 def test_explicit_protocol_expectation_can_still_score_mismatch() -> None:
     papers = (
         Paper(
@@ -1460,6 +1481,27 @@ def test_status_only_anchor_is_not_intervention_receipt() -> None:
     )
 
     scored = score_pairs(mine_pairs(papers), topic_terms={"metformin", "resistance", "training"})
+
+    assert scored == ()
+
+
+def test_during_and_after_anchor_is_context_not_intervention() -> None:
+    papers = (
+        Paper(
+            "rewarming",
+            "The influence of rewarming after therapeutic hypothermia on outcome after cardiac arrest",
+            "Results showed the rewarming association disappeared after adjustment for age and initial rhythm.",
+            "semantic_scholar",
+        ),
+        Paper(
+            "glucose",
+            "Increased blood glucose variability during therapeutic hypothermia and outcome after cardiac arrest",
+            "Results showed glucose variability during cooling was associated with mortality.",
+            "pubmed",
+        ),
+    )
+
+    scored = score_pairs(mine_pairs(papers), topic_terms={"therapeutic", "hypothermia", "cardiac", "arrest"})
 
     assert scored == ()
 
@@ -3673,6 +3715,20 @@ def test_writer_finding_prefers_complete_result_sentence() -> None:
 
     assert clipped.endswith("white men")
     assert not clipped.endswith("among.")
+
+    numbered = Paper(
+        "numbered",
+        "Glucose variability during therapeutic hypothermia",
+        (
+            "1. Crit Care Med. MEASUREMENTS AND MAIN RESULTS: Two-hundred and twenty patients were studied. "
+            "Increased blood glucose variability during hypothermia was an independent predictor of mortality."
+        ),
+        "pubmed",
+    )
+
+    extracted = v6_write._brief_finding(numbered, 180)
+
+    assert extracted == "Increased blood glucose variability during hypothermia was an independent predictor of mortality"
 
 
 def test_minimax_memo_rejects_extra_paragraph_after_caveats() -> None:

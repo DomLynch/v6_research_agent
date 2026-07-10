@@ -84,6 +84,7 @@ _NONPRIMARY_PHRASES = (
     "topic of interest", "viewpoint",
 )
 _DESIGN_ONLY_PHRASES = (
+    "aim is to assess", "aim is to compare", "aim is to determine", "aim is to test",
     "aimed to assess", "aimed to determine", "aims to assess", "aims to determine",
     "designed to assess", "designed to determine", "designed to test",
     "study protocol", "trial protocol", "will assess", "will determine", "will test",
@@ -405,8 +406,8 @@ def _receipt_hygiene_reject(
         return "reject:status_only_anchor"
     if not _has_finding_text(a) or not _has_finding_text(b):
         return "reject:title_only_receipt"
-    if _design_only_directional_receipt(a) or _design_only_directional_receipt(b):
-        return "reject:design_only_directional_receipt"
+    if _design_only_receipt(a) or _design_only_receipt(b):
+        return "reject:design_only_receipt"
     if _chemical_form_drift(a, b, anchors, topic_terms):
         return "reject:chemical_form_drift"
     if _nutrition_protein_timing_drift(a, b, topic_terms):
@@ -439,7 +440,10 @@ def _status_only_anchor(paper: Paper, anchors: tuple[str, ...], topic_terms: fro
     for anchor in anchors:
         if anchor in _CONTEXT_ANCHOR:
             continue
-        status_pattern = rf"\b(?:using|receiving|taking|on|treated with)\s+{re.escape(anchor)}\b|\b{re.escape(anchor)}-treated\b"
+        status_pattern = (
+            rf"\b(?:after|during|following|on|receiving|submitted to|taking|treated with|using)\s+"
+            rf"{re.escape(anchor)}\b|\b{re.escape(anchor)}-treated\b"
+        )
         active_pattern = (
             rf"\b(?:administration|effect|effects|placebo|randomized|supplementation|trial|versus|vs\.?)\b"
             rf"[^.:\n]{{0,90}}\b{re.escape(anchor)}\b|"
@@ -644,9 +648,8 @@ def _has_finding_text(paper: Paper) -> bool:
     return len(_WORD_RE.findall(paper.abstract.casefold())) >= 6
 
 
-def _design_only_directional_receipt(paper: Paper) -> bool:
-    title_direction = bool(_title_terms(paper) & (_PROMISE | _FAILURE | _NEGATIVE_RESULT_WORDS))
-    return title_direction and _design_only_abstract(paper)
+def _design_only_receipt(paper: Paper) -> bool:
+    return _design_only_abstract(paper) and not _protocol_expectation_signal(paper)
 
 
 def _design_only_abstract(paper: Paper) -> bool:
@@ -719,7 +722,7 @@ def _roles_fit(
             and _is_human(second)
             and _promise_signal(first)
             and _negative_update_receipt(second, anchors)
-            and _has(st, _LIMITED_HUMAN | _GATED | _BOUNDARY)
+            and _has(st, _GATED | _BOUNDARY | _TRIAL_CONTRAST_TERMS)
             and _endpoint_not_drift(first, second)
             and _population_compatible(first, second)
         )

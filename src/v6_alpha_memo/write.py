@@ -214,14 +214,10 @@ def _finding_text(paper: Paper, max_chars: int) -> str:
     abstract = " ".join(paper.abstract.split())
     if not abstract:
         return f"the title-level signal in {paper.title}"
-    sentences = re.split(r"(?<=[.!?])\s+", abstract)
-    markers = (
-        "demonstrated", "did not", "failed", "found", "no significant",
-        "observed", "reported", "resulted", "showed", "significant",
-    )
-    marked = [sentence for sentence in sentences if any(marker in sentence.casefold() for marker in markers)]
-    candidates = [*marked, *sentences]
-    chosen = next((sentence for sentence in candidates if len(sentence) <= max_chars), candidates[0])
+    sentences = tuple(filter(None, (_clean_finding_sentence(item) for item in re.split(r"(?<=[.!?])\s+", abstract))))
+    useful = tuple(sentence for sentence in sentences if len(_words(sentence)) >= 5)
+    candidates = useful or sentences
+    chosen = max(candidates, key=_finding_sentence_score)
     if len(chosen) <= max_chars:
         return chosen.rstrip(".")
     prefix = chosen[: max_chars + 1]
@@ -235,6 +231,21 @@ def _finding_text(paper: Paper, max_chars: int) -> str:
     while trimmed.split() and trimmed.split()[-1].casefold() in {"among", "and", "for", "in", "of", "the", "to", "with"}:
         trimmed = " ".join(trimmed.split()[:-1]).rstrip(" ,;:.")
     return f"{trimmed}."
+
+
+def _clean_finding_sentence(sentence: str) -> str:
+    sentence = re.sub(r"^(?:conclusions?|measurements and main results|results)\s*:\s*", "", sentence, flags=re.IGNORECASE)
+    return re.sub(r"^(?:however|in addition|therefore|thus),?\s+", "", sentence, flags=re.IGNORECASE).strip()
+
+
+def _finding_sentence_score(sentence: str) -> int:
+    text = sentence.casefold()
+    decisive = (
+        "after adjustment", "associated with", "did not", "failed", "independent predictor",
+        "no significant", "not associated", "unchanged",
+    )
+    reported = ("demonstrated", "found", "observed", "reported", "resulted", "showed", "significant")
+    return 4 * sum(marker in text for marker in decisive) + sum(marker in text for marker in reported)
 
 
 def _uses_selected_receipts(memo: str, scored: ScoredPair) -> bool:
