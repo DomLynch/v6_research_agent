@@ -315,19 +315,23 @@ ssh -i ~/.ssh/binance_futures_tool root@100.96.74.1 '
   git checkout v6-live
   git pull --ff-only origin v6-live
   python3 -m pytest tests/test_v6_alpha_memo.py -q
-  .venv/bin/ruff check src tests
+  .venv/bin/ruff check src scripts tests
   .venv/bin/mypy src tests/test_v6_alpha_memo.py
   install -m 0644 deploy/v6-alpha-memo-live.service /etc/systemd/system/v6-alpha-memo-live.service
+  install -m 0644 deploy/v6-fullraw-watchdog.service /etc/systemd/system/v6-fullraw-watchdog.service
+  install -m 0644 deploy/v6-fullraw-watchdog.timer /etc/systemd/system/v6-fullraw-watchdog.timer
   rm -f /etc/systemd/system/v6-alpha-memo-live.service.d/40-partial-coverage.conf
   systemctl daemon-reload
   systemctl restart v6-alpha-memo-live.service
+  systemctl enable --now v6-fullraw-watchdog.timer
   systemctl is-active v6-alpha-memo-live.service
   systemctl is-active v6-fullraw-search.service
 '
 ```
 
 Do not restart `v6-fullraw-search.service` during normal V6 code deploys; its strict sweeps need uninterrupted runtime.
-Only install/restart `deploy/v6-fullraw-search.service` during an explicit fullraw config deploy window.
+During an explicit fullraw config window, install `deploy/v6-fullraw-search.service` as both
+`v6-fullraw-search.service` and `v6-fullraw-search-recovery.service`, then reload systemd.
 Do not restart or edit V3/V4/V5 services as part of V6 work.
 
 ## Recommended GPT Pro Audit Prompt

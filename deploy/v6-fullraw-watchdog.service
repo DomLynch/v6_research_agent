@@ -1,0 +1,18 @@
+[Unit]
+Description=V6 fullraw progress and recovery watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/v6-research-agent
+Environment=PYTHONPATH=/opt/v6-research-agent/src
+EnvironmentFile=-/etc/researka-fullraw.env
+Environment=V6_FULLRAW_SWEEP_CACHE_DIR=/var/lib/v6-research-agent/fullraw-sweep-cache
+Environment=V6_FULLRAW_WATCHDOG_STATE_PATH=/var/lib/v6-research-agent/daemon/fullraw-watchdog.json
+Environment=V6_FULLRAW_WATCHDOG_STALE_SECONDS=5400
+Environment=V6_FULLRAW_WATCHDOG_HEALTH_FAILURES=3
+Environment=V6_FULLRAW_WATCHDOG_COOLDOWN_SECONDS=21600
+Environment=V6_FULLRAW_WATCHDOG_MAX_RESTARTS=2
+Environment=V6_FULLRAW_WATCHDOG_RESTART_WINDOW_SECONDS=86400
+ExecStart=/opt/v6-research-agent/.venv/bin/python /opt/v6-research-agent/scripts/v6_fullraw_watchdog.py --recover

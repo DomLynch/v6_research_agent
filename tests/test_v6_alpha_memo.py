@@ -22,6 +22,7 @@ from v6_alpha_memo import (
     score_pairs,
 )
 from v6_alpha_memo import daemon as v6_daemon
+from v6_alpha_memo import fullraw_watchdog as v6_fullraw_watchdog
 from v6_alpha_memo import run as v6_run
 from v6_alpha_memo import score as v6_score
 from v6_alpha_memo import search as v6_search
@@ -6620,3 +6621,152 @@ def test_watchdog_systemd_timer_is_wired() -> None:
     assert "scripts/v6_publish_watchdog.py" in service
     assert "OnUnitActiveSec=1h" in timer
     assert "v6-publish-watchdog.service" in timer
+
+
+def test_fullraw_watchdog_requires_repeated_stall_before_restart() -> None:
+    health = {"ok": True, "async_sweep": {"inflight_count": 2, "queued_count": 1}}
+    progress = {"files": 2, "total_shards": 100, "completed": 0}
+    first = v6_fullraw_watchdog.evaluate_status(
+        health=health,
+        progress=progress,
+        previous={},
+        now=100,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+    waiting = v6_fullraw_watchdog.evaluate_status(
+        health=health,
+        progress=progress,
+        previous=first,
+        now=180,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+    stalled = v6_fullraw_watchdog.evaluate_status(
+        health=health,
+        progress=progress,
+        previous=waiting,
+        now=191,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+
+    assert first["action"] == "progressing"
+    assert waiting["action"] == "observe"
+    assert stalled["action"] == "restart"
+    assert stalled["restart_times"] == []
+
+
+def test_fullraw_watchdog_resets_stall_on_progress() -> None:
+    health = {"ok": True, "async_sweep": {"inflight_count": 1, "queued_count": 0}}
+    previous = {
+        "progress_signature": "2:100:0",
+        "stalled_since": 100,
+        "restart_times": [],
+    }
+
+    status = v6_fullraw_watchdog.evaluate_status(
+        health=health,
+        progress={"files": 2, "total_shards": 101, "completed": 0},
+        previous=previous,
+        now=1000,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+
+    assert status["action"] == "progressing"
+    assert status["stalled_since"] == 1000
+
+
+def test_fullraw_watchdog_enforces_health_threshold_cooldown_and_budget() -> None:
+    progress = {"files": 0, "total_shards": 0, "completed": 0}
+    previous: dict[str, object] = {"health_failures": 2, "restart_times": []}
+    restart = v6_fullraw_watchdog.evaluate_status(
+        health={},
+        progress=progress,
+        previous=previous,
+        now=1000,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+    restart["restart_times"] = [1000]
+    cooldown = v6_fullraw_watchdog.evaluate_status(
+        health={},
+        progress=progress,
+        previous=restart,
+        now=1100,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=600,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+    budget_previous = {"health_failures": 2, "restart_times": [100, 700]}
+    budget = v6_fullraw_watchdog.evaluate_status(
+        health={},
+        progress=progress,
+        previous=budget_previous,
+        now=1000,
+        stale_seconds=90,
+        health_failures_before_restart=3,
+        cooldown_seconds=0,
+        max_restarts=2,
+        restart_window_seconds=3600,
+    )
+
+    assert restart["action"] == "restart"
+    assert cooldown["action"] == "restart_cooldown"
+    assert budget["action"] == "restart_budget_exhausted"
+
+
+def test_fullraw_watchdog_cache_progress_and_systemd_wiring(tmp_path: Path) -> None:
+    (tmp_path / "one.json").write_text(json.dumps({"receipt": {"shards_searched": 12, "shards_total": 20}}))
+    (tmp_path / "two.json").write_text(json.dumps({"receipt": {"shards_searched": 20, "shards_total": 20}}))
+
+    assert v6_fullraw_watchdog.cache_progress(tmp_path) == {"files": 2, "total_shards": 32, "completed": 1}
+    service = Path("deploy/v6-fullraw-watchdog.service").read_text()
+    timer = Path("deploy/v6-fullraw-watchdog.timer").read_text()
+    fullraw = Path("deploy/v6-fullraw-search.service").read_text()
+    assert "V6_FULLRAW_WATCHDOG_STALE_SECONDS=5400" in service
+    assert "V6_FULLRAW_WATCHDOG_COOLDOWN_SECONDS=21600" in service
+    assert "V6_FULLRAW_WATCHDOG_MAX_RESTARTS=2" in service
+    assert "v6_fullraw_watchdog.py --recover" in service
+    assert "OnUnitActiveSec=10min" in timer
+    assert "KillMode=mixed" in fullraw
+    assert "TimeoutStopSec=30" in fullraw
+
+
+def test_fullraw_watchdog_restart_requires_recovered_health(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Completed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    responses = iter(({}, {"ok": True}))
+    monkeypatch.setattr("v6_alpha_memo.fullraw_watchdog.subprocess.run", lambda *args, **kwargs: Completed())
+    monkeypatch.setattr(v6_fullraw_watchdog, "_fetch_health", lambda *args, **kwargs: next(responses))
+    monkeypatch.setattr("v6_alpha_memo.fullraw_watchdog.time.sleep", lambda seconds: None)
+
+    recovered, error = v6_fullraw_watchdog.restart_service(
+        "v6-fullraw-search.service",
+        health_url="http://127.0.0.1:9918/health",
+        health_timeout=1,
+    )
+
+    assert recovered is True
+    assert error == ""
