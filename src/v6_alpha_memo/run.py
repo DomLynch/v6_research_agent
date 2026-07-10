@@ -18,7 +18,7 @@ from v6_alpha_memo.search import (
     Paper,
     SearchResult,
     _fullraw_min_shards_searched,
-    _fullraw_require_complete_search,
+    _fullraw_min_sources_searched,
     merge_results,
     query_shapes,
 )
@@ -79,7 +79,9 @@ def build_memo(
         )
         if preview and _topic_fit(preview[0], topic_terms) and preview[0].score >= 85 and len(collected) >= min_stop_queries:
             break
-        if _complete_required_but_incomplete(result.receipt):
+        if _incomplete_fullraw_coverage(result.receipt):
+            break
+        if _completed_coverage_count(collected) >= max(1, _int_env("V6_DAEMON_MIN_COMPLETED_SHAPES", 3)):
             break
         if result.receipt.error == "async_sweep_queue_full":
             break
@@ -224,8 +226,8 @@ def _waitable_search_error(error: str) -> bool:
     return error.startswith(("async_sweep_", "fullraw_incomplete:", "fullraw_low_source_count:")) or error == "fullraw_partial"
 
 
-def _complete_required_but_incomplete(receipt: CoverageReceipt) -> bool:
-    if not _fullraw_require_complete_search() or receipt.error:
+def _incomplete_fullraw_coverage(receipt: CoverageReceipt) -> bool:
+    if receipt.error == "async_sweep_stopped_no_hits" or receipt.async_status == "stopped_no_hits":
         return False
     if not (receipt.partial or receipt.shards_searched or receipt.shards_total):
         return False
@@ -235,6 +237,21 @@ def _complete_required_but_incomplete(receipt: CoverageReceipt) -> bool:
         or receipt.shards_searched < min_shards
         or receipt.shards_total < min_shards
         or receipt.shards_searched != receipt.shards_total
+    )
+
+
+def _completed_coverage_count(results: list[SearchResult]) -> int:
+    min_shards = _fullraw_min_shards_searched()
+    min_sources = _fullraw_min_sources_searched()
+    return sum(
+        not result.receipt.error
+        and not result.receipt.partial
+        and result.receipt.shards_searched >= min_shards
+        and result.receipt.shards_total >= min_shards
+        and result.receipt.shards_searched == result.receipt.shards_total
+        and result.receipt.sweep_failed_shards == 0
+        and result.receipt.source_count_searched >= min_sources
+        for result in results
     )
 
 

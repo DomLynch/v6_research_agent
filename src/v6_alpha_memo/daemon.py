@@ -20,9 +20,8 @@ from v6_alpha_memo.search import (
     Paper,
     _fullraw_min_shards_searched,
     _fullraw_min_sources_searched,
-    _fullraw_require_complete_search,
     completed_cached_result,
-    strict_source_diverse_partial_coverage,
+    strict_no_hit_stop_coverage,
 )
 from v6_alpha_memo.write import render_memo, render_with_minimax, validate_memo_against_pair
 
@@ -991,6 +990,8 @@ def _save_board(run_dir: Path, board: dict[str, object]) -> None:
 def _blocked_stage(trace: dict[str, object]) -> str:
     coverage = trace.get("coverage")
     if isinstance(coverage, list) and coverage:
+        if any(_waitable_coverage(item) for item in coverage if isinstance(item, dict)):
+            return "search_cache_waiting"
         strict_count = sum(1 for item in coverage if _strict_coverage(item))
         if strict_count:
             if (
@@ -1000,8 +1001,6 @@ def _blocked_stage(trace: dict[str, object]) -> str:
                 and _int(trace.get("pair_count")) > 0
             ):
                 return "selector_rejected"
-            if any(_waitable_coverage(item) for item in coverage):
-                return "search_cache_waiting"
             if (
                 _int(trace.get("scored_count")) == 0
                 and _int(trace.get("paper_count")) > 0
@@ -1011,8 +1010,6 @@ def _blocked_stage(trace: dict[str, object]) -> str:
             return "selector_rejected"
         error = coverage[-1].get("error") if isinstance(coverage[-1], dict) else ""
         error_text = str(error)
-        if any(_waitable_coverage(item) for item in coverage if isinstance(item, dict)):
-            return "search_cache_waiting"
         if error_text == "async_sweep_stopped_no_hits" and not _waitable_coverage(coverage[-1]):
             return "selector_rejected"
         if (
@@ -1077,13 +1074,14 @@ def _waitable_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
     error_text = str(value.get("error") or "")
-    if _complete_required_but_incomplete(value):
-        return True
-    if error_text == "async_sweep_stopped_no_hits":
+    if error_text == "async_sweep_stopped_no_hits" or str(value.get("async_status") or "") == "stopped_no_hits":
         return False
+    if _incomplete_fullraw_coverage(value):
+        return True
     return (
         error_text.startswith("async_sweep_")
         or error_text.startswith("fullraw_incomplete")
+        or error_text == "fullraw_partial"
         or "Connection refused" in error_text
         or error_text.startswith(("URLError:", "TimeoutError:", "ConnectionResetError:"))
     )
@@ -1092,7 +1090,7 @@ def _waitable_coverage(value: object) -> bool:
 def _strict_coverage(value: object) -> bool:
     if not isinstance(value, dict):
         return False
-    if not _fullraw_require_complete_search() and strict_source_diverse_partial_coverage(value):
+    if strict_no_hit_stop_coverage(value):
         return True
     return (
         not value.get("error")
@@ -1104,8 +1102,8 @@ def _strict_coverage(value: object) -> bool:
     )
 
 
-def _complete_required_but_incomplete(value: dict[str, object]) -> bool:
-    if not _fullraw_require_complete_search() or value.get("error"):
+def _incomplete_fullraw_coverage(value: dict[str, object]) -> bool:
+    if strict_no_hit_stop_coverage(value) or value.get("error"):
         return False
     if _int(value.get("sweep_failed_shards")):
         return False

@@ -318,6 +318,7 @@ ssh -i ~/.ssh/binance_futures_tool root@100.96.74.1 '
   .venv/bin/ruff check src tests
   .venv/bin/mypy src tests/test_v6_alpha_memo.py
   install -m 0644 deploy/v6-alpha-memo-live.service /etc/systemd/system/v6-alpha-memo-live.service
+  rm -f /etc/systemd/system/v6-alpha-memo-live.service.d/40-partial-coverage.conf
   systemctl daemon-reload
   systemctl restart v6-alpha-memo-live.service
   systemctl is-active v6-alpha-memo-live.service

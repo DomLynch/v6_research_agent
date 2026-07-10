@@ -3150,7 +3150,9 @@ def test_build_memo_caps_empty_waitable_fanout() -> None:
     assert [row["error"] for row in coverage] == ["async_sweep_queued"]
 
 
-def test_build_memo_stops_nonempty_incomplete_required_fanout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_memo_stops_nonempty_incomplete_fanout_even_when_complete_flag_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class PartialHitClient:
         def __init__(self) -> None:
             self.queries: list[str] = []
@@ -3179,7 +3181,7 @@ def test_build_memo_stops_nonempty_incomplete_required_fanout(monkeypatch: pytes
             )
 
     client = PartialHitClient()
-    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
     with pytest.raises(NoMemoError) as exc:
         build_memo("early goal directed therapy sepsis mortality", client=client, query_limit=4)
 
@@ -3187,6 +3189,32 @@ def test_build_memo_stops_nonempty_incomplete_required_fanout(monkeypatch: pytes
     assert client.queries == ["early goal directed therapy sepsis mortality"]
     assert coverage[0]["shards_searched"] == 1247
     assert coverage[0]["partial"] is True
+
+
+def test_build_memo_stops_after_configured_completed_shape_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    class CompleteEmptyClient:
+        def __init__(self) -> None:
+            self.queries: list[str] = []
+
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            self.queries.append(query)
+            return SearchResult(
+                query,
+                (),
+                CoverageReceipt(
+                    shards_searched=1525,
+                    shards_total=1525,
+                    source_count_searched=5,
+                ),
+            )
+
+    client = CompleteEmptyClient()
+    monkeypatch.setenv("V6_DAEMON_MIN_COMPLETED_SHAPES", "2")
+    with pytest.raises(NoMemoError):
+        build_memo("generic randomized intervention mortality", client=client, query_limit=4)
+
+    assert len(client.queries) == 2
 
 
 def test_build_memo_empty_waitable_fanout_has_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -4830,8 +4858,8 @@ def test_daemon_treats_useful_no_hit_sweep_stop_as_strict_coverage(monkeypatch: 
     assert v6_daemon._waitable_coverage(item) is False
 
 
-def test_daemon_waits_on_partial_hit_coverage_when_complete_required(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+def test_daemon_waits_on_partial_hit_coverage_even_when_complete_flag_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
     item: dict[str, object] = {
         "hits": 25,
         "async_status": "hit",
@@ -4854,11 +4882,11 @@ def test_daemon_waits_on_partial_hit_coverage_when_complete_required(monkeypatch
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_does_not_submit_publishable_pair_from_incomplete_required_coverage(
+def test_daemon_does_not_submit_publishable_pair_from_incomplete_coverage_when_flag_is_off(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "1")
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", "0")
     pair = CandidatePair(
         a=Paper("a", "Interventionx improved mortality", "Results showed interventionx improved mortality.", "openalex", doi="10.1000/a"),
         b=Paper("b", "Interventionx failed mortality", "Results showed interventionx failed mortality.", "pubmed", doi="10.1000/b"),
@@ -4925,7 +4953,7 @@ def test_daemon_waits_for_queued_side_search_after_strict_receipt() -> None:
     assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
-def test_daemon_rejects_zero_yield_after_enough_completed_shapes_even_with_side_search() -> None:
+def test_daemon_waits_for_side_search_after_enough_completed_shapes() -> None:
     trace: dict[str, object] = {
         "paper_count": 9,
         "pair_count": 36,
@@ -4959,7 +4987,7 @@ def test_daemon_rejects_zero_yield_after_enough_completed_shapes_even_with_side_
         ],
     }
 
-    assert v6_daemon._blocked_stage(trace) == "selector_rejected"
+    assert v6_daemon._blocked_stage(trace) == "search_cache_waiting"
 
 
 def test_daemon_final_rejects_after_enough_completed_shapes_with_zero_scored_pairs() -> None:
