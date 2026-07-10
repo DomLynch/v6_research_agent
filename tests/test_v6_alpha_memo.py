@@ -6284,7 +6284,8 @@ def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
     assert "Environment=RESEARKA_FULLRAW_SWEEP_WORKERS=8" in service
     assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=32" in service
     assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=2" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=0" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=1" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_MAX_INFLIGHT=3" in service
     assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=4" in service
     assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=900" in service
     assert "RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20" in service
