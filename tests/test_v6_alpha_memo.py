@@ -6449,6 +6449,7 @@ def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
     assert "RESEARKA_FULLRAW_SWEEP_INFLIGHT_STALE_SECONDS=3600" in service
     assert "RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=1800" in service
     assert "RESEARKA_FULLRAW_SHARD_CACHE_COPY_TIMEOUT_SECONDS=1800" in service
+    assert "unset RESEARKA_FULLRAW_SHARD_LOCAL_CACHE_DIR V5_MEMO_FULL_RAW_SHARD_LOCAL_CACHE_DIR" in service
 
 
 def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
