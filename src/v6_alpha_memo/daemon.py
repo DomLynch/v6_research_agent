@@ -518,15 +518,15 @@ def _cache_ready_topics(rows: list[dict[str, object]]) -> set[str]:
 
 
 def _waiting_rank(row: dict[str, object]) -> int:
-    if row.get("blocked_stage") != "search_cache_waiting":
-        return 2
-    return 0 if _int(row.get("wait_shards")) else 1
+    if _int(row.get("wait_shards")):
+        return 0
+    return 1 if row.get("blocked_stage") == "search_cache_waiting" else 2
 
 
 def _refresh_wait_progress_from_cache(rows: list[dict[str, object]], topics: tuple[str, ...]) -> None:
     progress = _cache_wait_progress(topics)
     for row in rows:
-        if row.get("blocked_stage") != "search_cache_waiting":
+        if row.get("submitted") or row.get("public") or row.get("blocked_final"):
             continue
         shards = progress.get(str(row.get("topic")))
         if shards and shards > _int(row.get("wait_shards")):

@@ -5594,6 +5594,39 @@ def test_daemon_refreshes_wait_progress_from_primary_cache(
     assert [row["topic"] for row in selected] == ["ACCORD intensive glucose control mortality type 2 diabetes"]
 
 
+def test_daemon_prioritizes_reopened_row_with_more_cached_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "reopened.json").write_text(json.dumps({
+        "hits": [{"title": "A"}],
+        "receipt": {
+            "sweep_original_query": "reopened trial mortality outcome",
+            "shards_searched": 1500,
+            "shards_total": 1525,
+        },
+    }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("V6_DAEMON_ACTIVE_TOPIC_LIMIT", "1")
+    rows: list[dict[str, object]] = [
+        {
+            "topic": "current trial mortality outcome",
+            "blocked_stage": "search_cache_waiting",
+            "wait_shards": 700,
+        },
+        {"topic": "reopened trial mortality outcome"},
+    ]
+    topics = tuple(str(row["topic"]) for row in rows)
+
+    v6_daemon._refresh_wait_progress_from_cache(rows, topics)
+    selected = v6_daemon._candidate_rows(rows, topics)
+
+    assert rows[1]["wait_shards"] == 1500
+    assert [row["topic"] for row in selected] == ["reopened trial mortality outcome"]
+
+
 def test_daemon_prioritizes_completed_cache_topic_over_partial_waiter(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
