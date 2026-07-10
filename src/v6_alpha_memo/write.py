@@ -27,6 +27,14 @@ _SHAPE_TITLE = {
     "subgroup_endpoint_split": "endpoint split",
     "translation_boundary": "cross-context signal",
 }
+_SHAPE_TITLE_CLAUSE = {
+    "mechanism_to_human_failure": "evidence differs between model and human settings",
+    "modality_boundary": "evidence changes across measurement modalities",
+    "promise_reversal": "evidence changes with study context",
+    "protocol_result_mismatch": "evidence changes with study context",
+    "subgroup_endpoint_split": "evidence varies with population or endpoint definition",
+    "translation_boundary": "evidence changes across experimental contexts",
+}
 _TITLE_OVERCLAIM = re.compile(
     r"\b(?:blunts?|improves?|increases?|mimics?|protects?|reduces?|translation boundary)\b",
     flags=re.IGNORECASE,
@@ -152,11 +160,9 @@ def judge_with_minimax(top_pairs: tuple[ScoredPair, ...]) -> tuple[ScoredPair, .
 
 
 def _title(scored: ScoredPair) -> str:
-    anchor = " ".join(_title_terms(scored)[:4]) or "receipt pair"
-    shape = _SHAPE_TITLE.get(scored.shape, "evidence boundary")
-    if shape not in anchor:
-        anchor = f"{anchor} {shape}"
-    return f"Alpha memo: {anchor}"
+    anchor = " ".join(_title_terms(scored)[:3]) or "receipt pair"
+    clause = _SHAPE_TITLE_CLAUSE.get(scored.shape, "evidence changes across contexts")
+    return f"Alpha memo: {anchor} {clause}"
 
 
 def _title_terms(scored: ScoredPair) -> tuple[str, ...]:

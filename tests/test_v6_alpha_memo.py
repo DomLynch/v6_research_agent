@@ -3714,7 +3714,8 @@ def test_title_prefers_specific_shared_receipt_terms() -> None:
         (),
     )
 
-    assert v6_write._title(scored) == "Alpha memo: nicotinamide riboside exercise performance context boundary"
+    assert v6_write._title(scored) == "Alpha memo: nicotinamide riboside exercise evidence changes with study context"
+    assert "mechanical_shape_title" not in v6_write.validate_memo_against_pair(v6_write.render_memo(scored), scored)
 
 
 def test_title_hides_internal_protocol_mismatch_label() -> None:
@@ -3733,7 +3734,7 @@ def test_title_hides_internal_protocol_mismatch_label() -> None:
 
     title = v6_write._title(scored)
 
-    assert title == "Alpha memo: resveratrol exercise context boundary"
+    assert title == "Alpha memo: resveratrol exercise evidence changes with study context"
     assert "protocol mismatch" not in title
 
 
@@ -3753,7 +3754,7 @@ def test_translation_boundary_title_uses_cautious_public_label() -> None:
 
     title = v6_write._title(scored)
 
-    assert title == "Alpha memo: resveratrol exercise cross-context signal"
+    assert title == "Alpha memo: resveratrol exercise evidence changes across experimental contexts"
     assert "translation boundary" not in title
 
 
@@ -3926,7 +3927,7 @@ def test_mechanism_to_human_title_uses_cross_context_signal() -> None:
         (),
     )
 
-    assert v6_write._title(scored) == "Alpha memo: resveratrol exercise cross-context evidence signal"
+    assert v6_write._title(scored) == "Alpha memo: resveratrol exercise evidence differs between model and human settings"
 
 
 def test_minimax_writer_falls_back_on_malformed_memo(monkeypatch: pytest.MonkeyPatch) -> None:
