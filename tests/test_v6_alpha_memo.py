@@ -2037,14 +2037,39 @@ def test_fullraw_client_rejects_low_source_no_hit_stop() -> None:
     assert result.papers == ()
 
 
-def test_fullraw_client_uses_source_diverse_partial_cache(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+@pytest.mark.parametrize(
+    ("require_complete", "async_status", "expected_calls", "expected_error"),
+    (("0", "hit", 0, ""), ("1", "queued", 1, "async_sweep_queued"), ("1", "running", 1, "async_sweep_running")),
+)
+def test_fullraw_client_handles_source_diverse_partial_cache_by_coverage_policy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    require_complete: str,
+    async_status: str,
+    expected_calls: int,
+    expected_error: str,
 ) -> None:
     cache_dir = tmp_path / "cache"
     extra_dir = tmp_path / "extra"
     cache_dir.mkdir()
     extra_dir.mkdir()
     query = "ACCORD intensive glucose control mortality type 2 diabetes"
+    receipt = {
+        "sweep_original_query": query,
+        "shards_searched": 1522,
+        "shards_total": 1525,
+        "source_count_searched": 5,
+        "sources_searched": {
+            "openalex": 1,
+            "pubmed": 1,
+            "semantic_scholar": 1,
+            "semantic_scholar_abstracts": 1,
+            "biorxiv": 1,
+        },
+        "partial_shard_search": True,
+        "sweep_failed_shards": 0,
+        "sweep_result_limit": 25,
+    }
     (cache_dir / "accord.json").write_text(json.dumps({
         "hits": [
             {
@@ -2060,36 +2085,39 @@ def test_fullraw_client_uses_source_diverse_partial_cache(
                 "doi": "10.1000/accord-cache-b",
             },
         ],
-        "receipt": {
-            "sweep_original_query": query,
-            "shards_searched": 1005,
-            "shards_total": 1525,
-            "source_count_searched": 5,
-            "sources_searched": {
-                "openalex": 1,
-                "pubmed": 1,
-                "semantic_scholar": 1,
-                "semantic_scholar_abstracts": 1,
-                "biorxiv": 1,
-            },
-            "partial_shard_search": True,
-            "sweep_failed_shards": 0,
-            "sweep_result_limit": 25,
-        },
+        "receipt": receipt,
     }))
     monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
     monkeypatch.setenv("V6_FULLRAW_EXTRA_SWEEP_CACHE_DIRS", str(extra_dir))
+    monkeypatch.setenv("V6_FULLRAW_REQUIRE_COMPLETE", require_complete)
+    calls = 0
 
     def opener(request: Request, timeout: float) -> _Response:
+        nonlocal calls
         del request, timeout
-        raise AssertionError("source-diverse cache should satisfy the search before endpoint fetch")
+        calls += 1
+        return _Response({
+            "meta": {
+                "async_sweep": {
+                    "status": async_status,
+                    "key_queued": async_status == "queued",
+                    "key_running": async_status == "running",
+                },
+                "shard_receipt": receipt,
+            },
+            "results": [],
+        })
 
-    result = FullrawSearchClient(search_url="http://fullraw/search", token="token", opener=opener).search(query, limit=25)
+    result = FullrawSearchClient(
+        search_url="http://fullraw/search",
+        token="token",
+        opener=opener,
+    ).search(query, limit=25)
 
-    assert result.receipt.error == ""
-    assert result.receipt.partial is True
-    assert result.receipt.source_count_searched == 5
-    assert len(result.papers) == 2
+    assert calls == expected_calls
+    assert result.receipt.error == expected_error
+    assert result.receipt.shards_searched == 1522
+    assert len(result.papers) == (2 if require_complete == "0" else 0)
 
 
 def test_fullraw_client_backfills_missing_abstract_by_doi(monkeypatch: pytest.MonkeyPatch) -> None:

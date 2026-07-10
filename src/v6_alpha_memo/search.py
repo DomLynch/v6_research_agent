@@ -466,7 +466,11 @@ def _completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
             payload = {"meta": {"async_sweep": {"status": "hit"}, "shard_receipt": receipt}, "results": data.get("hits", [])}
             parsed = [paper for item in _items(payload)[:limit] if (paper := _parse_paper(item)) is not None]
             papers = _filter_query_papers(parsed, query)
-            if _coverage_error(payload) and not _strict_source_diverse_partial_result(payload, len(papers)):
+            coverage_error = _coverage_error(payload)
+            if coverage_error and (
+                _fullraw_require_complete_search()
+                or not _strict_source_diverse_partial_result(payload, len(papers))
+            ):
                 continue
             result = SearchResult(query=query, papers=papers, receipt=_receipt(payload, hits=len(papers)))
             if papers and (match_kind == "exact" or _result_matches_query(result, query)):
@@ -583,6 +587,8 @@ def _parsed_papers(data: object) -> list[Paper]:
 
 def _empty_partial_stop(data: object, papers: tuple[Paper, ...]) -> bool:
     if papers:
+        return False
+    if not _items(data):
         return False
     receipt = _receipt(data, hits=0)
     threshold = _int(os.environ.get("V6_FULLRAW_EMPTY_PARTIAL_STOP_SHARDS")) or 512
