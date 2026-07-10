@@ -233,6 +233,7 @@ class FullrawSearchClient:
 def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
     """Turn a domain/topic seed into targeted novelty-search shapes."""
     seed = " ".join(seed.split())
+    identifier_query = _trial_identifier_query(seed)
     words = seed.split()
     compact = " ".join(words[:4])
     alpha_seed = f"{seed} null failed primary endpoint"
@@ -247,8 +248,23 @@ def query_shapes(seed: str, *, limit: int = 8) -> tuple[str, ...]:
         "{seed} same intervention different modality adaptation",
     )
     shaped = tuple(template.format(seed=seed) for template in templates if seed)
-    queries = [seed, *shaped[:2], compact, *shaped[2:]]
-    return tuple(dict.fromkeys(queries))[: max(1, limit)]
+    queries = [identifier_query, seed, *shaped[:2], compact, *shaped[2:]]
+    return tuple(dict.fromkeys(query for query in queries if query))[: max(1, limit)]
+
+
+def _trial_identifier_query(seed: str) -> str:
+    identifiers: list[str] = []
+    seen: set[str] = set()
+    for raw in seed.split():
+        token = raw.strip(".,;:()[]{}")
+        if len("".join(char for char in token if char.isalnum())) < 2 or not token[0].isalnum():
+            continue
+        is_identifier = token.isupper() or any(char.isupper() for char in token[1:]) or any(char.isdigit() for char in token)
+        key = token.casefold()
+        if is_identifier and key not in seen:
+            identifiers.append(token)
+            seen.add(key)
+    return " ".join(identifiers[:3])
 
 
 def _http_error_json(exc: HTTPError) -> object:

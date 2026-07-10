@@ -100,6 +100,32 @@ def test_query_shapes_preserve_full_non_gero_seed_first() -> None:
     assert queries[2] == "cold water immersion resistance training mechanism model human failed translation"
 
 
+def test_query_shapes_prioritize_generic_trial_identifiers() -> None:
+    queries = query_shapes(
+        "intervention mortality ALPHA-2 BeTA9 GAMMA",
+        limit=3,
+    )
+
+    assert queries == (
+        "ALPHA-2 BeTA9 GAMMA",
+        "intervention mortality ALPHA-2 BeTA9 GAMMA",
+        "intervention mortality ALPHA-2 BeTA9 GAMMA null failed primary endpoint",
+    )
+    assert query_shapes("prevention outcome SELECT", limit=1) == ("SELECT",)
+
+
+def test_query_shapes_drop_empty_identifier_query() -> None:
+    queries = query_shapes("marketing attribution incrementality", limit=3)
+
+    assert queries[0] == "marketing attribution incrementality"
+    assert "" not in queries
+
+
+def test_query_shapes_ignore_single_letter_clinical_tokens() -> None:
+    assert query_shapes("vitamin D fracture randomized trial", limit=1) == ("vitamin D fracture randomized trial",)
+    assert query_shapes("protein C mortality PROWESS PROWESS-SHOCK", limit=1) == ("PROWESS PROWESS-SHOCK",)
+
+
 def test_query_shapes_keep_short_compound_head_together() -> None:
     queries = query_shapes("omega 3 atrial fibrillation cardiovascular prevention", limit=3)
     vitamin_queries = query_shapes("vitamin D fracture randomized trial", limit=3)
