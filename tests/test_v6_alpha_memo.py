@@ -6307,8 +6307,8 @@ def test_live_service_config_uses_focused_strict_search() -> None:
     text = Path("deploy/v6-alpha-memo-live.service").read_text()
 
     assert "Environment=V6_DAEMON_MIN_SCORE=85" in text
-    assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=3" in text
-    assert "Environment=V6_DAEMON_MAX_WAITING=3" in text
+    assert "Environment=V6_DAEMON_ACTIVE_TOPIC_LIMIT=1" in text
+    assert "Environment=V6_DAEMON_MAX_WAITING=1" in text
     assert "Environment=V6_DAEMON_QUERY_LIMIT=4" in text
     assert "Environment=V6_DAEMON_PER_QUERY_LIMIT=25" in text
     assert "Environment=V6_DAEMON_MIN_COMPLETED_SHAPES=2" in text
@@ -6346,11 +6346,11 @@ def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
 
     assert "Environment=RESEARKA_FULLRAW_SWEEP_WORKERS=8" in service
     assert "Environment=RESEARKA_FULLRAW_SWEEP_PASS_SHARD_LIMIT=32" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=2" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=1" in service
-    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_MAX_INFLIGHT=3" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_INFLIGHT=1" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_BURST=0" in service
+    assert "Environment=RESEARKA_FULLRAW_SWEEP_PRIORITY_MAX_INFLIGHT=1" in service
     assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=4" in service
-    assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=900" in service
+    assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=1800" in service
     assert "RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20" in service
     assert "RESEARKA_FULLRAW_SHARD_CACHE_COPY_TIMEOUT_SECONDS=600" in service
 
