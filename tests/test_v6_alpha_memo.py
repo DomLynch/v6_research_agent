@@ -3509,6 +3509,44 @@ def test_build_memo_continues_after_no_hit_sweep_stop() -> None:
     assert coverage[0]["error"] == "async_sweep_stopped_no_hits"
 
 
+def test_build_memo_prioritizes_query_shape_with_most_cached_progress(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    topic = "activated protein C severe sepsis mortality PROWESS PROWESS-SHOCK"
+    for name, query, shards in (
+        ("identifier", "PROWESS PROWESS-SHOCK", 680),
+        ("topic", topic, 1390),
+    ):
+        (cache_dir / f"{name}.json").write_text(json.dumps({
+            "receipt": {
+                "sweep_original_query": query,
+                "sweep_query": query,
+                "shards_searched": shards,
+                "shards_total": 1525,
+            },
+        }))
+    monkeypatch.setenv("V6_FULLRAW_SWEEP_CACHE_DIR", str(cache_dir))
+    seen: list[str] = []
+
+    class PartialClient:
+        def search(self, query: str, *, limit: int = 25) -> SearchResult:
+            del limit
+            seen.append(query)
+            return SearchResult(
+                query,
+                (),
+                CoverageReceipt(partial=True, shards_searched=1390, shards_total=1525, error="async_sweep_running"),
+            )
+
+    with pytest.raises(NoMemoError):
+        build_memo(topic, client=PartialClient(), query_limit=2)
+
+    assert seen == [topic]
+
+
 def test_build_memo_stops_query_fanout_on_non_waitable_search_error() -> None:
     class ErrorClient:
         def __init__(self) -> None:

@@ -19,6 +19,7 @@ from v6_alpha_memo.search import (
     SearchResult,
     _fullraw_min_shards_searched,
     _fullraw_min_sources_searched,
+    cached_query_progress,
     merge_results,
     query_shapes,
 )
@@ -70,7 +71,9 @@ def build_memo(
     waitable_empty = 0
     min_stop_queries = max(1, _int_env("V6_MIN_QUERY_SHAPES_BEFORE_STOP", 2))
     max_empty_waitable = max(1, _int_env("V6_MAX_EMPTY_WAITABLE_QUERIES", 1))
-    for query in query_shapes(topic, limit=query_limit):
+    queries = query_shapes(topic, limit=query_limit)
+    queries = tuple(query for _, query in sorted(enumerate(queries), key=lambda item: (-cached_query_progress(item[1]), item[0])))
+    for query in queries:
         result = client.search(query, limit=per_query_limit)
         collected.append(result)
         preview = _publishable_pairs(

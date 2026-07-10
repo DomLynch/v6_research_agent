@@ -493,6 +493,23 @@ def completed_cached_result(query: str, *, limit: int) -> SearchResult | None:
     return _completed_cached_result(query, limit=limit)
 
 
+def cached_query_progress(query: str) -> int:
+    progress = 0
+    for cache_dir in _sweep_cache_dirs():
+        for path in Path(cache_dir).glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            receipt = data.get("receipt") if isinstance(data, dict) else None
+            if not isinstance(receipt, dict):
+                continue
+            cached_queries = {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}
+            if query in cached_queries:
+                progress = max(progress, _int(receipt.get("shards_searched")) or 0)
+    return progress
+
+
 def _result_rank(result: SearchResult) -> tuple[int, int]:
     return (len(result.papers), sum(_paper_rank(paper) for paper in result.papers))
 
