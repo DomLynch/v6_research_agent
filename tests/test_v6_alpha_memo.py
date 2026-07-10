@@ -6289,6 +6289,7 @@ def test_live_fullraw_service_config_matches_v6_throughput_window() -> None:
     assert "Environment=RESEARKA_FULLRAW_SWEEP_MAX_QUEUE=4" in service
     assert "RESEARKA_FULLRAW_SWEEP_TIMEOUT_SECONDS=900" in service
     assert "RESEARKA_FULLRAW_SWEEP_SHARD_TIMEOUT_SECONDS=20" in service
+    assert "RESEARKA_FULLRAW_SHARD_CACHE_COPY_TIMEOUT_SECONDS=600" in service
 
 
 def test_daemon_reopens_legacy_reviewer_revision_without_parent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
