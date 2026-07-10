@@ -490,6 +490,8 @@ def _cache_match_kind(query: str, receipt: dict[object, object]) -> str:
     cached_queries = {str(receipt.get("sweep_original_query") or ""), str(receipt.get("sweep_query") or "")}
     if query in cached_queries:
         return "exact"
+    if _trial_identifier_query(query) == query:
+        return ""
     request_ordered = _cache_match_ordered_terms(query)
     request_terms = set(request_ordered)
     cache_terms = _cache_match_terms(" ".join(cached_queries))

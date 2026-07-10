@@ -126,6 +126,17 @@ def test_query_shapes_ignore_single_letter_clinical_tokens() -> None:
     assert query_shapes("protein C mortality PROWESS PROWESS-SHOCK", limit=1) == ("PROWESS PROWESS-SHOCK",)
 
 
+def test_trial_identifier_query_requires_exact_cache_match() -> None:
+    broad_receipt: dict[object, object] = {
+        "sweep_original_query": "activated protein C severe sepsis mortality PROWESS PROWESS-SHOCK",
+        "sweep_query": "activated severe mortality",
+    }
+    exact_receipt: dict[object, object] = {"sweep_original_query": "PROWESS PROWESS-SHOCK"}
+
+    assert v6_search._cache_match_kind("PROWESS PROWESS-SHOCK", broad_receipt) == ""
+    assert v6_search._cache_match_kind("PROWESS PROWESS-SHOCK", exact_receipt) == "exact"
+
+
 def test_query_shapes_keep_short_compound_head_together() -> None:
     queries = query_shapes("omega 3 atrial fibrillation cardiovascular prevention", limit=3)
     vitamin_queries = query_shapes("vitamin D fracture randomized trial", limit=3)
